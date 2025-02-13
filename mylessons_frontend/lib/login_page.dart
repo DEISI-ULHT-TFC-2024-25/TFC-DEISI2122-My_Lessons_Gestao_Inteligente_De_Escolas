@@ -49,7 +49,7 @@ class _LoginPageState extends State<LoginPage> {
         _errorMessage = null;
       });
 
-      final Uri loginUrl = Uri.parse('$_apiBaseUrl/api/auth/login/'); // 🔥 Fix here
+      final Uri loginUrl = Uri.parse('$_apiBaseUrl/api/users/login/');
 
       final response = await http.post(
         loginUrl,
@@ -107,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
       print('ID Token: ${googleAuth.idToken}');  // Verifica se o token aparece no console
 
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:8000/api/auth/google/'),
+        Uri.parse('http://127.0.0.1:8000/api/users/google/'),
         headers: {
           'Content-Type': 'application/json',
         },

@@ -66,7 +66,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ? "http://127.0.0.1:8000" // Web (localhost)
         : (Platform.isAndroid ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000"); // Mobile
 
-    final Uri registerUrl = Uri.parse("$apiBaseUrl/api/auth/register/");
+    final Uri registerUrl = Uri.parse("$apiBaseUrl/api/users/register/");
 
     try {
       final response = await http.post(

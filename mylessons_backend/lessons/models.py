@@ -145,7 +145,7 @@ class GroupClass(models.Model):
     instructors = models.ManyToManyField(Instructor, related_name="group_classes")
     location = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, related_name="group_classes")
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='group_classes', blank=True, null=True)
-    type = models.CharField(max_length=50, default='group_lesson')
+    type = models.CharField(max_length=50, default='Group')
     sport = models.ForeignKey('sports.Sport', related_name='group_classes', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
@@ -458,7 +458,7 @@ class PrivateClass(models.Model):
     location = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name="private_classes")
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='private_classes', blank=True, null=True)
     pack = models.ForeignKey(PrivatePack, on_delete=models.CASCADE, related_name='classes', blank=True, null=True)
-    type = models.CharField(max_length=50, default='private_lesson')
+    type = models.CharField(max_length=50, default='Private')
     sport = models.ForeignKey('sports.Sport', related_name='private_classes', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):

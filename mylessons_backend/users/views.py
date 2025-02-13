@@ -3,13 +3,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import logging
 from django.contrib.auth.hashers import make_password
 from .models import UserAccount
 from .serializers import UserAccountSerializer
+from notifications.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -101,3 +102,31 @@ def register_user(request):
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    user = request.user  # Obtém o utilizador autenticado
+
+    # Conta as notificações não lidas
+    unread_notifications = Notification.objects.filter(user=user, date_read=None).count()
+
+    data = {
+        "id": user.id,
+        "first_name": user.first_name,
+        "notifications_count": unread_notifications
+    }
+
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_role(request):
+    user = request.user  # Obtém o utilizador autenticado
+
+    data = {
+        "current_role": user.current_role
+    }
+
+    return Response(data)

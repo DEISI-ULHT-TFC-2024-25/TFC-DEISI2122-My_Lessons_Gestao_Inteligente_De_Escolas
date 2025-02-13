@@ -1,3 +1,7 @@
 from django.shortcuts import render
 
-# Create your views here.
+def notifications(request):
+    return False
+
+def read_notification(request):
+    return False
