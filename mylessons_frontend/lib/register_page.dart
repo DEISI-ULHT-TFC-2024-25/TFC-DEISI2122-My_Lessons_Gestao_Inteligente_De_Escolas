@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io' show Platform; // Import for platform detection
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({Key? key}) : super(key: key);
+  const RegisterPage({super.key});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -19,6 +23,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final String _selectedCountryCode = "+351"; // Default Portugal
 
   // State for checkboxes.
   bool _dontReceiveMarketing = false;
@@ -48,23 +53,55 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // Example registration logic.
-  void _register() {
-    // TODO: Add your registration logic here.
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Registration"),
-        content: const Text("Registration logic goes here."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
-          )
-        ],
-      ),
-    );
+  Future<void> _register() async {
+    if (!_agreeTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You must accept the terms and conditions to proceed.")),
+      );
+      return;
+    }
+
+    // Dynamically determine the correct API base URL
+    final String apiBaseUrl = kIsWeb
+        ? "http://127.0.0.1:8000" // Web (localhost)
+        : (Platform.isAndroid ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000"); // Mobile
+
+    final Uri registerUrl = Uri.parse("$apiBaseUrl/api/auth/register/");
+
+    try {
+      final response = await http.post(
+        registerUrl,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": _emailController.text.trim(),
+          "password": _passwordController.text,
+          "first_name": _firstNameController.text.trim(),
+          "last_name": _lastNameController.text.trim(),
+          "country_code": _selectedCountryCode,
+          "phone": _phoneController.text.trim(),
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Registration successful!")),
+        );
+
+        // Redirect to login page
+        Navigator.pushReplacementNamed(context, "/login_success_page");
+      } else {
+        final errorMessage = jsonDecode(response.body)['error'] ?? "An error occurred.";
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $errorMessage")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Network error: $e")),
+      );
+    }
   }
+
 
   @override
   void dispose() {

@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io' show Platform; // Import for platform detection
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 
 class LoginPage extends StatefulWidget {
@@ -19,8 +21,17 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  // Update this to match your actual login endpoint.
-  final Uri _loginUrl = Uri.parse('http://127.0.0.1:8000/api/auth/login/');
+  // Dynamic API base URL
+  String get _apiBaseUrl {
+    if (kIsWeb) {
+      return 'http://127.0.0.1:8000'; // Web environment
+    } else if (Platform.isAndroid) {
+      return 'http://10.0.2.2:8000'; // Android Emulator
+    } else {
+      return 'http://127.0.0.1:8000'; // Default (iOS)
+    }
+  }
+
 
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
@@ -38,9 +49,10 @@ class _LoginPageState extends State<LoginPage> {
         _errorMessage = null;
       });
 
-      // Make HTTP POST to Django /api/auth/login/
+      final Uri loginUrl = Uri.parse('$_apiBaseUrl/api/auth/login/'); // 🔥 Fix here
+
       final response = await http.post(
-        _loginUrl,
+        loginUrl,
         body: {
           'username': email,
           'password': password,
@@ -48,14 +60,9 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (response.statusCode == 200) {
-        // If Django returns success, parse the response
         final data = jsonDecode(response.body);
-        // data might have a token, a user object, etc. 
-        // For now, we just show a success message or navigate away.
-        
         Navigator.pushReplacementNamed(context, '/login_success_page');
       } else {
-        // Show error
         final data = jsonDecode(response.body);
         setState(() {
           _errorMessage = data['error'] ?? 'Credenciais inválidas.';
@@ -71,6 +78,7 @@ class _LoginPageState extends State<LoginPage> {
       });
     }
   }
+
 
   // Google Sign-In Logic
   Future<void> _handleGoogleSignIn() async {

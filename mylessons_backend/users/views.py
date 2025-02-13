@@ -7,6 +7,9 @@ from rest_framework.permissions import AllowAny
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import logging
+from django.contrib.auth.hashers import make_password
+from .models import UserAccount
+from .serializers import UserAccountSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -66,3 +69,35 @@ def google_oauth_start(request):
     except Exception as e:
         logger.error(f'Erro inesperado: {e}')
         return Response({'error': f'Erro inesperado: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])  # Permite acesso sem autenticação
+def register_user(request):
+    """
+    Regista um novo utilizador na base de dados.
+    """
+    data = request.data
+
+    required_fields = ['email', 'password', 'first_name', 'last_name', 'country_code', 'phone']
+    missing_fields = [field for field in required_fields if field not in data]
+
+    if missing_fields:
+        return Response({'error': f'Missing fields: {", ".join(missing_fields)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = UserAccount.objects.create(
+            username=data['email'],
+            email=data['email'],
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            country_code=data['country_code'],
+            phone=data['phone'],
+            password=make_password(data['password']),
+        )
+
+        return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
