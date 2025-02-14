@@ -1,63 +1,66 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import PrivateClass, GroupClass
+from .models import PrivateClass, ClassTicket
 from datetime import datetime
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def upcoming_lessons(request):
-    user = request.user  # Get the logged-in parent
+    user = request.user
 
-    # Fetch upcoming private lessons
+    student_ids = user.students.values_list('id', flat=True)
+
     private_lessons = PrivateClass.objects.filter(
-        student__parent=user,
+        students__id__in=student_ids,
         date__gte=datetime.today()
-    ).order_by('date', 'time')
-    '''
-    # Fetch upcoming group lessons where the student is enrolled
-    group_lessons = GroupClass.objects.filter(
-        students__parent=user,
-        date__gte=datetime.today()
-    ).order_by('date', 'time')
+    ).order_by('date', 'start_time')
+    
+    group_lessons_tickets = ClassTicket.objects.filter(
+        student__id__in=student_ids,
+        group_class__date__gte=datetime.today()
+    ).order_by('group_class__date', 'group_class__start_time')
 
-    # Serialize private lessons
+    print(group_lessons_tickets)
+
     private_lessons_data = [
         {
             "id": lesson.id,
-            "title": f"{lesson.get_students_first_name()}'s Private Lesson {lesson.class_number} of {lesson.pack.number_of_classes}",
+            "students_name": f"{lesson.get_students_name()}",
+            "students_ids": f"{lesson.get_students_ids()}",
+            "type": lesson.type,
+            "lesson_number": lesson.class_number,
+            "number_of_lessons": lesson.pack.number_of_classes,
             "date": lesson.date.strftime("%d %b"),
             "time": lesson.start_time.strftime("%I:%M %p"),
-            "instructor_name": lesson.instructor.get_full_name() if lesson.instructor else "Unknown",
-            "instructor_phone": lesson.instructor.get_phone() if lesson.instructor else "Unknown",
+            "instructor_name": str(lesson.instructor) if lesson.instructor else "Unknown",
             "location_name": lesson.location.name if lesson.location else "Unknown",
             "location_link": lesson.location.link if lesson.location else "Unknown"
         }
         for lesson in private_lessons
     ]
 
-    # Serialize group lessons
     group_lessons_data = [
         {
             "id": ticket.id,
-            "title": f"{ticket.student.first_name}'s Group Lesson {ticket.lesson_number} of {lesson.})",
-            "date": lesson.date.strftime("%d %b"),
-            "time": lesson.time.strftime("%I:%M %p"),
-            "instructor_name": lesson.instructor.get_full_name() if lesson.instructor else "Unknown",
-            "instructor_phone": lesson.instructor.get_phone() if lesson.instructor else "Unknown",
-            "location_name": lesson.location.name if lesson.location else "Unknown"
+            "students_name": f"{ticket.student}",
+            "students_ids": f"[{ticket.student.id}]",
+            "type": ticket.group_class.type,
+            "lesson_number": ticket.ticket_number,
+            "number_of_lessons": ticket.pack.number_of_classes,
+            "date": ticket.group_class.date.strftime("%d %b"),
+            "time": ticket.group_class.start_time.strftime("%I:%M %p"),
+            "instructors_name": ticket.group_class.get_instructors_name() if ticket.group_class.instructors else "Unknown",
+            "location_name": ticket.group_class.location.name if ticket.group_class.location else "Unknown",
+            "location_link": ticket.group_class.location.link if ticket.group_class.location else "Unknown"
         }
         for ticket in group_lessons_tickets
     ]
-    '''
     
+    lessons_data = private_lessons_data + group_lessons_data
 
-    # Combine both lessons into a single response
-    #lessons_data = private_lessons_data + group_lessons_data
-
-    #return Response(lessons_data)
-    return False
+    return Response(lessons_data)
 
 def last_lessons(request):
     return False

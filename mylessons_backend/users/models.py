@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, date, time
 from django.contrib.auth.models import AbstractUser,  Group, Permission
 from django.db import models
+from .utils import get_phone
 
 from notifications.models import Notification
 
@@ -26,7 +27,7 @@ class UserAccount(AbstractUser):
     current_role = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.email})"
+        return f"{self.first_name} {self.last_name}"
 
 class Student(models.Model):
     id = models.AutoField(primary_key=True)
@@ -52,7 +53,10 @@ class Instructor(models.Model):
     user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name='instructor_profile')
 
     def __str__(self):
-        return f"Instructor: {self.user.first_name} {self.user.last_name}"
+        return f"{self.user.first_name} {self.user.last_name}"
+    
+    def get_phone(self):
+        return get_phone(self.user)
     
     def view_available_lesson_times(self, date, duration, increment, school, is_group_lesson=False, is_private_lesson=False):
         # Define the working hours (adjust as needed for the school or instructor)
