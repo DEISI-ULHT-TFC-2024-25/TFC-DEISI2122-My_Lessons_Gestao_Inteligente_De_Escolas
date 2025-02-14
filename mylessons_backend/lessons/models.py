@@ -3,6 +3,7 @@ from django.db import models
 from events.models import Activity
 from notifications.models import Notification
 from users.models import Discount, Unavailability, UserAccount, Student, Instructor
+from users.utils import get_users_name, get_students_ids, get_instructors_name
 
 class GroupPack(models.Model):
     date = models.DateField()
@@ -22,7 +23,7 @@ class GroupPack(models.Model):
     sport = models.ForeignKey('sports.Sport', related_name='group_packs', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
-        return f"Group Pack for {self.student.user.username} - {self.date}"
+        return f"Group Pack for {self.student} - {self.date}"
 
         
     @classmethod
@@ -143,13 +144,17 @@ class GroupClass(models.Model):
     is_done = models.BooleanField(default=False)
     students = models.ManyToManyField(Student, related_name="group_classes")
     instructors = models.ManyToManyField(Instructor, related_name="group_classes")
-    location = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, related_name="group_classes")
+    location = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, related_name="group_classes", blank=True)
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='group_classes', blank=True, null=True)
     type = models.CharField(max_length=50, default='Group')
     sport = models.ForeignKey('sports.Sport', related_name='group_classes', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
-        return f"Group Class on {self.date} at {self.time} - Level {self.level}"
+        return f"Group Class on {self.date} at {self.start_time} - Level {self.level}"
+    
+    def get_instructors_name(self):
+        return get_instructors_name(self.instructors.all())
+
 
     def mark_done(self):
         self.is_done = True
@@ -257,10 +262,11 @@ class ClassTicket(models.Model):
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='class_tickets', blank=True, null=True)
     pack = models.ForeignKey(GroupPack, on_delete=models.CASCADE, related_name='tickets', blank=True, null=True)
     sport = models.ForeignKey('sports.Sport', related_name='group_tickets', on_delete=models.SET_NULL, blank=True, null=True)
+    ticket_number = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         status = "Used" if self.is_used else "Not Used"
-        return f"Class Ticket for {self.student.user.first_name} ({status}) in {self.group_class}"
+        return f"Class Ticket for {self.student} ({status}) in {self.group_class}"
 
     
     def mark_done(self):
@@ -449,7 +455,6 @@ class PrivateClass(models.Model):
     class_number = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_done = models.BooleanField(default=False)
-    expiration_date = models.DateField(null=True, blank=True)
     equipments = models.ManyToManyField('equipment.Equipment', related_name="private_classes", blank=True)
     extra_students = models.ManyToManyField('users.Student', related_name="extra_private_classes", blank=True)
     number_of_extra_students = models.PositiveIntegerField(null=True, blank=True)
@@ -463,6 +468,12 @@ class PrivateClass(models.Model):
 
     def __str__(self):
         return f"Private Class {self.class_number} on {self.date} at {self.start_time}"
+    
+    def get_students_name(self):
+        return get_users_name(self.students.all())
+    
+    def get_students_ids(self):
+        return get_students_ids(self.students.all())
     
     def get_extra_costs(self):
         """
