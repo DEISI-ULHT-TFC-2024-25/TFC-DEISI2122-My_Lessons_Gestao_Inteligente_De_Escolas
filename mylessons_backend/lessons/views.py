@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import PrivateClass, ClassTicket
+from .models import PrivateClass, ClassTicket, PrivatePack, GroupPack
 from django.utils.timezone import now
 
 
@@ -108,8 +108,45 @@ def last_lessons(request):
 def reschedule_lesson(request):
     return False
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def active_packs(request):
-    return False
+    today = now().date()
+    user = request.user  # Get authenticated user
+    student_ids = user.students.values_list('id', flat=True)
+
+    # Fetch active private packs
+    private_packs = PrivatePack.objects.filter(students__id__in=student_ids, is_done=False)
+    # Fetch active group packs
+    group_packs = GroupPack.objects.filter(student__id__in=student_ids, is_done=False)
+
+    packs_data = []
+
+    # Process private packs
+    for pack in private_packs:
+        packs_data.append({
+            "pack_id": pack.id,
+            "students_name": pack.get_students_name(),
+            "students_ids": pack.get_students_ids(),
+            "type": pack.type,
+            "lessons_remaining": pack.get_number_of_lessons_remaining(),
+            "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
+            "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None
+        })
+
+    # Process group packs
+    for pack in group_packs:
+        packs_data.append({
+            "pack_id": pack.id,
+            "students_name": str(pack.student),
+            "students_ids": list(f"{pack.student.id}"),
+            "type": pack.type,
+            "lessons_remaining": pack.get_number_of_lessons_remaining(),
+            "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
+            "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None
+        })
+
+    return Response(packs_data)
 
 def pack_datails(request):
     return False

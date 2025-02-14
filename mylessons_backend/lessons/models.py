@@ -4,9 +4,12 @@ from events.models import Activity
 from notifications.models import Notification
 from users.models import Discount, Unavailability, UserAccount, Student, Instructor
 from users.utils import get_users_name, get_students_ids, get_instructors_name
+from django.db.models import Q
+from django.utils.timezone import now
 
 class GroupPack(models.Model):
     date = models.DateField()
+    type = models.CharField(max_length=50, default='Group')
     number_of_classes = models.PositiveIntegerField()
     number_of_classes_left = models.PositiveIntegerField()
     duration_in_minutes = models.PositiveIntegerField()
@@ -24,15 +27,24 @@ class GroupPack(models.Model):
 
     def __str__(self):
         return f"Group Pack for {self.student} - {self.date}"
+    
+    def get_number_of_lessons_remaining(self):
+        return self.tickets.filter(is_used=False).count()
 
-        
+    def get_number_of_unscheduled_lessons(self):
+        return self.tickets.filter(
+            is_used=False,
+            group_class__isnull=True
+        ).count()
+
+
     @classmethod
     def book_new_pack(cls, student, school, date, number_of_classes, duration_in_minutes, price, payment, discount_id = None):
         """
         Books a new private pack, creates the necessary associations, and sends notifications.
         """
         if not date:
-            date = datetime.now().date()
+            date = now().date()
 
         parents = list(student.parents.all())
 
@@ -287,6 +299,7 @@ class ClassTicket(models.Model):
     
 class PrivatePack(models.Model):
     date = models.DateField()
+    type = models.CharField(max_length=50, default='Private')
     number_of_classes = models.PositiveIntegerField()
     duration_in_minutes = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -304,6 +317,26 @@ class PrivatePack(models.Model):
 
     def __str__(self):
         return f"Private Pack for {self.students} starting on {self.date}"
+    
+    def get_number_of_lessons_remaining(self):
+        return self.classes.filter(is_done=False).count()
+
+    def get_number_of_unscheduled_lessons(self):
+        today = now().date()
+
+        return self.classes.filter(
+            is_done=False
+        ).filter(
+            Q(date__lt=today) |
+            Q(date=None) |
+            Q(start_time=None)
+        ).count() 
+    
+    def get_students_name(self):
+        return get_users_name(self.students.all())
+    
+    def get_students_ids(self):
+        return get_students_ids(self.students.all())
 
 
     @classmethod
@@ -320,7 +353,7 @@ class PrivatePack(models.Model):
         parents = list(set(parents))
 
         if not date:
-            date = datetime.now().date()
+            date = now().date()
 
         # Create the private pack
         pack = cls.objects.create(
