@@ -10,7 +10,7 @@ def get_users_name(users_list):
     
 def get_students_ids(students_list):
 
-    students_ids = [student.id for student in students_list]
+    students_ids = [f"{student.id}" for student in students_list]
     return students_ids
 
 def get_phone(user):
