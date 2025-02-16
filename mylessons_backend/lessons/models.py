@@ -75,11 +75,11 @@ class GroupPack(models.Model):
             Notification.create_notification(
                 user=parent,
                 subject=school.get_notification_template("group_pack_purchased_subject_parent").format(
-                    student=student
+                    student=str(student)
                 ),
                 message=school.get_notification_template("group_pack_purchased_message_parent").format(
                     parent_name=parent.first_name,
-                    student=student,
+                    student=str(student),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     start_date=date,
@@ -88,7 +88,8 @@ class GroupPack(models.Model):
                     school_name=school.name
                 ),
                 group_packs=[pack],
-                school=school
+                school=school,
+                type="Parent",
             )
 
         # Notify school admin
@@ -97,7 +98,7 @@ class GroupPack(models.Model):
                 user=admin,
                 subject=school.get_notification_template("group_pack_purchased_subject_admin"),
                 message=school.get_notification_template("group_pack_purchased_message_admin").format(
-                    student=student,
+                    student=str(student),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     start_date=date,
@@ -105,7 +106,8 @@ class GroupPack(models.Model):
                     currency=school.currency
                 ),
                 group_packs=[pack],
-                school=school
+                school=school,
+                type="Admin",
             )
         
         if discount_id and pack:
@@ -376,19 +378,16 @@ class PrivatePack(models.Model):
         if payment:
             pack.update_debt(payment=payment)
 
-        # Collect student names for notification messages
-        student_names = ", ".join([f"{student}" for student in students])
-
         # Notify parents
         for parent in parents:
             Notification.create_notification(
                 user=parent,
                 subject=school.get_notification_template("private_pack_purchased_subject_parent").format(
-                    students=student_names
+                    students=cls.get_students_name(),
                 ),
                 message=school.get_notification_template("private_pack_purchased_message_parent").format(
                     parent_name=parent.first_name,
-                    students=student_names,
+                    students=cls.get_students_name(),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}" if instructor else "Not Assigned yet",
@@ -398,7 +397,8 @@ class PrivatePack(models.Model):
                     school_name=school.name
                 ),
                 private_packs=[pack],
-                school=school
+                school=school,
+                type="Parent",
             )
 
         # Notify instructor
@@ -408,13 +408,14 @@ class PrivatePack(models.Model):
                 subject=school.get_notification_template("private_pack_purchased_subject_instructor"),
                 message=school.get_notification_template("private_pack_purchased_message_instructor").format(
                     instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}",
-                    students=student_names,
+                    students=cls.get_students_name(),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     start_date=date
                 ),
                 private_packs=[pack],
-                school=school
+                school=school,
+                type="Instructor",
             )
 
         # Notify school admin
@@ -423,7 +424,7 @@ class PrivatePack(models.Model):
                 user=admin,
                 subject=school.get_notification_template("private_pack_purchased_subject_admin"),
                 message=school.get_notification_template("private_pack_purchased_message_admin").format(
-                    students=student_names,
+                    students=cls.get_students_name(),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}" if instructor else "Not Assigned",
@@ -432,7 +433,8 @@ class PrivatePack(models.Model):
                     currency=school.currency
                 ),
                 private_packs=[pack],
-                school=school
+                school=school,
+                type="Admin",
             )
         
         if discount_id and pack:
@@ -637,11 +639,11 @@ class PrivateClass(models.Model):
                     Notification.create_notification(
                         user=parent,
                         subject=self.school.get_notification_template("private_class_scheduled_subject_parent").format(
-                            students=self.students
+                            students=self.get_students_name()
                         ),
                         message=self.school.get_notification_template("private_class_scheduled_message_parent").format(
                             parent_name=parent.first_name,
-                            students=self.students,
+                            students=self.get_students_name(),
                             class_number=self.class_number,
                             number_of_classes=self.pack.number_of_classes,
                             date=date,
@@ -650,7 +652,8 @@ class PrivateClass(models.Model):
                             instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}" if instructor else "Not Assigned yet"
                         ),
                         private_classes=[self],
-                        school=self.school
+                        school=self.school,
+                        type="Parent",
                     )
 
                 # Notify instructor
@@ -658,11 +661,11 @@ class PrivateClass(models.Model):
                     Notification.create_notification(
                         user=instructor.user,
                         subject=self.school.get_notification_template("private_class_scheduled_subject_instructor").format(
-                            students=self.students
+                            students=self.get_students_name()
                         ),
                         message=self.school.get_notification_template("private_class_scheduled_message_instructor").format(
                             instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}",
-                            students=self.students,
+                            students=self.get_students_name(),
                             class_number=self.class_number,
                             number_of_classes=self.pack.number_of_classes,
                             date=date,
@@ -670,7 +673,8 @@ class PrivateClass(models.Model):
                             duration_in_minutes=self.duration_in_minutes
                         ),
                         private_classes=[self],
-                        school=self.school
+                        school=self.school,
+                        type="Instructor",
                     )
 
                 # Notify school admin
@@ -678,10 +682,10 @@ class PrivateClass(models.Model):
                     Notification.create_notification(
                         user=admin,
                         subject=self.school.get_notification_template("private_class_scheduled_subject_admin").format(
-                            students=self.students
+                            students=self.get_students_name()
                         ),
                         message=self.school.get_notification_template("private_class_scheduled_message_admin").format(
-                            students=self.students,
+                            students=self.get_students_name(),
                             class_number=self.class_number,
                             number_of_classes=self.pack.number_of_classes,
                             date=date,
@@ -692,7 +696,8 @@ class PrivateClass(models.Model):
                             currency=self.school.currency if self.price else ""
                         ),
                         private_classes=[self],
-                        school=self.school
+                        school=self.school,
+                        type="Admin",
                     )
 
             return True

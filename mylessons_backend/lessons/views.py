@@ -1,8 +1,10 @@
+from datetime import datetime
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import PrivateClass, ClassTicket, PrivatePack, GroupPack
 from django.utils.timezone import now
+from rest_framework import status
 
 
 def get_lessons_data(user, date_lookup, is_done_flag):
@@ -105,8 +107,59 @@ def last_lessons(request):
     )
     return Response(lessons_data)
 
-def reschedule_lesson(request):
-    return False
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def schedule_private_lesson(request):
+    """
+    Permite aos pais/instrutores reagendarem uma aula privada.
+    """
+    user = request.user
+    lesson_id = request.data.get("lesson_id")
+    new_date = request.data.get("date")  # Formato esperado: 'YYYY-MM-DD'
+    new_time = request.data.get("time")  # Formato esperado: 'HH:MM'
+
+    # Validação inicial
+    if not lesson_id or not new_date or not new_time:
+        return Response({"error": "É necessário fornecer lesson_id, date e time."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        lesson = PrivateClass.objects.get(id=lesson_id)
+    except PrivateClass.DoesNotExist:
+        return Response({"error": "Aula não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Verifica se o utilizador pode reagendar esta aula (somente pais da pack ou instrutores)
+    if not lesson.pack.parents.filter(id=user.id).exists() and lesson.instructor.user != user:
+        return Response({"error": "Não tem permissão para agendar esta aula."},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    # Converte strings para objetos `datetime`
+    try:
+        new_date_obj = datetime.strptime(new_date, "%Y-%m-%d").date()
+        new_time_obj = datetime.strptime(new_time, "%H:%M").time()
+    except ValueError:
+        return Response({"error": "Formato de data ou hora inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    # Verifica se ainda é possível reagendar esta aula
+
+    # Verifica se ainda é possível reagendar esta aula
+    if new_date_obj < now().date():
+        return Response({"error": "Não é possível agendar para uma data no passado."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    if not lesson.can_still_reschedule():
+        return Response({"error": "O período permitido para agendamento já passou."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Tenta reagendar a aula
+    reschedule_success = lesson.schedule_lesson(new_date_obj, new_time_obj)
+
+    if reschedule_success:
+        return Response({"message": "Aula agendada com sucesso!"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "Não foi possível agendar. Data e horário não disponíveis."},
+                        status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
