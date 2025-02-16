@@ -21,11 +21,12 @@ class Notification(models.Model):
     activities = models.ManyToManyField('events.Activity', related_name="notifications", blank=True)
     private_packs = models.ManyToManyField('lessons.PrivatePack', related_name="notifications", blank=True)
     group_packs = models.ManyToManyField('lessons.GroupPack', related_name="notifications", blank=True)
-
+    type = models.CharField(max_length=255, null=True, blank=True)
     subject = models.CharField(max_length=255, default="Notification from MyLessons")
     message = models.TextField()
     sent_at = models.DateTimeField(null=True, blank=True)
     date_read = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Notification for {self.user} - {self.message[:30]}"
@@ -60,7 +61,7 @@ class Notification(models.Model):
         self.save()
 
     @classmethod
-    def create_notification(cls, user, subject, message, school=None, private_classes=None, group_classes=None, activities=None, private_packs=None, group_packs=None):
+    def create_notification(cls, user, subject, message, school=None, private_classes=None, group_classes=None, activities=None, private_packs=None, group_packs=None, type=None):
         """
         Creates a notification with optional associations.
         """
@@ -69,6 +70,8 @@ class Notification(models.Model):
             subject=subject,
             message=message,
             school=school,
+            type=type,
+            created_at=now(),
         )
 
         if private_classes:

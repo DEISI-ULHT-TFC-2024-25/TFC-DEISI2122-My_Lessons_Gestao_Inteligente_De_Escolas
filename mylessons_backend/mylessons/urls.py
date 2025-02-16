@@ -25,4 +25,5 @@ urlpatterns = [
     path('stripe/webhook/', stripe_webhook, name='stripe-webhook'),
     path('api/users/', include('users.urls')), 
     path('api/lessons/', include('lessons.urls')), 
+    path('api/notifications/', include('notifications.urls')),
 ]

@@ -24,7 +24,7 @@ class UserAccount(AbstractUser):
         help_text='Specific permissions for this user.',
         verbose_name='user permissions',
     )
-    current_role = models.CharField(max_length=255, blank=True, null=True)
+    current_role = models.CharField(max_length=255, default="Parent")
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

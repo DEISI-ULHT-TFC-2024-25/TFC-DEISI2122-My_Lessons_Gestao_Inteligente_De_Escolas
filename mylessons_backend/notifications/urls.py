@@ -1,7 +1,7 @@
 from django.urls import path
-from .views import notifications, read_notification
+from .views import mark_notification_as_read, get_unread_notifications
 
 urlpatterns = [
-    path('/', notifications, name='notifications'),
-    path('read/{id}/', read_notification, name='read-notification'),
+    path('unread/', get_unread_notifications, name='notifications'),
+    path('read/<int:id>/', mark_notification_as_read, name='read-notification'),
 ]
