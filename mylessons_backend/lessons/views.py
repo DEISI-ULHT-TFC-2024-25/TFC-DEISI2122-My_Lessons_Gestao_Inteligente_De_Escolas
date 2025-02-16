@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from .models import PrivateClass, ClassTicket, PrivatePack, GroupPack
 from django.utils.timezone import now
 from rest_framework import status
+from django.shortcuts import get_object_or_404
 
 
 def get_lessons_data(user, date_lookup, is_done_flag):
@@ -201,5 +202,109 @@ def active_packs(request):
 
     return Response(packs_data)
 
-def pack_datails(request):
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def private_pack_details(request, id):
+    user = request.user
+    pack = get_object_or_404(PrivatePack, id=id, parents=user)
+
+    data = {
+        "id": pack.id,
+        "date": pack.date,
+        "type": pack.type,
+        "number_of_classes": pack.number_of_classes,
+        "duration_in_minutes": pack.duration_in_minutes,
+        "price": str(pack.price),
+        "is_done": pack.is_done,
+        "is_paid": pack.is_paid,
+        "is_suspended": pack.is_suspended,
+        "debt": str(pack.debt),
+        "students": [{"id": s.id, "name": str(s)} for s in pack.students.all()],
+        "finished_date": pack.finished_date,
+        "expiration_date": pack.expiration_date,
+        "school": pack.school.name if pack.school else None,
+        "sport": pack.sport.name if pack.sport else None,
+        "instructor": {
+            "id": pack.instructor.id,
+            "name": str(pack.instructor),
+        } if pack.instructor else None
+    }
+    
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def group_pack_details(request, id):
+    user = request.user
+    pack = get_object_or_404(GroupPack, id=id, parents=user)
+
+    data = {
+        "id": pack.id,
+        "date": pack.date,
+        "type": pack.type,
+        "number_of_classes": pack.number_of_classes,
+        "number_of_classes_left": pack.number_of_classes_left,
+        "duration_in_minutes": pack.duration_in_minutes,
+        "price": str(pack.price),
+        "is_done": pack.is_done,
+        "is_paid": pack.is_paid,
+        "is_suspended": pack.is_suspended,
+        "debt": str(pack.debt),
+        "student": {
+            "id": pack.student.id,
+            "name": str(pack.student),
+        } if pack.student else None,
+        "finished_date": pack.finished_date,
+        "expiration_date": pack.expiration_date,
+        "school": pack.school.name if pack.school else None,
+        "sport": pack.sport.name if pack.sport else None,
+    }
+    
+    return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def private_lesson_details(request, id):
+    # Get the private class object or return 404 if not found
+    private_lesson = get_object_or_404(PrivateClass, id=id)
+
+    # Construct response data
+    data = {
+        "id": private_lesson.id,
+        "date": private_lesson.date,
+        "start_time": private_lesson.start_time,
+        "end_time": private_lesson.end_time,
+        "duration": private_lesson.duration_in_minutes,
+        "class_number": private_lesson.class_number,
+        "price": str(private_lesson.price),
+        "is_done": private_lesson.is_done,
+        "location": private_lesson.location.name if private_lesson.location else None,
+        "instructor": {
+            "id": private_lesson.instructor.id,
+            "name": str(private_lesson.instructor),
+            
+        } if private_lesson.instructor else None,
+        "students": [
+            {"id": student.id, "name": str(student)}
+            for student in private_lesson.students.all()
+        ],
+        "extra_students": [
+            {"id": student.id, "name": str(student)}
+            for student in private_lesson.extra_students.all()
+        ],
+        "number_of_extra_students": private_lesson.number_of_extra_students,
+        "equipments": [
+            {"id": equipment.id, "name": equipment.name}
+            for equipment in private_lesson.equipments.all()
+        ],
+        "sport": private_lesson.sport.name if private_lesson.sport else None,
+        "school": private_lesson.school.name if private_lesson.school else None,
+        "pack_id": private_lesson.pack.id if private_lesson.pack else None,
+        "type": private_lesson.type,
+    }
+
+    return Response(data)
+
+
+def group_lesson_details(response):
     return False
