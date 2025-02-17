@@ -2,7 +2,7 @@ from datetime import datetime
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import PrivateClass, ClassTicket, PrivatePack, GroupPack
+from .models import PrivateClass, ClassTicket, PrivatePack, GroupPack, GroupClass
 from django.utils.timezone import now
 from rest_framework import status
 from django.shortcuts import get_object_or_404
@@ -306,5 +306,46 @@ def private_lesson_details(request, id):
     return Response(data)
 
 
-def group_lesson_details(response):
-    return False
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def group_lesson_details(response, id):
+
+    # Get the private class object or return 404 if not found
+    ticket = get_object_or_404(ClassTicket, id=id)
+    group_lesson = ticket.group_class
+
+    # Construct response data
+    data = {
+        "id": ticket.id,
+        "date": group_lesson.date if group_lesson else None,
+        "start_time": group_lesson.start_time if group_lesson else None,
+        "end_time": group_lesson.end_time if group_lesson else None,
+        "duration": ticket.pack.duration_in_minutes,
+        "class_number": ticket.ticket_number,
+        "price": str(ticket.pack.price / ticket.pack.number_of_classes),
+        "is_done": ticket.is_used,
+        "location": group_lesson.location.name if group_lesson and group_lesson.location else None,
+        "instructor": {
+            "id": group_lesson.instructor.id,
+            "name": str(group_lesson.instructor),
+            
+        } if group_lesson and group_lesson.instructor else None,
+        "student": [
+            {"id": ticket.student.id, "name": str(ticket.student)}
+        ],
+        "extra_students": [
+            {"id": student.id, "name": str(student)}
+            for student in ticket.extra_students.all()
+        ],
+        "number_of_extra_students": ticket.number_of_extra_students,
+        "equipments": [
+            {"id": equipment.id, "name": equipment.name}
+            for equipment in ticket.equipments.all()
+        ],
+        "sport": group_lesson.sport.name if group_lesson and group_lesson.sport else None,
+        "school": ticket.school.name if ticket.school else None,
+        "pack_id": ticket.pack.id if ticket.pack else None,
+        "type": ticket.pack.type,
+    }
+
+    return Response(data)
