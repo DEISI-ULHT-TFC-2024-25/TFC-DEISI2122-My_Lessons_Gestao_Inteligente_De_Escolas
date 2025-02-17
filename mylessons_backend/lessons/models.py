@@ -277,6 +277,9 @@ class ClassTicket(models.Model):
     pack = models.ForeignKey(GroupPack, on_delete=models.CASCADE, related_name='tickets', blank=True, null=True)
     sport = models.ForeignKey('sports.Sport', related_name='group_tickets', on_delete=models.SET_NULL, blank=True, null=True)
     ticket_number = models.PositiveIntegerField(null=True, blank=True)
+    equipments = models.ManyToManyField('equipment.Equipment', related_name="class_tickets", blank=True)
+    extra_students = models.ManyToManyField('users.Student', related_name="extra_class_tickets", blank=True)
+    number_of_extra_students = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         status = "Used" if self.is_used else "Not Used"
