@@ -134,8 +134,8 @@ STRIPE_PUBLISHABLE_KEY = "pk_test_51QmkhvFKR0fDDDqcMPjzGLnTRzcF73xgfXA7bQ2Z2LmHN
 
 STRIPE_WEBHOOK_SECRET = 'whsec_86b4d0b973573dabf6dc25baa2fd061397f6a5f2335c51ed313c3decb15634d7'
 
-SUCCESS_URL = "https://mylessons.pythonanywhere.com/payments/payment-success"
-CANCEL_URL = "https://mylessons.pythonanywhere.com/payments/payment-failed"
+SUCCESS_URL = "https://mylessons.pythonanywhere.com/api/payments/payment-success"
+CANCEL_URL = "https://mylessons.pythonanywhere.com/api/payments/payment-failed"
 
 
 LOGIN_REDIRECT_URL = '/'

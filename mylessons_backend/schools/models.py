@@ -1,5 +1,56 @@
+import random
+import re
+import copy
 from django.db import models
 from django.apps import apps
+
+def default_payment_types():
+    """
+    Returns a default payment types structure.
+    This structure starts at the "role" level.
+    """
+    fixed_default = round(random.uniform(10, 20), 2)
+    commission_default = random.choice([0, 5, 10])
+    return {
+        "role": {
+            "instructor": {
+                "Fixed monthly rate": None,
+                "private lesson": {
+                    "Commission": commission_default,
+                    "fixed": {
+                        "90-1-2": fixed_default,
+                        "60-1-1": fixed_default,
+                        "60-0-0": fixed_default,
+                        "0-0-0": fixed_default,
+                    }
+                }
+            },
+            "admin": {
+                "Fixed monthly rate": None,
+                "private lesson": {
+                    "Commission": commission_default,
+                    "fixed": {
+                        "90-1-2": fixed_default,
+                        "60-1-1": fixed_default,
+                        "60-0-0": fixed_default,
+                        "0-0-0": fixed_default,
+                    }
+                }
+            },
+            "monitor": {
+                "Fixed monthly rate": None,
+                "private lesson": {
+                    "Commission": commission_default,
+                    "fixed": {
+                        "90-1-2": fixed_default,
+                        "60-1-1": fixed_default,
+                        "60-0-0": fixed_default,
+                        "0-0-0": fixed_default,
+                    }
+                }
+            }
+        }
+    }
 
 def default_alerts():
     return {
@@ -188,7 +239,7 @@ class School(models.Model):
     private_lessons_pack_prices = models.JSONField(default=default_private_lessons_pack_prices, blank=True)
     group_lessons_pack_prices = models.JSONField(default=default_group_lessons_pack_prices, blank=True)
     name = models.CharField(max_length=255)
-    payment_types = models.JSONField(blank=True, null=True)  # Example: {"hourly_rate": 20, "bonus_rate": 10}
+    payment_types = models.JSONField(default=default_payment_types, blank=True, null=True)
     extra_prices = models.JSONField(blank=True, null=True)  # Example: {"extra_time": 10, "private_lesson": 50}
     logo = models.ImageField(upload_to="school_logos/")
     description = models.TextField(blank=True, null=True)
@@ -217,6 +268,54 @@ class School(models.Model):
         return self.name
     
     # TODO get_unpaid_birthday_party_orders(self): (missing class)
+
+    @staticmethod
+    def _set_nested_value(data, keys, value):
+        """
+        Helper to navigate a nested dict using the list of keys and set the last key to value.
+        Creates intermediate dictionaries if needed.
+        """
+        for key in keys[:-1]:
+            if key not in data or not isinstance(data[key], dict):
+                data[key] = {}
+            data = data[key]
+        data[keys[-1]] = value
+
+    def update_payment_type_value(self, key_path, new_value, user_obj=None):
+        """
+        Updates a single nested field in the payment_types structure.
+
+        Args:
+            key_path (str): A string representing the nested path.
+                E.g. "role[instructor][private lesson][fixed][60-1-4]"
+            new_value: The value to assign at that nested key.
+            user_obj (optional): If provided, the function will update the user's
+                payment_types for this school. Otherwise, the school's default payment_types
+                are updated.
+        """
+        # Extract keys from a path like: role[instructor][private lesson][fixed][60-1-4]
+        keys = re.findall(r'\w[\w\s-]*', key_path)
+        
+        if user_obj:
+            # Ensure the user has a JSON field "payment_types".
+            # The first-level keys are school names.
+            if not user_obj.payment_types or not isinstance(user_obj.payment_types, dict):
+                user_obj.payment_types = {}
+
+            # If there is no entry for this school (or it's blank), copy the school's payment_types.
+            if self.name not in user_obj.payment_types or not user_obj.payment_types[self.name]:
+                # Use a deep copy to avoid shared references.
+                user_obj.payment_types[self.name] = copy.deepcopy(self.payment_types) if self.payment_types else {}
+
+            # Update the nested key within the user's payment_types for this school.
+            School._set_nested_value(user_obj.payment_types[self.name], keys, new_value)
+            user_obj.save(update_fields=['payment_types'])
+        else:
+            # Update the school's own payment_types.
+            if not self.payment_types or not isinstance(self.payment_types, dict):
+                self.payment_types = default_payment_types()
+            School._set_nested_value(self.payment_types, keys, new_value)
+            self.save(update_fields=['payment_types'])
     
     def get_unpaid_camp_orders(self):
         orders = []
@@ -447,14 +546,35 @@ class School(models.Model):
     def add_instructor(self, instructor):
         if instructor and instructor not in self.instructors.all():
             self.instructors.add(instructor)
+            user = instructor.user
+            
+            # Ensure the instructor has a dictionary for payment_types.
+            if not user.payment_types or not isinstance(user.payment_types, dict):
+                user.payment_types = {}
+            
+            # If there's no payment types entry for this school, initialize it
+            if self.name not in user.payment_types or not user.payment_types[self.name]:
+                # Copy the school's default payment_types (assumed to be structured at the "role" level)
+                user.payment_types[self.name] = copy.deepcopy(self.payment_types)
+                user.save(update_fields=['payment_types'])
+            
             return True
         return False
-
+    
     def remove_instructor(self, instructor):
         if instructor and instructor in self.instructors.all():
             self.instructors.remove(instructor)
+            user = instructor.user
+            
+            # Remove the payment types entry for this school if it exists
+            if user.payment_types and isinstance(user.payment_types, dict):
+                if self.name in user.payment_types:
+                    del user.payment_types[self.name]
+                    user.save(update_fields=['payment_types'])
+                    
             return True
         return False
+
 
     def add_scheduled_lesson_to_attendance(self, date, id, type, lesson_was_scheduled):
         # Initialize `attendance_by_date` if it's None

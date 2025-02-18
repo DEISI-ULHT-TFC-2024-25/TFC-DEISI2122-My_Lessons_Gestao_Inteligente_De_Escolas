@@ -386,11 +386,11 @@ class PrivatePack(models.Model):
             Notification.create_notification(
                 user=parent,
                 subject=school.get_notification_template("private_pack_purchased_subject_parent").format(
-                    students=cls.get_students_name(),
+                    students=get_users_name(students),
                 ),
                 message=school.get_notification_template("private_pack_purchased_message_parent").format(
                     parent_name=parent.first_name,
-                    students=cls.get_students_name(),
+                    students=get_users_name(students),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}" if instructor else "Not Assigned yet",
@@ -411,7 +411,7 @@ class PrivatePack(models.Model):
                 subject=school.get_notification_template("private_pack_purchased_subject_instructor"),
                 message=school.get_notification_template("private_pack_purchased_message_instructor").format(
                     instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}",
-                    students=cls.get_students_name(),
+                    students=get_users_name(students),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     start_date=date
@@ -427,7 +427,7 @@ class PrivatePack(models.Model):
                 user=admin,
                 subject=school.get_notification_template("private_pack_purchased_subject_admin"),
                 message=school.get_notification_template("private_pack_purchased_message_admin").format(
-                    students=cls.get_students_name(),
+                    students=get_users_name(students),
                     number_of_classes=number_of_classes,
                     duration_minutes=duration_in_minutes,
                     instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}" if instructor else "Not Assigned",

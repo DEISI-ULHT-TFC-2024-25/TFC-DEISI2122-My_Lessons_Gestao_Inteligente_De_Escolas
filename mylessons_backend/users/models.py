@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, date, time
+from decimal import Decimal
 from django.contrib.auth.models import AbstractUser,  Group, Permission
 from django.db import models
 from .utils import get_phone
+from django.utils import timezone
 
 from notifications.models import Notification
 
@@ -25,9 +27,49 @@ class UserAccount(AbstractUser):
         verbose_name='user permissions',
     )
     current_role = models.CharField(max_length=255, default="Parent")
-
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    balance_history = models.JSONField(null=True, blank=True, default=list)
+    payment_types = models.JSONField(blank=True, null=True, default=list) 
+    
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+    
+    def update_balance(self, amount, message):
+        """
+        Update the user's balance and record the transaction.
+
+        The balance_history JSON structure is now a list of transactions.
+        Each transaction is represented as:
+            {
+                "timestamp": "YYYY-MM-DDTHH:MM:SS",
+                "amount": "+50.00" or "-20.00",
+                "message": "Description of transaction"
+            }
+        """
+        # Ensure amount is a Decimal for arithmetic
+        amount = Decimal(amount)
+        self.balance += amount
+
+        # Get the current timestamp
+        now = timezone.now()
+
+        # Create a new transaction entry
+        transaction_entry = {
+            "timestamp": now.isoformat(),  # e.g., "2025-02-18T14:00:00"
+            "amount": f"{amount:+.2f}",      # formats as '+50.00' or '-20.00'
+            "message": message,
+        }
+
+        # Initialize balance_history as a list if it's empty
+        if not self.balance_history:
+            self.balance_history = []
+
+        # Append the new transaction entry
+        self.balance_history.append(transaction_entry)
+        
+        # Save changes to the instance
+        self.save(update_fields=["balance", "balance_history"])
+
 
 class Student(models.Model):
     id = models.AutoField(primary_key=True)
@@ -54,6 +96,7 @@ class Instructor(models.Model):
 
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name}"
+    
     
     def get_phone(self):
         return get_phone(self.user)
