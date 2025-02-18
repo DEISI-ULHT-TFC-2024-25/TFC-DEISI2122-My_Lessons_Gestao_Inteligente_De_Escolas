@@ -8,6 +8,12 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 
 
+# TODO change all views to work on specific roles (user.current_role)
+#
+# on instructor or admin schedule private lesson if the time is unavailable because of his unavailability or pecause its in the past there should be an alert message and an option to override
+
+
+
 def get_lessons_data(user, date_lookup, is_done_flag):
     """
     Helper function to get lessons data.
