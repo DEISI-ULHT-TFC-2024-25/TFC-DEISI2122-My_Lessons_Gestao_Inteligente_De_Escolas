@@ -321,7 +321,7 @@ class PrivatePack(models.Model):
     sport = models.ForeignKey('sports.Sport', related_name='private_packs', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
-        return f"Private Pack for {self.students} starting on {self.date}"
+        return f"Private Pack for {self.get_students_name()} starting on {self.date}"
     
     def get_number_of_lessons_remaining(self):
         return self.classes.filter(is_done=False).count()

@@ -325,11 +325,10 @@ def group_lesson_details(response, id):
         "price": str(ticket.pack.price / ticket.pack.number_of_classes),
         "is_done": ticket.is_used,
         "location": group_lesson.location.name if group_lesson and group_lesson.location else None,
-        "instructor": {
-            "id": group_lesson.instructor.id,
-            "name": str(group_lesson.instructor),
-            
-        } if group_lesson and group_lesson.instructor else None,
+        "instructors": [
+            {"id": instructor.id, "name": str(instructor)}
+            for instructor in group_lesson.instructors.all()
+        ],
         "student": [
             {"id": ticket.student.id, "name": str(ticket.student)}
         ],
