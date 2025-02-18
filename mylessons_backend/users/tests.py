@@ -3,7 +3,6 @@ from lessons.models import PrivateClass, PrivatePack, UserAccount, Instructor, U
 from schools.models import School
 from datetime import datetime, timedelta, date, time
 from django.utils.timezone import now
-
 from users.models import Student
 
 class StudentTests(TestCase):
@@ -137,25 +136,25 @@ class InstructorTests(TestCase):
         # The instructor's payment_types should now have an entry for the school name
         self.assertIn(self.school.name, self.instructor.user.payment_types)
         pt = self.instructor.user.payment_types[self.school.name]
-        self.assertIn("role", pt)
-        self.assertIn("instructor", pt["role"])
+        # With the new structure, the top-level keys are the roles directly
+        self.assertIn("instructor", pt)
         
         # Update a nested value:
-        # Set role[instructor][private lesson][fixed][60-1-4] to 10.00
+        # Set instructor[private lesson][fixed][60-1-4] to 10.00
         self.school.update_payment_type_value(
-            "role[instructor][private lesson][fixed][60-1-4]", 10.00, user_obj=self.instructor.user
+            "instructor[private lesson][fixed][60-1-4]", 10.00, user_obj=self.instructor.user
         )
         self.instructor.refresh_from_db()
-        updated_value = self.instructor.user.payment_types[self.school.name]["role"]["instructor"]["private lesson"]["fixed"].get("60-1-4")
+        updated_value = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"].get("60-1-4")
         self.assertEqual(updated_value, 10.00)
 
-        # Update a nested value:
-        # Set role[instructor][private lesson][fixed][60-1-4] to 20.00
+        # Update a nested value again:
+        # Set instructor[private lesson][fixed][60-1-4] to 20.00
         self.school.update_payment_type_value(
-            "role[instructor][private lesson][fixed][60-1-4]", 20.00, user_obj=self.instructor.user
+            "instructor[private lesson][fixed][60-1-4]", 20.00, user_obj=self.instructor.user
         )
         self.instructor.refresh_from_db()
-        updated_value = self.instructor.user.payment_types[self.school.name]["role"]["instructor"]["private lesson"]["fixed"].get("60-1-4")
+        updated_value = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"].get("60-1-4")
         self.assertEqual(updated_value, 20.00)
         
         # Remove the instructor from the school; this should also remove the payment_types entry
@@ -398,7 +397,6 @@ class DefineAvailabilityTests(TestCase):
         }
 
         for i in range(3):
-
             Unavailability.objects.create(
                 instructor=self.instructor,
                 date=date_today + timedelta(days=i),

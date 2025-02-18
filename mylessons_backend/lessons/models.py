@@ -507,6 +507,29 @@ class PrivateClass(models.Model):
     def __str__(self):
         return f"Private Class {self.class_number} on {self.date} at {self.start_time}"
     
+    def mark_as_given(self):
+        if self.is_done:
+            return False
+        else:
+            # mark as done
+            self.is_done = True
+
+            # update instructor balance by checking the instructor.user.payment_types[self.school]["instructor"]["private lesson"]["fixed"].get(f"{self.duration_in_minutes}-{self.students.all().count()+self.number_of_extra_students}-{self.students.all().count()+self.number_of_extra_students}")
+
+            # check if the pack finished
+            pass
+        return True
+    
+    def mark_as_not_given(self):
+        if not self.is_done:
+            return False
+        else:
+            # mark as not done
+            # update instructor balance
+            # check if the pack was finished
+            pass
+        return True
+    
     def get_students_name(self):
         return get_users_name(self.students.all())
     
