@@ -14,6 +14,7 @@ from .serializers import UserAccountSerializer
 from notifications.models import Notification
 from lessons.models import PrivateClass, GroupClass, PrivatePack, GroupPack
 from django.db.models import Q
+from django.utils.timezone import now
 
 logger = logging.getLogger(__name__)
 
@@ -192,4 +193,16 @@ def number_of_active_students(request):
         "number_of_active_students" : len(set(students))
     }
 
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_balance(request):
+    user = request.user
+
+    data = {
+        "current_balance": user.balance
+    }
+    
     return Response(data)

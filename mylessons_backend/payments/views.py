@@ -9,6 +9,10 @@ from lessons.models import GroupPack, PrivatePack
 from mylessons import settings
 from .utils import create_checkout_session
 import logging
+from datetime import datetime, timedelta
+from django.utils.timezone import now
+
+
 logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY

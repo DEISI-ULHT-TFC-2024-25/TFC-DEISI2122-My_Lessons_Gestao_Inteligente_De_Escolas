@@ -67,24 +67,31 @@ class StudentTests(TestCase):
 
 class InstructorTests(TestCase):
     def setUp(self):
-        self.instructor = Instructor.objects.create(user=UserAccount.objects.create(username="instructor"))
+        # Create an instructor with a related UserAccount
+        self.instructor = Instructor.objects.create(
+            user=UserAccount.objects.create(username="instructor")
+        )
+        # Create a school
         self.school = School.objects.create(name='School')
+        
+        # Create a couple of unavailability objects
         self.unavailability1 = Unavailability.objects.create(
             instructor=self.instructor,
             date=date(2025, 1, 2),
-            start_time=time(13, 00),
-            end_time=time(14, 00),
+            start_time=time(13, 0),
+            end_time=time(14, 0),
             duration_in_minutes=60,
         )
         self.unavailability2 = Unavailability.objects.create(
             instructor=self.instructor,
             date=date(2025, 1, 2),
-            start_time=time(10, 00),
-            end_time=time(12, 00),
+            start_time=time(10, 0),
+            end_time=time(12, 0),
             duration_in_minutes=120,
         )
+        # Create a private class
         self.private_class = PrivateClass.objects.create(
-            date=date(2025,1,2),
+            date=date(2025, 1, 2),
             start_time=time(15, 0),
             end_time=time(16, 0),
             duration_in_minutes=60,
@@ -93,22 +100,68 @@ class InstructorTests(TestCase):
             instructor=self.instructor,
             school=self.school,
         )
-        self.private_class.students.set([Student.objects.create(level=1, birthday=date(2001,1,1), first_name="Alice", last_name="Silva")])
+        # Create and assign a student to the private class
+        student = Student.objects.create(
+            level=1,
+            birthday=date(2001, 1, 1),
+            first_name="Alice",
+            last_name="Silva"
+        )
+        self.private_class.students.set([student])
 
     def test_view_available_lesson_times(self):
+        # Ensure the instructor is added to the school (which also initializes payment_types)
         self.assertTrue(self.school.add_instructor(self.instructor))
-        times_list = self.instructor.view_available_lesson_times(date(2025,1,2), 60, 60, self.school, False, True)
-        self.assertNotIn(time(8,0), times_list)
-        self.assertIn(time(9,0), times_list)
-        self.assertNotIn(time(10,0), times_list)
-        self.assertNotIn(time(11,0), times_list)
-        self.assertIn(time(12,0), times_list)
-        self.assertNotIn(time(13,0), times_list)
-        self.assertIn(time(14,0), times_list)
-        self.assertNotIn(time(15,0), times_list)
-        self.assertIn(time(16,0), times_list)
-        self.assertIn(time(17,0), times_list)
-        self.assertNotIn(time(18,0), times_list)
+        times_list = self.instructor.view_available_lesson_times(
+            date(2025, 1, 2), 60, 60, self.school, False, True
+        )
+        self.assertNotIn(time(8, 0), times_list)
+        self.assertIn(time(9, 0), times_list)
+        self.assertNotIn(time(10, 0), times_list)
+        self.assertNotIn(time(11, 0), times_list)
+        self.assertIn(time(12, 0), times_list)
+        self.assertNotIn(time(13, 0), times_list)
+        self.assertIn(time(14, 0), times_list)
+        self.assertNotIn(time(15, 0), times_list)
+        self.assertIn(time(16, 0), times_list)
+        self.assertIn(time(17, 0), times_list)
+        self.assertNotIn(time(18, 0), times_list)
+
+    def test_payment_types_initialization_and_update(self):
+        # Add the instructor to the school and initialize payment_types
+        self.assertTrue(self.school.add_instructor(self.instructor))
+        
+        # Refresh the instructor from the DB to ensure changes are persisted
+        self.instructor.refresh_from_db()
+        
+        # The instructor's payment_types should now have an entry for the school name
+        self.assertIn(self.school.name, self.instructor.user.payment_types)
+        pt = self.instructor.user.payment_types[self.school.name]
+        self.assertIn("role", pt)
+        self.assertIn("instructor", pt["role"])
+        
+        # Update a nested value:
+        # Set role[instructor][private lesson][fixed][60-1-4] to 10.00
+        self.school.update_payment_type_value(
+            "role[instructor][private lesson][fixed][60-1-4]", 10.00, user_obj=self.instructor.user
+        )
+        self.instructor.refresh_from_db()
+        updated_value = self.instructor.user.payment_types[self.school.name]["role"]["instructor"]["private lesson"]["fixed"].get("60-1-4")
+        self.assertEqual(updated_value, 10.00)
+
+        # Update a nested value:
+        # Set role[instructor][private lesson][fixed][60-1-4] to 20.00
+        self.school.update_payment_type_value(
+            "role[instructor][private lesson][fixed][60-1-4]", 20.00, user_obj=self.instructor.user
+        )
+        self.instructor.refresh_from_db()
+        updated_value = self.instructor.user.payment_types[self.school.name]["role"]["instructor"]["private lesson"]["fixed"].get("60-1-4")
+        self.assertEqual(updated_value, 20.00)
+        
+        # Remove the instructor from the school; this should also remove the payment_types entry
+        self.assertTrue(self.school.remove_instructor(self.instructor))
+        self.instructor.refresh_from_db()
+        self.assertNotIn(self.school.name, self.instructor.user.payment_types)
 
 
 class UnavailabilityTests(TestCase):
