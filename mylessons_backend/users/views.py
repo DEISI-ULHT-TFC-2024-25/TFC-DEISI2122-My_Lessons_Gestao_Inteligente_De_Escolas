@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -11,6 +12,8 @@ from django.contrib.auth.hashers import make_password
 from .models import UserAccount
 from .serializers import UserAccountSerializer
 from notifications.models import Notification
+from lessons.models import PrivateClass, GroupClass, PrivatePack, GroupPack
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +130,66 @@ def current_role(request):
 
     data = {
         "current_role": user.current_role
+    }
+
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def number_of_active_students(request):
+
+    # number of students with active packs or packs that finished in less than a month
+    # for admins, students are in packs registered to the admins school
+    # for instructors, students that were in lessons given by the instructor in less than a month
+
+
+
+    user = request.user
+    current_role = user.current_role
+    a_month_ago = (datetime.now() - timedelta(weeks=4)).date()
+
+    students = []
+
+
+    if current_role == "Instructor":
+        private_lessons = PrivateClass.objects.filter(
+            instructor=user.instructor_profile
+        ).filter(
+            Q(date__gte=a_month_ago) |
+            Q(date=None)
+        )
+        group_lessons = GroupClass.objects.filter(
+            instructors__in=user.instructor_profile
+        ).filter(
+            Q(date__gte=a_month_ago) |
+            Q(date=None)
+        )
+        for l in private_lessons:
+            for student in l.students.all():
+                students.append(student)
+        for l in group_lessons:
+            for student in l.students.all():
+                students.append(student)
+
+    elif current_role == "Admin":
+        private_lessons = PrivateClass.objects.filter(
+            Q(date__gte=a_month_ago) |
+            Q(date=None)
+        )
+        group_lessons = GroupClass.objects.filter(
+            Q(date__gte=a_month_ago) |
+            Q(date=None)
+        )
+        for l in private_lessons:
+            for student in l.students.all():
+                students.append(student)
+        for l in group_lessons:
+            for student in l.students.all():
+                students.append(student)
+
+    data = {
+        "number_of_active_students" : len(set(students))
     }
 
     return Response(data)
