@@ -323,6 +323,25 @@ class PrivatePack(models.Model):
     def __str__(self):
         return f"Private Pack for {self.get_students_name()} starting on {self.date}"
     
+    def update_pack_status(self):
+
+        # TODO notifications
+
+        """
+        Atualiza o estado do pacote privado com base no status das aulas associadas.
+        """
+        # Obtém todas as aulas associadas a este pacote (supondo que exista uma relação entre classes e PrivatePack)
+        related_classes = self.classes.all()  # Ajusta conforme o nome do related_name na relação
+
+        # Se todas as aulas estiverem concluídas, marca o pacote como concluído
+        if related_classes.exists() and all(cls.is_done for cls in related_classes):
+            self.is_done = True
+        else:
+            self.is_done = False
+
+        self.save(update_fields=["is_done"])
+
+    
     def get_number_of_lessons_remaining(self):
         return self.classes.filter(is_done=False).count()
 
@@ -531,6 +550,9 @@ class PrivateClass(models.Model):
             return False
         self.is_done = True
 
+        if self.pack:
+            self.pack.update_pack_status()
+
         fixed_price = self.get_fixed_price() or 0
 
         try:
@@ -549,6 +571,9 @@ class PrivateClass(models.Model):
             return False
         fixed_price = self.get_fixed_price() or 0
         self.is_done = False
+
+        if self.pack:
+            self.pack.update_pack_status()
 
         try:
             commission = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["commission"]
