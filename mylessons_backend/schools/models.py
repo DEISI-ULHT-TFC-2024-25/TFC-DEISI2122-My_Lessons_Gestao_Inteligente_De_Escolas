@@ -8,44 +8,36 @@ def default_payment_types():
     """
     Returns a default payment types structure.
     The top-level keys represent roles directly.
+    The "fixed" pricing for private lessons is now a list of pricing dictionaries.
     """
     fixed_default = round(random.uniform(10, 20), 2)
     commission_default = random.choice([0, 5, 10])
+    default_fixed = [
+        {"duration": 90, "min_students": 1, "max_students": 2, "price": fixed_default},
+        {"duration": 60, "min_students": 1, "max_students": 4, "price": fixed_default},
+        {"duration": 60, "min_students": 0, "max_students": 0, "price": fixed_default},
+        {"duration": 0, "min_students": 0, "max_students": 0, "price": fixed_default},
+    ]
     return {
         "instructor": {
             "fixed monthly rate": None,
             "private lesson": {
                 "commission": commission_default,
-                "fixed": {
-                    "90-1-2": fixed_default,
-                    "60-1-1": fixed_default,
-                    "60-0-0": fixed_default,
-                    "0-0-0": fixed_default,
-                }
+                "fixed": copy.deepcopy(default_fixed)
             }
         },
         "admin": {
             "fixed monthly rate": None,
             "private lesson": {
                 "commission": commission_default,
-                "fixed": {
-                    "90-1-2": fixed_default,
-                    "60-1-1": fixed_default,
-                    "60-0-0": fixed_default,
-                    "0-0-0": fixed_default,
-                }
+                "fixed": copy.deepcopy(default_fixed)
             }
         },
         "monitor": {
             "fixed monthly rate": None,
             "private lesson": {
                 "commission": commission_default,
-                "fixed": {
-                    "90-1-2": fixed_default,
-                    "60-1-1": fixed_default,
-                    "60-0-0": fixed_default,
-                    "0-0-0": fixed_default,
-                }
+                "fixed": copy.deepcopy(default_fixed)
             }
         }
     }
@@ -262,53 +254,76 @@ class School(models.Model):
 
     def __str__(self):
         return self.name
-    
-    @staticmethod
-    def _set_nested_value(data, keys, value):
-        """
-        Helper to navigate a nested dict using the list of keys and set the last key to value.
-        Creates intermediate dictionaries if needed.
-        """
-        for key in keys[:-1]:
-            if key not in data or not isinstance(data[key], dict):
-                data[key] = {}
-            data = data[key]
-        data[keys[-1]] = value
 
     def update_payment_type_value(self, key_path, new_value, user_obj=None):
         """
         Updates a single nested field in the payment_types structure.
-        
+
+        For simple dictionary fields (e.g., "commission" or "fixed monthly rate"), the key_path is used as before.
+        However, if the target field is the "fixed" pricing list, then new_value is expected to be a dictionary 
+        with keys: "duration", "min_students", "max_students", and "price". The method will search the list for 
+        a pricing rule matching the provided criteria. If found, it updates the rule’s "price" with new_value["price"].
+        If no matching rule exists, it appends new_value to the list.
+
         Args:
             key_path (str): A string representing the nested path.
-                For example: "instructor[private lesson][fixed][60-1-4]"
-            new_value: The value to assign at that nested key.
-            user_obj (optional): If provided, the function will update the user's
-                payment_types for this school. Otherwise, the school's default payment_types
-                are updated.
+                For example: "instructor[private lesson][fixed]" for the fixed pricing list.
+            new_value: The new value to assign. For the "fixed" field, this must be a dict with the required keys.
+            user_obj (optional): If provided, update that user's payment_types for this school.
+                            Otherwise, update the school's default payment_types.
         """
-        # Extract keys from a path like: instructor[private lesson][fixed][60-1-4]
+        # Parse the key_path into parts. For example, "instructor[private lesson][fixed]" -> 
+        # ["instructor", "private lesson", "fixed"]
         keys = re.findall(r'\w[\w\s-]*', key_path)
         
+        # Determine the target: either user-specific (keyed by school name) or the school's own payment_types.
         if user_obj:
-            # Ensure the user has a JSON field "payment_types".
-            # The first-level keys are school names.
             if not user_obj.payment_types or not isinstance(user_obj.payment_types, dict):
                 user_obj.payment_types = {}
-
-            # If there is no entry for this school (or it's blank), copy the school's payment_types.
             if self.name not in user_obj.payment_types or not user_obj.payment_types[self.name]:
                 user_obj.payment_types[self.name] = copy.deepcopy(self.payment_types) if self.payment_types else {}
-
-            # Update the nested key within the user's payment_types for this school.
-            School._set_nested_value(user_obj.payment_types[self.name], keys, new_value)
-            user_obj.save(update_fields=['payment_types'])
+            target = user_obj.payment_types[self.name]
         else:
-            # Update the school's own payment_types.
             if not self.payment_types or not isinstance(self.payment_types, dict):
                 self.payment_types = default_payment_types()
-            School._set_nested_value(self.payment_types, keys, new_value)
-            self.save(update_fields=['payment_types'])
+            target = self.payment_types
+
+        # Traverse the nested structure for all keys except the last.
+        current = target
+        for key in keys[:-1]:
+            if key not in current or not isinstance(current[key], (dict, list)):
+                current[key] = {}
+            current = current[key]
+        
+        last_key = keys[-1]
+        
+        # If the current node for last_key is a list, we assume it is the "fixed" pricing list.
+        if isinstance(current.get(last_key), list):
+            # In this case, new_value must be a dict with required keys.
+            if not isinstance(new_value, dict):
+                raise ValueError("For updating a list field (fixed pricing), new_value must be a dictionary.")
+            required_keys = {"duration", "min_students", "max_students", "price"}
+            if not required_keys.issubset(new_value.keys()):
+                raise ValueError(f"new_value must contain keys: {required_keys}")
+            updated = False
+            for rule in current[last_key]:
+                if (rule.get("duration") == new_value["duration"] and
+                    rule.get("min_students") == new_value["min_students"] and
+                    rule.get("max_students") == new_value["max_students"]):
+                    rule["price"] = new_value["price"]
+                    updated = True
+                    break
+            if not updated:
+                current[last_key].append(new_value)
+        else:
+            # Otherwise, simply update the field.
+            current[last_key] = new_value
+
+        # Save the changes.
+        if user_obj:
+            user_obj.save(update_fields=["payment_types"])
+        else:
+            self.save(update_fields=["payment_types"])
     
     def get_unpaid_camp_orders(self):
         orders = []

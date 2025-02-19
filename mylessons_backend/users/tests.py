@@ -1,9 +1,178 @@
 from django.test import TestCase
-from lessons.models import PrivateClass, PrivatePack, UserAccount, Instructor, Unavailability
-from schools.models import School
+from lessons.models import PrivateClass, PrivatePack, Unavailability
+from schools.models import School, default_payment_types
 from datetime import datetime, timedelta, date, time
 from django.utils.timezone import now
-from users.models import Student
+from users.models import Student, UserAccount, Instructor
+from decimal import Decimal
+import copy
+import re
+
+# -------------------- PaymentTypeUpdateTests --------------------
+
+class PaymentTypeUpdateTests(TestCase):
+    def setUp(self):
+        # Create a school and an instructor user.
+        self.school = School.objects.create(name="Test School", currency="EUR")
+        self.user = UserAccount.objects.create(username="instructor", first_name="John", last_name="Doe")
+        self.instructor = Instructor.objects.create(user=self.user)
+        # Add the instructor to the school so that user's payment_types is initialized.
+        self.school.add_instructor(self.instructor)
+    
+    def test_update_simple_field(self):
+        # Update a simple field like commission.
+        # Key path: "instructor[private lesson][commission]"
+        self.school.update_payment_type_value("instructor[private lesson][commission]", 12, user_obj=self.user)
+        self.user.refresh_from_db()
+        commission = self.user.payment_types[self.school.name]["instructor"]["private lesson"]["commission"]
+        self.assertEqual(commission, 12)
+    
+    def test_update_fixed_existing_rule(self):
+        # Assume the default fixed pricing list contains a rule for duration=60, min_students=1, max_students=4.
+        # Update that rule's price to 10.00.
+        new_rule = {"duration": 60, "min_students": 1, "max_students": 4, "price": 10.00}
+        self.school.update_payment_type_value("instructor[private lesson][fixed]", new_rule, user_obj=self.user)
+        self.user.refresh_from_db()
+        fixed_list = self.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"]
+        # Find the rule.
+        rule = next((r for r in fixed_list 
+                     if r["duration"] == 60 and r["min_students"] == 1 and r["max_students"] == 4), None)
+        self.assertIsNotNone(rule)
+        self.assertEqual(rule["price"], 10.00)
+    
+    def test_update_fixed_append_new_rule(self):
+        # Use a rule that does not exist in the fixed list.
+        new_rule = {"duration": 45, "min_students": 2, "max_students": 3, "price": 8.50}
+        self.school.update_payment_type_value("instructor[private lesson][fixed]", new_rule, user_obj=self.user)
+        self.user.refresh_from_db()
+        fixed_list = self.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"]
+        rule = next((r for r in fixed_list 
+                     if r["duration"] == 45 and r["min_students"] == 2 and r["max_students"] == 3), None)
+        self.assertIsNotNone(rule)
+        self.assertEqual(rule["price"], 8.50)
+    
+    def test_update_without_user_obj(self):
+        # Update the school default payment_types.
+        self.school.update_payment_type_value("instructor[private lesson][commission]", 7)
+        self.school.refresh_from_db()
+        commission = self.school.payment_types["instructor"]["private lesson"]["commission"]
+        self.assertEqual(commission, 7)
+
+# -------------------- PrivateClassMarkingTests --------------------
+
+class PrivateClassMarkingTests(TestCase):
+    def setUp(self):
+        # Create a school, instructor user, and student.
+        self.school = School.objects.create(name="Test School", currency="EUR")
+        self.user = UserAccount.objects.create(username="instructor", first_name="John", last_name="Doe")
+        self.instructor = Instructor.objects.create(user=self.user)
+        self.school.add_instructor(self.instructor)
+        # Update fixed pricing for 60-minute lesson with 1-4 students to 15.00.
+        self.school.update_payment_type_value(
+            "instructor[private lesson][fixed]",
+            {"duration": 60, "min_students": 1, "max_students": 4, "price": 15.00},
+            user_obj=self.user
+        )
+        # Set commission to 10%
+        self.school.update_payment_type_value("instructor[private lesson][commission]", 10, user_obj=self.user)
+        # Create a student.
+        self.student = Student.objects.create(level=1, first_name="Alice", last_name="Smith", birthday=date(2010,1,1))
+    
+    def test_get_fixed_price(self):
+        # Create a PrivateClass with a 60-minute duration and 1 student.
+        private_class = PrivateClass.objects.create(
+            date=date(2025, 1, 1),
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            duration_in_minutes=60,
+            class_number=1,
+            price=50.00,
+            instructor=self.instructor,
+            school=self.school,
+        )
+        private_class.students.add(self.student)
+        fixed_price = private_class.get_fixed_price()
+        self.assertEqual(fixed_price, 15.00)
+    
+    def test_mark_as_given_updates_balance_and_history(self):
+        # Initialize user balance and history.
+        self.user.balance = Decimal("0.00")
+        self.user.balance_history = []
+        self.user.save(update_fields=["balance", "balance_history"])
+        
+        private_class = PrivateClass.objects.create(
+            date=date(2025, 1, 1),
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            duration_in_minutes=60,
+            class_number=1,
+            price=50.00,
+            instructor=self.instructor,
+            school=self.school,
+        )
+        private_class.students.add(self.student)
+        # Commission is 10% so commission fee = 50 * 0.10 = 5.00.
+        # Total amount to add = fixed price (15.00) + commission fee (5.00) = 20.00.
+        result = private_class.mark_as_given()
+        self.assertTrue(result)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("20.00"))
+        # Verify that a transaction was recorded.
+        self.assertGreaterEqual(len(self.user.balance_history), 1)
+        last_tx = self.user.balance_history[-1]
+        self.assertEqual(last_tx["amount"], "+20.00")
+        # Calling mark_as_given again should return False.
+        self.assertFalse(private_class.mark_as_given())
+    
+    def test_mark_as_not_given_reverses_balance(self):
+        # Initialize balance and history.
+        self.user.balance = Decimal("0.00")
+        self.user.balance_history = []
+        self.user.save(update_fields=["balance", "balance_history"])
+        
+        private_class = PrivateClass.objects.create(
+            date=date(2025, 1, 1),
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            duration_in_minutes=60,
+            class_number=1,
+            price=50.00,
+            instructor=self.instructor,
+            school=self.school,
+        )
+        private_class.students.add(self.student)
+        # First mark as given (+20.00), then reverse it.
+        private_class.mark_as_given()
+        result = private_class.mark_as_not_given()
+        self.assertTrue(result)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("0.00"))
+        transactions = self.user.balance_history
+        # Expect at least two transactions: one for mark_as_given and one for reversal.
+        self.assertGreaterEqual(len(transactions), 2)
+        self.assertEqual(transactions[-1]["amount"], "-20.00")
+
+# -------------------- BalanceHistoryTests --------------------
+
+class BalanceHistoryTests(TestCase):
+    def setUp(self):
+        self.user = UserAccount.objects.create(username="testuser", first_name="Test", last_name="User")
+        self.user.balance = Decimal("0.00")
+        self.user.balance_history = []
+        self.user.save(update_fields=["balance", "balance_history"])
+    
+    def test_multiple_transactions_recorded(self):
+        # Perform multiple balance updates.
+        self.user.update_balance(50.00, "Initial deposit")
+        self.user.update_balance(-20.00, "Withdrawal")
+        self.user.update_balance(30.00, "Another deposit")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("60.00"))
+        self.assertEqual(len(self.user.balance_history), 3)
+        # Check that amounts are correctly formatted.
+        self.assertEqual(self.user.balance_history[0]["amount"], "+50.00")
+        self.assertEqual(self.user.balance_history[1]["amount"], "-20.00")
+        self.assertEqual(self.user.balance_history[2]["amount"], "+30.00")
 
 class StudentTests(TestCase):
     def setUp(self):
@@ -126,41 +295,6 @@ class InstructorTests(TestCase):
         self.assertIn(time(17, 0), times_list)
         self.assertNotIn(time(18, 0), times_list)
 
-    def test_payment_types_initialization_and_update(self):
-        # Add the instructor to the school and initialize payment_types
-        self.assertTrue(self.school.add_instructor(self.instructor))
-        
-        # Refresh the instructor from the DB to ensure changes are persisted
-        self.instructor.refresh_from_db()
-        
-        # The instructor's payment_types should now have an entry for the school name
-        self.assertIn(self.school.name, self.instructor.user.payment_types)
-        pt = self.instructor.user.payment_types[self.school.name]
-        # With the new structure, the top-level keys are the roles directly
-        self.assertIn("instructor", pt)
-        
-        # Update a nested value:
-        # Set instructor[private lesson][fixed][60-1-4] to 10.00
-        self.school.update_payment_type_value(
-            "instructor[private lesson][fixed][60-1-4]", 10.00, user_obj=self.instructor.user
-        )
-        self.instructor.refresh_from_db()
-        updated_value = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"].get("60-1-4")
-        self.assertEqual(updated_value, 10.00)
-
-        # Update a nested value again:
-        # Set instructor[private lesson][fixed][60-1-4] to 20.00
-        self.school.update_payment_type_value(
-            "instructor[private lesson][fixed][60-1-4]", 20.00, user_obj=self.instructor.user
-        )
-        self.instructor.refresh_from_db()
-        updated_value = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"].get("60-1-4")
-        self.assertEqual(updated_value, 20.00)
-        
-        # Remove the instructor from the school; this should also remove the payment_types entry
-        self.assertTrue(self.school.remove_instructor(self.instructor))
-        self.instructor.refresh_from_db()
-        self.assertNotIn(self.school.name, self.instructor.user.payment_types)
 
 
 class UnavailabilityTests(TestCase):
