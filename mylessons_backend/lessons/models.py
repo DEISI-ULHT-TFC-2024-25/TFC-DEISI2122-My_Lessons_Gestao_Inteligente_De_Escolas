@@ -505,29 +505,60 @@ class PrivateClass(models.Model):
     sport = models.ForeignKey('sports.Sport', related_name='private_classes', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
-        return f"Private Class {self.class_number} on {self.date} at {self.start_time}"
+        return f"Private Class {self.class_number} on {self.date} at {self.start_time} id {self.id}"
+    
+    def get_fixed_price(self):
+        """
+        Searches the instructor's fixed pricing list for a configuration matching:
+         - self.duration_in_minutes equals configuration["duration"]
+         - total student count (students + extra) is between configuration["min_students"] and configuration["max_students"] (inclusive)
+         
+        Returns the price if a match is found; otherwise, returns None.
+        """
+        total_students = self.students.count() + (self.number_of_extra_students or 0)
+        try:
+            pricing_list = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["fixed"]
+        except (KeyError, TypeError):
+            return None
+        for pricing in pricing_list:
+            if (self.duration_in_minutes == pricing.get("duration") and 
+                pricing.get("min_students") <= total_students <= pricing.get("max_students")):
+                return pricing.get("price")
+        return None
     
     def mark_as_given(self):
         if self.is_done:
             return False
-        else:
-            # mark as done
-            self.is_done = True
+        self.is_done = True
 
-            # update instructor balance by checking the instructor.user.payment_types[self.school]["instructor"]["private lesson"]["fixed"].get(f"{self.duration_in_minutes}-{self.students.all().count()+self.number_of_extra_students}-{self.students.all().count()+self.number_of_extra_students}")
+        fixed_price = self.get_fixed_price() or 0
 
-            # check if the pack finished
-            pass
+        try:
+            commission = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["commission"]
+        except (KeyError, TypeError):
+            commission = 0
+
+        commission_fee = self.price * (commission / 100) if commission else 0
+        amount_to_add = fixed_price + commission_fee
+        
+        self.instructor.user.update_balance(amount=amount_to_add, message=str(self))
         return True
     
     def mark_as_not_given(self):
         if not self.is_done:
             return False
-        else:
-            # mark as not done
-            # update instructor balance
-            # check if the pack was finished
-            pass
+        fixed_price = self.get_fixed_price() or 0
+        self.is_done = False
+
+        try:
+            commission = self.instructor.user.payment_types[self.school.name]["instructor"]["private lesson"]["commission"]
+        except (KeyError, TypeError):
+            commission = 0
+
+        commission_fee = self.price * (commission / 100) if commission else 0
+        amount_to_add = fixed_price + commission_fee
+        
+        self.instructor.user.update_balance(amount=-amount_to_add, message=str(self))
         return True
     
     def get_students_name(self):
