@@ -29,19 +29,19 @@ def get_lessons_data(user, date_lookup, is_done_flag):
     student_ids = user.students.values_list('id', flat=True)
     
     # Adjust the private class filters with the given parameters.
-    lessons = Lesson.objects.filter(
+    lessons = list(set(Lesson.objects.filter(
         students__id__in=student_ids,
         is_done=is_done_flag,
         **date_lookup  # expects key like date__gte or date__lte with value today
-    ).order_by('date', 'start_time')
+    ).order_by('date', 'start_time')))
 
     # Process private lessons data.
     lessons_data = [
         {
             "lesson_id": lesson.id,
-            "date": lesson.date.strftime("%d %b"),
-            "start_time": lesson.start_time.strftime("%I:%M %p"),
-            "end_time": lesson.start_time.strftime("%I:%M %p"),
+            "date": lesson.date.strftime("%d %b") if lesson.date else "None",
+            "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
+            "end_time": lesson.start_time.strftime("%I:%M %p") if lesson.end_time else "None",
             "duration_in_minutes": lesson.duration_in_minutes,
             "lesson_number": lesson.class_number,
             "number_of_lessons": lesson.pack.number_of_classes,
@@ -58,7 +58,8 @@ def get_lessons_data(user, date_lookup, is_done_flag):
             "minimum_age": lesson.minimum_age,
             "maximum_age": lesson.maximum_age,
             "maximum_number_of_students": lesson.maximum_number_of_students,
-            "school": lesson.school if lesson.school else "Unknown",
+            "school_name": str(lesson.school) if lesson.school else "Unknown",
+            "school_id": lesson.school.id if lesson.school else "Unknown",
             "pack_id": lesson.pack.id if lesson.pack else "Unknown",
             "sport_name": lesson.sport.name if lesson.sport else "Unknown",
         }
@@ -156,7 +157,7 @@ def active_packs(request):
     student_ids = user.students.values_list('id', flat=True)
 
     # Fetch active packs
-    packs = Pack.objects.filter(students__id__in=student_ids, is_done=False)
+    packs = list(set(Pack.objects.filter(students__id__in=student_ids, is_done=False)))
 
     packs_data = [
         {
@@ -179,7 +180,8 @@ def active_packs(request):
             "instructors_name": pack.get_instructors_name() if pack.instructors.exists() else "Unknown",
             "instructors_ids": pack.get_instructors_ids() if pack.instructors.exists() else "Unknown",
             "finished_date": pack.finished_date,
-            "school": pack.school.name if pack.school else None,
+            "school_name": str(pack.school) if pack.school else "Unknown",
+            "school_id": pack.school.id if pack.school else "Unknown",
             "sport": pack.sport.name if pack.sport else None,
         }
         for pack in packs
@@ -223,7 +225,8 @@ def pack_details(request, id):
         "instructors_name": pack.get_instructors_name() if pack.instructors.exists() else "Unknown",
         "instructors_ids": pack.get_instructors_ids() if pack.instructors.exists() else "Unknown",
         "finished_date": pack.finished_date,
-        "school": pack.school.name if pack.school else None,
+        "school_name": str(pack.school) if pack.school else "Unknown",
+        "school_id": pack.school.id if pack.school else "Unknown",
         "sport": pack.sport.name if pack.sport else None,
     }
     return Response(data)
@@ -247,12 +250,12 @@ def lesson_details(request, id):
 
     data = {
             "lesson_id": lesson.id,
-            "date": lesson.date.strftime("%d %b"),
-            "start_time": lesson.start_time.strftime("%I:%M %p"),
-            "end_time": lesson.start_time.strftime("%I:%M %p"),
+            "date": lesson.date.strftime("%d %b") if lesson.date else "None",
+            "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
+            "end_time": lesson.start_time.strftime("%I:%M %p") if lesson.end_time else "None",
             "duration_in_minutes": lesson.duration_in_minutes,
             "lesson_number": lesson.class_number,
-            "number_of_lessons": lesson.pack.number_of_classes,
+            "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None",
             "price": lesson.price,
             "is_done": lesson.is_done,
             "extras": lesson.extras,
@@ -266,7 +269,8 @@ def lesson_details(request, id):
             "minimum_age": lesson.minimum_age,
             "maximum_age": lesson.maximum_age,
             "maximum_number_of_students": lesson.maximum_number_of_students,
-            "school": lesson.school if lesson.school else "Unknown",
+            "school_name": str(lesson.school) if lesson.school else "Unknown",
+            "school_id": lesson.school.id if lesson.school else "Unknown",
             "pack_id": lesson.pack.id if lesson.pack else "Unknown",
             "sport_name": lesson.sport.name if lesson.sport else "Unknown",
         }
