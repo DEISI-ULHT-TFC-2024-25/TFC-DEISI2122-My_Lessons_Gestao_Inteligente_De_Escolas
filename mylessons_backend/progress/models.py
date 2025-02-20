@@ -1,6 +1,6 @@
 from django.db import models
 from users.models import Student, Instructor
-from lessons.models import PrivateClass, GroupClass
+from lessons.models import Lesson
 from sports.models import Sport
 from django.utils.timezone import now
 
@@ -24,7 +24,7 @@ class SkillProficiency(models.Model):
         self.save()
 
     def __str__(self):
-        return f"{self.student.user.username} - {self.skill.name}: Level {self.level}"
+        return f"{self.student} - {self.skill.name}: Level {self.level}"
 
 class Goal(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="goals")
@@ -61,14 +61,7 @@ class Goal(models.Model):
 class ProgressRecord(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="progress_records")
     lesson = models.ForeignKey(
-        PrivateClass, 
-        on_delete=models.CASCADE, 
-        related_name="progress_records",
-        null=True, 
-        blank=True
-    )
-    group_class = models.ForeignKey(
-        GroupClass, 
+        Lesson, 
         on_delete=models.CASCADE, 
         related_name="progress_records",
         null=True, 
@@ -87,7 +80,7 @@ class ProgressRecord(models.Model):
         self.save()
 
     def __str__(self):
-        return f"Progress Record for {self.student.user.username} on {self.date}"
+        return f"Progress Record for {self.student} on {self.date}"
 
 class ProgressReport(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="progress_reports")
@@ -111,7 +104,7 @@ class ProgressReport(models.Model):
             date__range=(start_date, end_date)
         )
 
-        summary = f"Progress report for {student.user.username} from {start_date} to {end_date}\n\n"
+        summary = f"Progress report for {student} from {start_date} to {end_date}\n\n"
 
         summary += "Goals:\n"
         for goal in goals:
@@ -120,7 +113,7 @@ class ProgressReport(models.Model):
 
         summary += "\nProgress Records:\n"
         for record in progress_records:
-            lesson_info = f"Lesson ID: {record.lesson.id}" if record.lesson else f"Group Class ID: {record.group_class.id}"
+            lesson_info = f"Lesson ID: {record.lesson.id}" if record.lesson else f"Lesson Not Assigned"
             summary += f"- Date: {record.date} | {lesson_info} | Skills Covered: {[skill.skill.name for skill in record.skills.all()]}\n"
 
         return cls.objects.create(
@@ -136,4 +129,4 @@ class ProgressReport(models.Model):
         return cls.objects.filter(student=student).latest('created_at')
 
     def __str__(self):
-        return f"Progress Report for {self.student.user.username} ({self.period_start} to {self.period_end})"
+        return f"Progress Report for {self.student} ({self.period_start} to {self.period_end})"

@@ -90,10 +90,10 @@ def default_private_lessons_pack_prices():
 
 def default_notification_templates():
     return {
-            "group_pack_purchased_subject_parent": "Group Pack Purchased for {student}",
+            "group_pack_purchased_subject_parent": "Group Pack Purchased for {students}",
             "group_pack_purchased_message_parent": (
                 "Dear {parent_name},\n\n"
-                "A new group pack has been purchased for {student}.\n\n"
+                "A new group pack has been purchased for {students}.\n\n"
                 "Pack Details:\n"
                 "- Number of Classes: {number_of_classes}\n"
                 "- Duration per Class: {duration_minutes} minutes\n"
@@ -104,7 +104,7 @@ def default_notification_templates():
             "group_pack_purchased_subject_admin": "New Group Pack Booked",
             "group_pack_purchased_message_admin": (
                 "Dear Admin,\n\n"
-                "A new group pack has been booked for {student}.\n\n"
+                "A new group pack has been booked for {students}.\n\n"
                 "Pack Details:\n"
                 "- Number of Classes: {number_of_classes}\n"
                 "- Duration per Class: {duration_minutes} minutes\n"
@@ -227,7 +227,7 @@ class Review(models.Model):
         ordering = ['-date']  # Newest reviews appear first
 
 class School(models.Model):
-    private_lessons_pack_prices = models.JSONField(default=default_private_lessons_pack_prices, blank=True)
+    private_lessons_pack_prices = models.JSONField(default=default_private_lessons_pack_prices, blank=True) # TODO merge private and group into one
     group_lessons_pack_prices = models.JSONField(default=default_group_lessons_pack_prices, blank=True)
     name = models.CharField(max_length=255)
     payment_types = models.JSONField(default=default_payment_types, blank=True, null=True)
@@ -326,27 +326,10 @@ class School(models.Model):
             self.save(update_fields=["payment_types"])
     
     def get_unpaid_camp_orders(self):
-        orders = []
-        camp_orders = self.camp_orders.all()
-        if camp_orders:
-            for order in camp_orders:
-                orders.append(order)
-        return orders
+        return list(self.camp_orders.filter(is_fully_paid=False))
     
     def get_unpaid_packs(self):
-        packs = []
-        private_packs = self.private_packs.all()
-        group_packs = self.group_packs.all()
-
-        if private_packs:
-            for pack in private_packs:
-                packs.append(pack)
-
-        if group_packs:
-            for pack in group_packs:
-                packs.append(pack)
-
-        return packs
+        return list(self.packs.filter(is_paid=False))
     
     def update_pack_price(self, pack_type, duration, number_of_people=None, number_of_classes=None, price=None):
         """

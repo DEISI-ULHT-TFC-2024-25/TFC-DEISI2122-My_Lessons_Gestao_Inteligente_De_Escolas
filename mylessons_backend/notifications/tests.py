@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.utils.timezone import now
 from datetime import datetime, timedelta, date, time
 from users.models import UserAccount, Student, Instructor
-from lessons.models import GroupClass, PrivateClass, GroupPack, PrivatePack
+from lessons.models import Pack, Lesson
 from schools.models import School
 from events.models import Activity
 from notifications.models import Notification
@@ -14,7 +14,7 @@ class NotificationModelTests(TestCase):
         self.school = School.objects.create(name="Test School")
         self.user = UserAccount.objects.create(username="test_user", email="test_user@example.com")
         self.student = Student.objects.create(user=self.user, level=1, birthday=date(2010, 1, 1))
-        self.group_class = GroupClass.objects.create(
+        self.group_class = Lesson.objects.create(
             date=date(2025, 1, 1),
             start_time=time(10, 0),
             end_time=time(11, 0),
@@ -23,9 +23,10 @@ class NotificationModelTests(TestCase):
             minimum_age=5,
             maximum_age=18,
             maximum_number_of_students=10,
-            school=self.school
+            school=self.school,
+            type="group"
         )
-        self.private_class = PrivateClass.objects.create(
+        self.private_class = Lesson.objects.create(
             date=date(2025, 1, 2),
             start_time=time(12, 0),
             end_time=time(13, 0),
@@ -33,25 +34,29 @@ class NotificationModelTests(TestCase):
             class_number=1,
             price=50.00,
             school=self.school,
+            type="private"
         )
         self.private_class.students.set([self.student])
-        self.group_pack = GroupPack.objects.create(
+        self.group_pack = Pack.objects.create(
             date=date(2025, 1, 1),
             number_of_classes=5,
             number_of_classes_left=5,
             duration_in_minutes=60,
             price=100.00,
-            student=self.student,
             expiration_date=date(2025, 6, 1),
-            school=self.school
+            school=self.school,
+            type="group"
         )
-        self.private_pack = PrivatePack.objects.create(
+        self.group_pack.students.set([self.student])
+        self.private_pack = Pack.objects.create(
             date=date(2025, 1, 1),
             number_of_classes=5,
+            number_of_classes_left=5,
             duration_in_minutes=60,
             price=200.00,
             expiration_date=date(2025, 6, 1),
-            school=self.school
+            school=self.school,
+            type="private"
         )
         self.private_pack.students.set([self.student])
         self.activity = Activity.objects.create(
@@ -75,20 +80,18 @@ class NotificationModelTests(TestCase):
             sent_at=now(),
             school=self.school
         )
-        notification.group_classes.set([self.group_class])
-        notification.private_classes.set([self.private_class])
-        notification.group_packs.set([self.group_pack])
-        notification.private_packs.set([self.private_pack])
+        notification.lessons.set([self.group_class, self.private_class])
+        notification.packs.set([self.group_pack, self.private_pack])
         notification.activities.set([self.activity])
 
         self.assertEqual(notification.user, self.user)
         self.assertEqual(notification.subject, "Group Class Scheduled")
         self.assertEqual(notification.message, "Your group class is scheduled.")
         self.assertEqual(notification.school, self.school)
-        self.assertIn(self.group_class, notification.group_classes.all())
-        self.assertIn(self.private_class, notification.private_classes.all())
-        self.assertIn(self.group_pack, notification.group_packs.all())
-        self.assertIn(self.private_pack, notification.private_packs.all())
+        self.assertIn(self.group_class, notification.lessons.all())
+        self.assertIn(self.private_class, notification.lessons.all())
+        self.assertIn(self.group_pack, notification.packs.all())
+        self.assertIn(self.private_pack, notification.packs.all())
         self.assertIn(self.activity, notification.activities.all())
 
     def test_mark_as_read(self):

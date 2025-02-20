@@ -13,9 +13,10 @@ class ActivityModel(models.Model):
 class Activity(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    student_price = models.DecimalField(max_digits=10, decimal_places=2)
-    monitor_price = models.DecimalField(max_digits=10, decimal_places=2)
+    student_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monitor_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     date = models.DateField()
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     start_time = models.TimeField()
     end_time = models.TimeField(null=True, blank=True)
     duration_in_minutes = models.PositiveIntegerField()
@@ -29,7 +30,7 @@ class Activity(models.Model):
         return f"{self.name} on {self.date} at {self.start_time}"
     
     def add_instructor(self, instructor):
-        from lessons.models import GroupClass, PrivateClass
+        from lessons.models import Lesson
         from users.models import Unavailability
    
         # Overlapping unavailabilities
@@ -41,18 +42,9 @@ class Activity(models.Model):
             end_time__gt=self.start_time,
         )
 
-        # Overlapping private classes
-        overlapping_private_classes = PrivateClass.objects.filter(
-            instructor=instructor,
-            date=self.date,
-        ).filter(
-            start_time__lt=self.end_time,
-            end_time__gt=self.start_time,
-        )
-
-        # Overlapping group classes
-        overlapping_group_classes = GroupClass.objects.filter(
-            instructors=instructor,
+        # Overlapping lessons
+        overlapping_lessons = Lesson.objects.filter(
+            instructors__in=[instructor],
             date=self.date,
         ).filter(
             start_time__lt=self.end_time,
@@ -61,11 +53,12 @@ class Activity(models.Model):
 
         overlapping_activities = Activity.objects.filter(
             date=self.date,
+            instructors__in=[instructor],
             start_time__lt=self.end_time,
             end_time__gt=self.start_time,
         )
             
-        if not (overlapping_unavailabilities or overlapping_private_classes or overlapping_group_classes) or overlapping_activities:
+        if not (overlapping_unavailabilities or overlapping_lessons) or overlapping_activities:
             if self.instructors:
                 # TODO notify Instructor
                 pass

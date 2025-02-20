@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from datetime import date, timedelta, time, datetime
 from schools.models import School
 from users.models import Instructor, Student, UserAccount
-from lessons.models import PrivateClass
+from lessons.models import Lesson
 from sports.models import Sport
 from .models import Skill, SkillProficiency, Goal, ProgressRecord, ProgressReport
 
@@ -69,17 +69,17 @@ class ProgressRecordTests(TestCase):
         self.sport = Sport.objects.create(name="Skateboarding")
         self.skill = Skill.objects.create(name="Manual", sport=self.sport)
         self.proficiency = SkillProficiency.objects.create(student=self.student, skill=self.skill)
-        self.private_class = PrivateClass.objects.create(
+        self.private_class = Lesson.objects.create(
             date=date(2025,1,2),
             start_time=time(12, 0),
             end_time=time(13, 0),
             duration_in_minutes=60,
             class_number=1,
             price=50.00,
-            instructor=self.instructor,
             school=self.school,
         )
         self.private_class.students.set([self.student])
+        self.private_class.instructors.set([self.instructor])
         self.record = ProgressRecord.objects.create(student=self.student, lesson=self.private_class)
 
     def test_add_covered_skill(self):
@@ -120,17 +120,17 @@ class ProgressReportTests(TestCase):
             description="Land a proper 360 Flip",
             target_date=date(2026,1,5),
         )
-        self.private_class = PrivateClass.objects.create(
+        self.private_class = Lesson.objects.create(
             date=date(2025,1,2),
             start_time=time(12, 0),
             end_time=time(13, 0),
             duration_in_minutes=60,
             class_number=1,
             price=50.00,
-            instructor=self.instructor,
             school=self.school,
         )
         self.private_class.students.set([self.student])
+        self.private_class.instructors.set([self.instructor])
         self.record = ProgressRecord.objects.create(student=self.student, lesson=self.private_class)
 
     def test_generate_report(self):

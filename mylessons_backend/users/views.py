@@ -12,7 +12,7 @@ from django.contrib.auth.hashers import make_password
 from .models import UserAccount
 from .serializers import UserAccountSerializer
 from notifications.models import Notification
-from lessons.models import PrivateClass, GroupClass, PrivatePack, GroupPack
+from lessons.models import Lesson, Pack
 from django.db.models import Q
 from django.utils.timezone import now
 
@@ -154,38 +154,22 @@ def number_of_active_students(request):
 
 
     if current_role == "Instructor":
-        private_lessons = PrivateClass.objects.filter(
-            instructor=user.instructor_profile
-        ).filter(
-            Q(date__gte=a_month_ago) |
-            Q(date=None)
-        )
-        group_lessons = GroupClass.objects.filter(
+        lessons = Lesson.objects.filter(
             instructors__in=user.instructor_profile
         ).filter(
             Q(date__gte=a_month_ago) |
             Q(date=None)
         )
-        for l in private_lessons:
-            for student in l.students.all():
-                students.append(student)
-        for l in group_lessons:
+        for l in lessons:
             for student in l.students.all():
                 students.append(student)
 
     elif current_role == "Admin":
-        private_lessons = PrivateClass.objects.filter(
+        lessons = Lesson.objects.filter(
             Q(date__gte=a_month_ago) |
             Q(date=None)
         )
-        group_lessons = GroupClass.objects.filter(
-            Q(date__gte=a_month_ago) |
-            Q(date=None)
-        )
-        for l in private_lessons:
-            for student in l.students.all():
-                students.append(student)
-        for l in group_lessons:
+        for l in lessons:
             for student in l.students.all():
                 students.append(student)
 

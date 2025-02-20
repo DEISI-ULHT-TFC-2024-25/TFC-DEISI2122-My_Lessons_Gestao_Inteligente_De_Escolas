@@ -1,5 +1,5 @@
 from django.test import TestCase
-from lessons.models import PrivateClass, PrivatePack, Unavailability
+from lessons.models import Lesson, Pack, Unavailability
 from schools.models import School, default_payment_types
 from datetime import datetime, timedelta, date, time
 from django.utils.timezone import now
@@ -80,18 +80,19 @@ class PrivateClassMarkingTests(TestCase):
     
     def test_get_fixed_price(self):
         # Create a PrivateClass with a 60-minute duration and 1 student.
-        private_class = PrivateClass.objects.create(
+        private_class = Lesson.objects.create(
             date=date(2025, 1, 1),
             start_time=time(10, 0),
             end_time=time(11, 0),
             duration_in_minutes=60,
             class_number=1,
             price=50.00,
-            instructor=self.instructor,
             school=self.school,
+            type="private"
         )
         private_class.students.add(self.student)
-        fixed_price = private_class.get_fixed_price()
+        private_class.instructors.add(self.instructor)
+        fixed_price = private_class.get_fixed_price(instructor=self.instructor)
         self.assertEqual(fixed_price, 15.00)
     
     def test_mark_as_given_updates_balance_and_history(self):
@@ -100,17 +101,18 @@ class PrivateClassMarkingTests(TestCase):
         self.user.balance_history = []
         self.user.save(update_fields=["balance", "balance_history"])
         
-        private_class = PrivateClass.objects.create(
+        private_class = Lesson.objects.create(
             date=date(2025, 1, 1),
             start_time=time(10, 0),
             end_time=time(11, 0),
             duration_in_minutes=60,
             class_number=1,
             price=50.00,
-            instructor=self.instructor,
             school=self.school,
+            type="private"
         )
         private_class.students.add(self.student)
+        private_class.instructors.add(self.instructor)
         # Commission is 10% so commission fee = 50 * 0.10 = 5.00.
         # Total amount to add = fixed price (15.00) + commission fee (5.00) = 20.00.
         result = private_class.mark_as_given()
@@ -130,17 +132,18 @@ class PrivateClassMarkingTests(TestCase):
         self.user.balance_history = []
         self.user.save(update_fields=["balance", "balance_history"])
         
-        private_class = PrivateClass.objects.create(
+        private_class = Lesson.objects.create(
             date=date(2025, 1, 1),
             start_time=time(10, 0),
             end_time=time(11, 0),
             duration_in_minutes=60,
             class_number=1,
             price=50.00,
-            instructor=self.instructor,
             school=self.school,
+            type="private"
         )
         private_class.students.add(self.student)
+        private_class.instructors.add(self.instructor)
         # First mark as given (+20.00), then reverse it.
         private_class.mark_as_given()
         result = private_class.mark_as_not_given()
@@ -197,22 +200,23 @@ class StudentTests(TestCase):
         payment = 300.00
 
         # Call the book_new_pack function
-        pack = PrivatePack.book_new_pack(
+        pack = Pack.book_new_pack(
             students=[self.student],
             school=self.school,
             date=date_of_pack,
             number_of_classes=number_of_classes,
             duration_in_minutes=duration_in_minutes,
-            instructor=self.instructor,
+            instructors=[self.instructor],
             price=price,
-            payment=payment
+            payment=payment,
+            type="private"
         )
         # Verify the pack creation
         self.assertIsNotNone(pack)
-        private_lesson1 = pack.classes.all()[0]
-        private_lesson2 = pack.classes.all()[1]
-        private_lesson3 = pack.classes.all()[2]
-        private_lesson4 = pack.classes.all()[3]
+        private_lesson1 = pack.lessons.all()[0]
+        private_lesson2 = pack.lessons.all()[1]
+        private_lesson3 = pack.lessons.all()[2]
+        private_lesson4 = pack.lessons.all()[3]
         self.assertIsNotNone(private_lesson1)
         self.assertIsNotNone(private_lesson2)
         self.assertIsNotNone(private_lesson3)
@@ -222,7 +226,7 @@ class StudentTests(TestCase):
         self.assertFalse(private_lesson3.schedule_lesson(date(2025,1,1), time(10,00)))
         self.assertFalse(private_lesson4.schedule_lesson(date(2025,1,1), time(11,00)))
 
-        lessons = self.student.get_all_booked_private_lessons()
+        lessons = self.student.get_all_booked_lessons()
 
         self.assertIn(private_lesson1, lessons)
         self.assertIn(private_lesson2, lessons)
@@ -258,15 +262,15 @@ class InstructorTests(TestCase):
             duration_in_minutes=120,
         )
         # Create a private class
-        self.private_class = PrivateClass.objects.create(
+        self.private_class = Lesson.objects.create(
             date=date(2025, 1, 2),
             start_time=time(15, 0),
             end_time=time(16, 0),
             duration_in_minutes=60,
             class_number=1,
             price=50.00,
-            instructor=self.instructor,
             school=self.school,
+            type="private"
         )
         # Create and assign a student to the private class
         student = Student.objects.create(
@@ -275,13 +279,14 @@ class InstructorTests(TestCase):
             first_name="Alice",
             last_name="Silva"
         )
+        self.private_class.instructors.set([self.instructor])
         self.private_class.students.set([student])
 
     def test_view_available_lesson_times(self):
         # Ensure the instructor is added to the school (which also initializes payment_types)
         self.assertTrue(self.school.add_instructor(self.instructor))
         times_list = self.instructor.view_available_lesson_times(
-            date(2025, 1, 2), 60, 60, self.school, False, True
+            date(2025, 1, 2), 60, 60, self.school
         )
         self.assertNotIn(time(8, 0), times_list)
         self.assertIn(time(9, 0), times_list)

@@ -3,7 +3,7 @@ import json
 from django.conf import settings
 from users.models import UserAccount
 from schools.models import School
-from lessons.models import GroupPack, PrivatePack
+from lessons.models import Pack
 
 stripe.api_key = settings.STRIPE_SECRET_KEY  # Store this in settings.py
 

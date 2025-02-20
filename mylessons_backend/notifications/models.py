@@ -16,11 +16,9 @@ class Notification(models.Model):
         null=True, 
         blank=True
     )
-    private_classes = models.ManyToManyField('lessons.PrivateClass', related_name="notifications", blank=True)
-    group_classes = models.ManyToManyField('lessons.GroupClass', related_name="notifications", blank=True)
+    lessons = models.ManyToManyField('lessons.Lesson', related_name="notifications", blank=True)
     activities = models.ManyToManyField('events.Activity', related_name="notifications", blank=True)
-    private_packs = models.ManyToManyField('lessons.PrivatePack', related_name="notifications", blank=True)
-    group_packs = models.ManyToManyField('lessons.GroupPack', related_name="notifications", blank=True)
+    packs = models.ManyToManyField('lessons.Pack', related_name="notifications", blank=True)
     type = models.CharField(max_length=255, null=True, blank=True)
     subject = models.CharField(max_length=255, default="Notification from MyLessons")
     message = models.TextField()
@@ -61,7 +59,7 @@ class Notification(models.Model):
         self.save()
 
     @classmethod
-    def create_notification(cls, user, subject, message, school=None, private_classes=None, group_classes=None, activities=None, private_packs=None, group_packs=None, type=None):
+    def create_notification(cls, user, subject, message, school=None, lessons=None, activities=None, packs=None, type=None):
         """
         Creates a notification with optional associations.
         """
@@ -74,16 +72,12 @@ class Notification(models.Model):
             created_at=now(),
         )
 
-        if private_classes:
-            notification.private_classes.set(private_classes)
-        if group_classes:
-            notification.group_classes.set(group_classes)
+        if lessons:
+            notification.lessons.set(lessons)
+        if packs:
+            notification.packs.set(packs)
         if activities:
             notification.activities.set(activities)
-        if private_packs:
-            notification.private_packs.set(private_packs)
-        if group_packs:
-            notification.group_packs.set(group_packs)
 
         notification.save()
         return notification
