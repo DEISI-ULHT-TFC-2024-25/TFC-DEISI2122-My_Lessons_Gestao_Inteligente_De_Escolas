@@ -13,6 +13,11 @@ def get_students_ids(students_list):
     students_ids = [f"{student.id}" for student in students_list]
     return students_ids
 
+def get_instructors_ids(instructors_list):
+
+    instructors_ids = [f"{instructor.id}" for instructor in instructors_list]
+    return instructors_ids
+
 def get_phone(user):
     if user.country_code and user.phone:
         return f"{user.country_code}{user.phone}"

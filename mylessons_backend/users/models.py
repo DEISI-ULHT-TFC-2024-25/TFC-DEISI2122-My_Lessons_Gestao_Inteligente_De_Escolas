@@ -83,11 +83,8 @@ class Student(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
     
-    def get_all_booked_private_lessons(self):
-        lessons = []
-        for lesson in self.private_classes.exclude(date=None, start_time=None):
-            lessons.append(lesson)
-        return lessons
+    def get_all_booked_lessons(self):
+        return list(self.lessons.exclude(date=None, start_time=None))
     
     
 class Instructor(models.Model):
@@ -101,11 +98,11 @@ class Instructor(models.Model):
     def get_phone(self):
         return get_phone(self.user)
     
-    def view_available_lesson_times(self, date, duration, increment, school, is_group_lesson=False, is_private_lesson=False):
+    def view_available_lesson_times(self, date, duration, increment, school):
         # Define the working hours (adjust as needed for the school or instructor)
         start_time = time(9, 0)  # Start of the day
         end_time = time(18, 0)  # End of the day
-        # TODO
+        # TODO 
         # Get all conflicting schedules for the instructor on the given date
         conflicting_times = []
 
@@ -116,12 +113,7 @@ class Instructor(models.Model):
 
         # Private Classes
         conflicting_times.extend(
-            [(pc.start_time, pc.end_time) for pc in self.instructor_private_classes.filter(date=date)]
-        )
-
-        # Group Classes
-        conflicting_times.extend(
-            [(gc.start_time, gc.end_time) for gc in self.group_classes.filter(date=date, school=school)]
+            [(pc.start_time, pc.end_time) for pc in self.lessons.filter(date=date)]
         )
 
         # Activities
@@ -279,12 +271,7 @@ class Unavailability(models.Model):
 
             if instructor:
                 # Check for conflicts with related classes and activities via instructor
-                conflicts += list(instructor.instructor_private_classes.filter(
-                    date=current_date,
-                    start_time__lt=end_time,
-                    end_time__gt=start_time
-                ))
-                conflicts += list(instructor.group_classes.filter(
+                conflicts += list(instructor.lessons.filter(
                     date=current_date,
                     start_time__lt=end_time,
                     end_time__gt=start_time
@@ -310,12 +297,7 @@ class Unavailability(models.Model):
             if student:
                 # Check for conflicts via students
                 for parent in student.parents.all():
-                    conflicts += list(student.private_classes.filter(
-                        date=current_date,
-                        start_time__lt=end_time,
-                        end_time__gt=start_time
-                    ))
-                    conflicts += list(student.group_classes.filter(
+                    conflicts += list(student.lessons.filter(
                         date=current_date,
                         start_time__lt=end_time,
                         end_time__gt=start_time
@@ -333,27 +315,32 @@ class Unavailability(models.Model):
                     )
                 )
 
+            # TODO admin notifications?
+
             # Notify relevant parties
             if conflicts:
                 notified_parents = set()
+                notified_instructors = set()
                 for conflict in conflicts:
                     # Notify instructor
-                    if conflict.instructor:
-                        Notification.create_notification(
-                            user=conflict.instructor.user,
-                            subject=school.get_notification_template("conflict_notification_subject").format(
-                                conflict_type=conflict.__class__.__name__
-                            ),
-                            message=school.get_notification_template("conflict_notification_message_instructor").format(
-                                instructor_name=conflict.instructor.user.first_name,
-                                conflict_type=conflict.__class__.__name__,
-                                date=conflict.date,
-                                start_time=conflict.start_time,
-                                end_time=conflict.end_time,
-                                school_name=school.name
-                            ),
-                            school=school
-                        )
+                    for instructor in conflict.instructors.all():
+                        if instructor.id not in notified_instructors:
+                            Notification.create_notification(
+                                user=instructor.user,
+                                subject=school.get_notification_template("conflict_notification_subject").format(
+                                    conflict_type=conflict.__class__.__name__
+                                ),
+                                message=school.get_notification_template("conflict_notification_message_instructor").format(
+                                    instructor_name=instructor.user.first_name,
+                                    conflict_type=conflict.__class__.__name__,
+                                    date=conflict.date,
+                                    start_time=conflict.start_time,
+                                    end_time=conflict.end_time,
+                                    school_name=school.name
+                                ),
+                                school=school
+                            )
+                            notified_instructors.add(instructor.id)
 
                     # Notify parents, avoiding duplicates
                     if hasattr(conflict, 'students'):

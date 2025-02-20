@@ -5,7 +5,7 @@ import stripe
 import json
 from users.models import Student, UserAccount
 from schools.models import School
-from lessons.models import GroupPack, PrivatePack
+from lessons.models import Pack
 from mylessons import settings
 from .utils import create_checkout_session
 import logging
@@ -29,7 +29,7 @@ def start_test_checkout(request):
     user = request.user  # Assuming authentication is in place
     cart = [
         {
-            "type": "private_pack",
+            "type": "private",
             "number_of_classes": 4,
             "duration_in_minutes": 60,
             "price": 100.00,  # Test price
@@ -95,14 +95,11 @@ def stripe_webhook(request):
         for item in cart:
             pack_type = item["type"]  # "group_pack" or "private_pack"
             school = School.objects.get(name=item["school_name"])
+            instructor = item['instructor']
 
+            # TODO check book structure (is something is missing here)
 
-            if pack_type == "group_pack":
-                # TODO book_new_pack(?):
-                pass
-            elif pack_type == "private_pack":
-                instructor = item['instructor']
-                pack = PrivatePack.book_new_pack(students_list, school, None, item["number_of_classes"], item["duration_in_minutes"], instructor, item["price"], item["price"], discount)
-                if not pack:
-                    JsonResponse({"status": "cancel"}, status=200)
+            pack = Pack.book_new_pack(students=students_list, school=school, number_of_classes=item["number_of_classes"], duration_in_minutes=item["duration_in_minutes"], instructors=[instructor], price=item["price"], discount_id=discount)
+            if not pack:
+                JsonResponse({"status": "cancel"}, status=200)
     return JsonResponse({"status": "success"}, status=200)

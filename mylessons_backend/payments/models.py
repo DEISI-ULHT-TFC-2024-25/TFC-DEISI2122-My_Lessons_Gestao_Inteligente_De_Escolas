@@ -13,22 +13,27 @@ class Payment(models.Model):
         on_delete=models.CASCADE, 
         related_name="payments"
     )
-    group_pack = models.ManyToManyField(
-        'lessons.GroupPack',  
+    packs = models.ManyToManyField(
+        'lessons.Pack',  
         blank=True, 
         related_name="payments"
     )
-    private_pack = models.ManyToManyField(
-        'lessons.PrivatePack',
+    lessons = models.ManyToManyField(
+        'lessons.Lesson',
         blank=True, 
         related_name="payments"
     )
-    camp = models.ManyToManyField(
+    camp_orders = models.ManyToManyField(
         'events.CampOrder',
         blank=True, 
         related_name="payments"
     )
-    birthday_party = models.ManyToManyField(
+    activities = models.ManyToManyField(
+        'events.Activity',
+        blank=True, 
+        related_name="payments"
+    )
+    birthday_parties = models.ManyToManyField(
         'events.BirthdayParty',
         blank=True, 
         related_name="payments"
@@ -47,7 +52,7 @@ class Payment(models.Model):
         blank=True, 
         related_name="payments"
     )
-    voucher = models.ManyToManyField(
+    vouchers = models.ManyToManyField(
         'lessons.Voucher',  
         blank=True, 
         related_name="payments"
@@ -84,40 +89,48 @@ class Payment(models.Model):
         }
 
         # Add purchased services to the receipt
-        if self.private_pack.exists():
-            for pack in self.private_pack.all():
+        if self.packs.exists():
+            for pack in self.packs.all():
                 receipt_data["items"].append({
-                    "type": "Private Lesson Pack",
+                    "type": "Pack",
                     "name": f"{pack.number_of_classes} Lessons - {pack.duration_in_minutes} min",
                     "price": f"{pack.price:.2f} {receipt_data['currency']}"
                 })
 
-        if self.group_pack.exists():
-            for pack in self.group_pack.all():
+        if self.lessons.exists():
+            for lesson in self.lessons.all():
                 receipt_data["items"].append({
-                    "type": "Group Lesson Pack",
-                    "name": f"{pack.number_of_classes} Lessons - {pack.duration_in_minutes} min",
-                    "price": f"{pack.price:.2f} {receipt_data['currency']}"
+                    "type": "Lesson",
+                    "name": f"Lesson - {lesson.duration_in_minutes} min",
+                    "price": f"{lesson.price:.2f} {receipt_data['currency']}"
                 })
 
-        if self.camp.exists():
-            for camp in self.camp.all():
+        if self.camp_orders.exists():
+            for camp in self.camp_orders.all():
                 receipt_data["items"].append({
                     "type": "Camp Enrollment",
                     "name": camp.name,
                     "price": f"{camp.price:.2f} {receipt_data['currency']}"
                 })
 
-        if self.birthday_party.exists():
-            for party in self.birthday_party.all():
+        if self.activities.exists():
+            for activity in self.birthday_party.all():
+                receipt_data["items"].append({
+                    "type": "Activity",
+                    "name": activity.name,
+                    "price": f"{activity.price:.2f} {receipt_data['currency']}"
+                })
+
+        if self.birthday_parties.exists():
+            for party in self.birthday_parties.all():
                 receipt_data["items"].append({
                     "type": "Birthday Party",
                     "name": party.name,
                     "price": f"{party.price:.2f} {receipt_data['currency']}"
                 })
 
-        if self.voucher.exists():
-            for voucher in self.voucher.all():
+        if self.vouchers.exists():
+            for voucher in self.vouchers.all():
                 receipt_data["items"].append({
                     "type": "Voucher",
                     "name": voucher.code,
