@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons
+from .views import upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, mark_lesson_as_done, mark_lesson_as_not_done
 
 urlpatterns = [
     path('upcoming-lessons/', upcoming_lessons, name='upcoming-lessons'),
@@ -9,4 +9,6 @@ urlpatterns = [
     path('pack-details/<int:id>/', pack_details, name='pack-details'),
     path('lesson-details/<int:id>/', lesson_details, name='lesson-details'),
     path('todays-lessons/', todays_lessons, name='todays-lessons'),
+    path("mark_lesson_as_done/", mark_lesson_as_done, name="mark_lesson_as_done"),
+    path("mark_lesson_as_not_done/", mark_lesson_as_not_done, name="mark_lesson_as_not_done"),
 ]
