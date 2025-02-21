@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Receipt</title>
+</head>
+<body>
+    <h2>Payment Receipt - {{ receipt.receipt_number }}</h2>
+    <p>Thank you for your payment, {{ receipt.payer_name }}!</p>
+    <p><strong>Amount Paid:</strong> €{{ receipt.total_price }}</p>
+    <p><strong>Payment Method:</strong> {{ receipt.payment_method }}</p>
+    <h3>Details:</h3>
+    <ul>
+        {% for item in receipt.items %}
+        <li>{{ item.type }} - {{ item.name }} (€{{ item.price }})</li>
+        {% endfor %}
+    </ul>
+    <p>For any questions, contact {{ receipt.school_email }}</p>
+</body>
+</html>

@@ -44,6 +44,7 @@ class UserAccount(AbstractUser):
                 "timestamp": "YYYY-MM-DDTHH:MM:SS",
                 "amount": "+50.00" or "-20.00",
                 "message": "Description of transaction"
+                "current_balance": "current balance at this time after the new transaction"
             }
         """
         # Ensure amount is a Decimal for arithmetic
@@ -58,6 +59,7 @@ class UserAccount(AbstractUser):
             "timestamp": now.isoformat(),  # e.g., "2025-02-18T14:00:00"
             "amount": f"{amount:+.2f}",      # formats as '+50.00' or '-20.00'
             "message": message,
+            "current_balance" : f"{self.balance:+.2f}"
         }
 
         # Initialize balance_history as a list if it's empty

@@ -1,16 +1,23 @@
+from events.models import Activity, BirthdayParty, CampOrder
+from payments.models import Payment
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 import stripe
 import json
-from users.models import Student, UserAccount
+from users.models import Instructor, Monitor, Student, UserAccount
 from schools.models import School
-from lessons.models import Pack
+from lessons.models import Lesson, Pack, Voucher
 from mylessons import settings
 from .utils import create_checkout_session
 import logging
 from datetime import datetime, timedelta
 from django.utils.timezone import now
+from django.db import transaction
+
 
 
 logger = logging.getLogger(__name__)
@@ -18,6 +25,104 @@ logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 #stripe listen --forward-to 127.0.0.1:8000/stripe/webhook
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def new_payment(request):
+    user = request.user
+    data = request.data
+
+    # TODO 
+    # change receipt info (tab the lessons of the pack to separate them from each other or from separate lessons)
+    # change debt and is_paid flag
+    # register request.user
+    # change receipt for staff payments
+
+    try:
+        with transaction.atomic():
+            # Extract and validate payment details
+            value = data.get("value")
+            if not value or float(value) <= 0:
+                return Response({"error": "Invalid payment amount."}, status=400)
+            
+            school_id = data.get("school")
+            school = School.objects.get(id=school_id) if school_id else None
+            
+            user_id = data.get("user")
+            payment_user = UserAccount.objects.get(id=user_id)
+            
+            payment = Payment.objects.create(
+                value=value,
+                user=payment_user,
+                school=school,
+                description=data.get("description", {})
+            )
+
+            # Process individual lessons
+            lessons = data.get("lessons", [])
+            for lesson_id in lessons:
+                lesson = Lesson.objects.get(id=lesson_id)
+                payment.lessons.add(lesson)
+
+            # Process packs and related lessons
+            packs = data.get("packs", [])
+            for pack_id in packs:
+                pack = Pack.objects.get(id=pack_id)
+                payment.packs.add(pack)
+                for lesson in pack.lessons.all():
+                    payment.lessons.add(lesson)
+
+            # Process individual activities
+            activities = data.get("activities", [])
+            for activity_id in activities:
+                activity = Activity.objects.get(id=activity_id)
+                payment.activities.add(activity)
+
+            # Process camp orders and related activities
+            camp_orders = data.get("camp_orders", [])
+            for camp_order_id in camp_orders:
+                camp_order = CampOrder.objects.get(id=camp_order_id)
+                payment.camp_orders.add(camp_order)
+                for activity in camp_order.activities.all():
+                    payment.activities.add(activity)
+
+            # Process birthday parties and related activities
+            birthday_parties = data.get("birthday_parties", [])
+            for party_id in birthday_parties:
+                party = BirthdayParty.objects.get(id=party_id)
+                payment.birthday_parties.add(party)
+                for activity in party.activities.all():
+                    payment.activities.add(activity)
+
+            # Process vouchers
+            vouchers = data.get("vouchers", [])
+            for voucher_id in vouchers:
+                voucher = Voucher.objects.get(id=voucher_id)
+                payment.vouchers.add(voucher)
+
+            # Assign instructor or monitor if specified
+            instructor_id = data.get("instructor")
+            monitor_id = data.get("monitor")
+            if instructor_id:
+                payment.instructor = Instructor.objects.get(id=instructor_id)
+            if monitor_id:
+                payment.monitor = Monitor.objects.get(id=monitor_id)
+
+            payment.save()
+            
+            # Send receipt email using Payment model's method
+            payment.send_receipt_email()
+            
+            # TODO Create a notification
+            
+            return Response({"message": "Payment successfully processed."}, status=201)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
+    
+
+
+
 
 def test_payment(request):
     return render(request, 'payments/test-payment.html')

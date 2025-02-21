@@ -1,5 +1,5 @@
 from django.db import models
-from django.utils.timezone import localtime
+from django.utils.timezone import localtime, make_aware, is_naive
 from django.template.loader import render_to_string
 from django.core.mail import send_mail
 from django.conf import settings
@@ -73,71 +73,70 @@ class Payment(models.Model):
         """
         Generates a receipt for the payment, including all relevant details.
         """
+        time_value = self.time
+        if is_naive(time_value):
+            time_value = make_aware(time_value)
+
         receipt_data = {
             "receipt_number": f"RCP-{self.id}",
             "school_name": self.school.name if self.school else "N/A",
-            "school_contact": self.school.contact if self.school and hasattr(self.school, "contact") else "N/A",
-            "school_email": self.school.email if self.school and hasattr(self.school, "email") else "N/A",
+            "school_contact": getattr(self.school, "contact", "N/A"),
+            "school_email": getattr(self.school, "email", "N/A"),
             "date": self.date.strftime("%Y-%m-%d"),
-            "time": localtime(self.time).strftime("%H:%M:%S"),
+            "time": self.time.strftime("%H:%M:%S"),
             "payer_name": f"{self.user.first_name} {self.user.last_name}",
             "payer_email": self.user.email,
-            "payment_method": "Online" if self.description.get("method") else "Unknown",
+            "payment_method": self.description.get("method", "Unknown"),
             "items": [],
             "total_price": self.value,
-            "currency": self.school.currency if self.school else "EUR",
+            "currency": getattr(self.school, "currency", "EUR"),
         }
 
         # Add purchased services to the receipt
-        if self.packs.exists():
-            for pack in self.packs.all():
-                receipt_data["items"].append({
-                    "type": "Pack",
-                    "name": f"{pack.number_of_classes} Lessons - {pack.duration_in_minutes} min",
-                    "price": f"{pack.price:.2f} {receipt_data['currency']}"
-                })
+        for pack in self.packs.all():
+            receipt_data["items"].append({
+                "type": "Pack",
+                "name": f"{pack.number_of_classes} Lessons - {pack.duration_in_minutes} min",
+                "price": f"{pack.price:.2f} {receipt_data['currency']}"
+            })
 
-        if self.lessons.exists():
-            for lesson in self.lessons.all():
-                receipt_data["items"].append({
-                    "type": "Lesson",
-                    "name": f"Lesson - {lesson.duration_in_minutes} min",
-                    "price": f"{lesson.price:.2f} {receipt_data['currency']}"
-                })
+        for lesson in self.lessons.all():
+            receipt_data["items"].append({
+                "type": "Lesson",
+                "name": f"Lesson - {lesson.duration_in_minutes} min",
+                "price": f"{lesson.price:.2f} {receipt_data['currency']}"
+            })
 
-        if self.camp_orders.exists():
-            for camp in self.camp_orders.all():
-                receipt_data["items"].append({
-                    "type": "Camp Enrollment",
-                    "name": camp.name,
-                    "price": f"{camp.price:.2f} {receipt_data['currency']}"
-                })
+        for camp in self.camp_orders.all():
+            receipt_data["items"].append({
+                "type": "Camp Enrollment",
+                "name": camp.name,
+                "price": f"{camp.price:.2f} {receipt_data['currency']}"
+            })
 
-        if self.activities.exists():
-            for activity in self.birthday_party.all():
-                receipt_data["items"].append({
-                    "type": "Activity",
-                    "name": activity.name,
-                    "price": f"{activity.price:.2f} {receipt_data['currency']}"
-                })
+        for activity in self.activities.all():  # Fixed iteration over activities
+            receipt_data["items"].append({
+                "type": "Activity",
+                "name": activity.name,
+                "price": f"{activity.price:.2f} {receipt_data['currency']}"
+            })
 
-        if self.birthday_parties.exists():
-            for party in self.birthday_parties.all():
-                receipt_data["items"].append({
-                    "type": "Birthday Party",
-                    "name": party.name,
-                    "price": f"{party.price:.2f} {receipt_data['currency']}"
-                })
+        for party in self.birthday_parties.all():
+            receipt_data["items"].append({
+                "type": "Birthday Party",
+                "name": party.name,
+                "price": f"{party.price:.2f} {receipt_data['currency']}"
+            })
 
-        if self.vouchers.exists():
-            for voucher in self.vouchers.all():
-                receipt_data["items"].append({
-                    "type": "Voucher",
-                    "name": voucher.code,
-                    "price": f"-{voucher.value:.2f} {receipt_data['currency']}"
-                })
+        for voucher in self.vouchers.all():
+            receipt_data["items"].append({
+                "type": "Voucher",
+                "name": voucher.code,
+                "price": f"-{voucher.value:.2f} {receipt_data['currency']}"
+            })
 
         return receipt_data
+
 
     def send_receipt_email(self):
         """

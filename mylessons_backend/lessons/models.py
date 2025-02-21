@@ -584,6 +584,7 @@ class Lesson(models.Model):
             self.end_time = (datetime.combine(self.date, time) + timedelta(minutes=self.duration_in_minutes)).time()
             self.save()
             if self.school:
+                # TODO think better this approach
                 self.school.add_scheduled_lesson_to_attendance(self.date, self.id, self.type, True)
             
                 # Notify parents
