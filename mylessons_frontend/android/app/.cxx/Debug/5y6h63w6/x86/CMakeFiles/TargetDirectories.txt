@@ -1,0 +1,2 @@
+/Users/franciscosousa/MyLessons-Project/mylessons_frontend/android/app/.cxx/Debug/5y6h63w6/x86/CMakeFiles/edit_cache.dir
+/Users/franciscosousa/MyLessons-Project/mylessons_frontend/android/app/.cxx/Debug/5y6h63w6/x86/CMakeFiles/rebuild_cache.dir

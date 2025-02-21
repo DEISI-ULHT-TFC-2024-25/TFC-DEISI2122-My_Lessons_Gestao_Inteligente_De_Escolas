@@ -9,10 +9,11 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import UserAccount
+from .models import UserAccount, Instructor
 from .serializers import UserAccountSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
+from schools.models import School
 from django.db.models import Q
 from django.utils.timezone import now
 
@@ -134,6 +135,43 @@ def current_role(request):
     }
 
     return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_role(request):
+    user = request.user  # Obtém o utilizador autenticado
+    new_role = request.data.get("new_role")
+
+    # TODO change strings inplementation for more flexible roles across the whole app
+
+    role_changed = False
+
+    if new_role == "Parent":
+        user.current_role = "Parent"
+        user.save(update_fields=["current_role"])
+
+    elif new_role == "Instructor":
+        instructors = Instructor.objects.filter(user=user)
+        if instructors:
+            user.current_role = "Instructor"
+            user.save(update_fields=["current_role"])
+
+    elif new_role == "Admin":
+        schools = School.objects.filter(admins__in=[user])
+        if schools:
+            user.current_role = "Admin"
+            user.save(update_fields=["current_role"])
+
+    # gets the new role and checks if it can be changed, if so then updates the role 
+
+    if user.current_role == new_role:
+        role_changed = True
+
+    if role_changed:
+        return Response({"message": f"Role changed to {new_role}!"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "Role was not changed!"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
