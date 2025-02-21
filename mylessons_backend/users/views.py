@@ -182,7 +182,7 @@ def number_of_active_students(request):
     # for admins, students are in packs registered to the admins school
     # for instructors, students that were in lessons given by the instructor in less than a month
 
-
+    # TODO  make a month ago aware
 
     user = request.user
     current_role = user.current_role
@@ -193,7 +193,7 @@ def number_of_active_students(request):
 
     if current_role == "Instructor":
         lessons = Lesson.objects.filter(
-            instructors__in=user.instructor_profile
+            instructors__in=[user.instructor_profile]
         ).filter(
             Q(date__gte=a_month_ago) |
             Q(date=None)

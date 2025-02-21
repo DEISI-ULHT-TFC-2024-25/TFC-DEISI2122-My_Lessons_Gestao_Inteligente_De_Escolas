@@ -84,6 +84,7 @@ def schedule_private_lesson(request):
     Permite aos pais/instrutores reagendarem uma aula privada.
     """
     user = request.user
+    current_role = user.current_role
     lesson_id = request.data.get("lesson_id")
     new_date = request.data.get("new_date")  # Formato esperado: 'YYYY-MM-DD'
     new_time = request.data.get("new_time")  # Formato esperado: 'HH:MM'
@@ -130,7 +131,7 @@ def schedule_private_lesson(request):
         return Response({"error": "Não é possível agendar para uma data no passado."},
                         status=status.HTTP_400_BAD_REQUEST)
     
-    if not lesson.can_still_reschedule():
+    if current_role == "Parent" and not lesson.can_still_reschedule():
         return Response({"error": "O período permitido para agendamento já passou."},
                         status=status.HTTP_400_BAD_REQUEST)
 
@@ -148,10 +149,18 @@ def schedule_private_lesson(request):
 def active_packs(request):
     today = now().date()
     user = request.user  # Get authenticated user
-    student_ids = user.students.values_list('id', flat=True)
+    current_role = user.current_role
 
-    # Fetch active packs
-    packs = list(set(Pack.objects.filter(students__id__in=student_ids, is_done=False)))
+    if current_role == "Parent":
+        # Fetch active packs
+        student_ids = user.students.values_list('id', flat=True)
+        packs = list(set(Pack.objects.filter(students__id__in=student_ids, is_done=False)))
+    elif current_role == "Instructor":
+        packs = list(set(Pack.objects.filter(lessons__instructors__in=[user.instructor_profile], is_done=False))) # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
+    elif current_role == "Admin":
+        packs = list(set(Pack.objects.filter(school__in=user.school_admins, is_done=False)))
+    else:
+        packs = []
 
     packs_data = [
         {
@@ -229,7 +238,7 @@ def lesson_details(request, id):
             "lesson_id": lesson.id,
             "date": lesson.date.strftime("%d %b") if lesson.date else "None",
             "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
-            "end_time": lesson.start_time.strftime("%I:%M %p") if lesson.end_time else "None",
+            "end_time": lesson.end_time.strftime("%I:%M %p") if lesson.end_time else "None",
             "duration_in_minutes": lesson.duration_in_minutes,
             "lesson_number": lesson.class_number,
             "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None",
@@ -306,3 +315,47 @@ def todays_lessons(request):
     
     
     return Response(lessons_data)
+
+def process_lesson_status(request, mark_as_done=True):
+    """
+    Função auxiliar para marcar uma aula como feita ou não feita.
+    """
+    user = request.user
+    current_role = user.current_role
+    lesson_id = request.data.get("lesson_id")
+    
+    if not lesson_id:
+        return Response({"error": "É necessário fornecer lesson_id"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        lesson = Lesson.objects.get(id=lesson_id)
+    except Lesson.DoesNotExist:
+        return Response({"error": "Aula não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+    
+    if current_role == "Parent":
+        return Response({"error": "Não tem permissão para alterar esta aula."}, status=status.HTTP_403_FORBIDDEN)
+    
+    success = lesson.mark_as_given() if mark_as_done else lesson.mark_as_not_given()
+    
+    if success:
+        return Response({"message": "Aula alterada com sucesso!"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "Não foi possível alterar a aula."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_lesson_as_done(request):
+    """
+    Permite aos instrutores ou admins marcar uma aula como realizada.
+    """
+    return process_lesson_status(request, mark_as_done=True)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_lesson_as_not_done(request):
+    """
+    Permite aos instrutores ou admins marcar uma aula como não realizada.
+    """
+    return process_lesson_status(request, mark_as_done=False)

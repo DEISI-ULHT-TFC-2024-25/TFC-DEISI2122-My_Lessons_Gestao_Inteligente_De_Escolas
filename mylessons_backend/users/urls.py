@@ -10,6 +10,7 @@ urlpatterns = [
     path('change_role/', change_role, name='change_role'),
     path('number_of_active_students/', number_of_active_students, name='number-of-students'),
     path("current_balance/", current_balance, name="current_balance"),
+    
 
     # Add more paths (e.g., /google/callback) as needed
 ]

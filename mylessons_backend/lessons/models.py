@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime
+from decimal import Decimal
 from django.db import models
 from events.models import Activity
 from notifications.models import Notification
@@ -273,10 +274,10 @@ class Lesson(models.Model):
         self.save(update_fields=["is_done"])
 
         if self.pack:
-            self.pack.number_of_classes_left =- 1
+            self.pack.number_of_classes_left -= 1
             self.pack.save(update_fields=["number_of_classes_left"])
             self.pack.update_pack_status()
-
+            
         for instructor in self.instructors.all():
             fixed_price = self.get_fixed_price(instructor=instructor) or 0
 
@@ -285,8 +286,8 @@ class Lesson(models.Model):
             except (KeyError, TypeError):
                 commission = 0
 
-            commission_fee = self.price * (commission / 100) if commission else 0
-            amount_to_add = fixed_price + commission_fee
+            commission_fee = self.price * Decimal(commission) / Decimal(100) if commission else Decimal(0)
+            amount_to_add = Decimal(fixed_price) + commission_fee
             
             instructor.user.update_balance(amount=amount_to_add, message=str(self))
         return True
@@ -298,7 +299,7 @@ class Lesson(models.Model):
         self.save(update_fields=["is_done"])
 
         if self.pack:
-            self.pack.number_of_classes_left =+ 1
+            self.pack.number_of_classes_left += 1
             self.pack.save(update_fields=["number_of_classes_left"])
             self.pack.update_pack_status()
 
@@ -310,8 +311,8 @@ class Lesson(models.Model):
             except (KeyError, TypeError):
                 commission = 0
 
-            commission_fee = self.price * (commission / 100) if commission else 0
-            amount_to_add = fixed_price + commission_fee
+            commission_fee = self.price * Decimal(commission) / Decimal(100) if commission else Decimal(0)
+            amount_to_add = Decimal(fixed_price) + commission_fee
             
             instructor.user.update_balance(amount=-amount_to_add, message=str(self))
         return True
