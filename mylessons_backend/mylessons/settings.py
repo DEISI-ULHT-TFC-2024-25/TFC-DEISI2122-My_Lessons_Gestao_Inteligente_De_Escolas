@@ -26,6 +26,7 @@ INSTALLED_APPS = [
 
     # Third-party apps
     'rest_framework',        # Django REST Framework
+    'rest_framework.authtoken',
     'corsheaders',           # Handle CORS
     'drf_yasg',              # API Documentation with Swagger
     'django.contrib.sites',  # Required for django-allauth
@@ -164,6 +165,9 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
+# Ensure UTF-8 encoding
+DEFAULT_CHARSET = 'utf-8'
+
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
@@ -181,10 +185,15 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
-    ]
+        'rest_framework.permissions.IsAuthenticated',
+    ],
 }
+
 
 # Swagger Settings
 SWAGGER_SETTINGS = {

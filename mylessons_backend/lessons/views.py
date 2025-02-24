@@ -41,9 +41,11 @@ def get_lessons_data(user, date_lookup, is_done_flag):
             "lesson_id": lesson.id,
             "date": lesson.date.strftime("%d %b") if lesson.date else "None",
             "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
-            "lesson_number": lesson.class_number,
-            "number_of_lessons": lesson.pack.number_of_classes,
+            "lesson_number": lesson.class_number if lesson.class_number else "None", # TODO fix for group lessons
+            "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None", # TODO fix for group lessons
             "students_name": lesson.get_students_name(),
+            "type": lesson.type,
+            "duration_in_minutes": lesson.duration_in_minutes,
         }
         for lesson in lessons
     ]
@@ -169,6 +171,7 @@ def active_packs(request):
             "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
             "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
             "students_name": pack.get_students_name(),
+            "type": pack.type
         }
         for pack in packs
     ]
