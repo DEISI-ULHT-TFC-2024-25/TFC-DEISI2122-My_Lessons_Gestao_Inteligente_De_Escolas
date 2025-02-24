@@ -107,7 +107,7 @@ class PrivateClassMarkingTests(TestCase):
             end_time=time(11, 0),
             duration_in_minutes=60,
             class_number=1,
-            price=50.00,
+            price=Decimal("50.00"),
             school=self.school,
             type="private"
         )
@@ -138,7 +138,7 @@ class PrivateClassMarkingTests(TestCase):
             end_time=time(11, 0),
             duration_in_minutes=60,
             class_number=1,
-            price=50.00,
+            price=Decimal("50.00"),
             school=self.school,
             type="private"
         )

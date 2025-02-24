@@ -584,9 +584,6 @@ class Lesson(models.Model):
             self.end_time = (datetime.combine(self.date, time) + timedelta(minutes=self.duration_in_minutes)).time()
             self.save()
             if self.school:
-                # TODO think better this approach
-                self.school.add_scheduled_lesson_to_attendance(self.date, self.id, self.type, True)
-            
                 # Notify parents
                 for parent in self.pack.parents.all():
                     Notification.create_notification(
@@ -661,9 +658,7 @@ class Lesson(models.Model):
         self.date = None
         self.start_time = None
         self.end_time = None
-        if self.school:
-            self.school.add_scheduled_lesson_to_attendance(self.date, self.id, self.type, True)
-            self.save()
+        self.save()
         return True
 
 class Voucher(models.Model):

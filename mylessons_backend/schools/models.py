@@ -250,7 +250,6 @@ class School(models.Model):
     )
     alerts = models.JSONField(blank=True, default=default_alerts)
     locations = models.ManyToManyField('locations.Location', related_name='schools', blank=True)
-    attendance_by_date = models.JSONField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -541,18 +540,6 @@ class School(models.Model):
                     
             return True
         return False
-    
-    def add_scheduled_lesson_to_attendance(self, date, id, type, lesson_was_scheduled):
-        if not self.attendance_by_date:
-            self.attendance_by_date = {}
-        date_str = str(date)
-        if date_str not in self.attendance_by_date:
-            self.attendance_by_date[date_str] = {"scheduled": [], "unscheduled": []}
-        if lesson_was_scheduled:
-            self.attendance_by_date[date_str]["scheduled"].append(f"{type}-{id}")
-        else:
-            self.attendance_by_date[date_str]["unscheduled"].append(f"{type}-{id}")
-        self.save()
     
     def update_extra_price(self, item_name, price):
         if not item_name or price is None:
