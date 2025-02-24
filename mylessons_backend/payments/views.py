@@ -19,7 +19,6 @@ from django.utils.timezone import now
 from django.db import transaction
 
 
-
 logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
