@@ -52,8 +52,8 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
-        final profileData = json.decode(utf8.decode(profileResponse.bodyBytes)); // ✅ UTF-8 decoding
-        final roleData = json.decode(utf8.decode(roleResponse.bodyBytes)); // ✅ UTF-8 decoding
+        final profileData = json.decode(utf8.decode(profileResponse.bodyBytes));
+        final roleData = json.decode(utf8.decode(roleResponse.bodyBytes));
 
         setState(() {
           firstName = profileData['first_name'];
@@ -78,17 +78,17 @@ class _HomePageState extends State<HomePage> {
 
         if (lessonsResponse.statusCode == 200) {
           setState(() {
-            upcomingLessons = json.decode(utf8.decode(lessonsResponse.bodyBytes)); // ✅ UTF-8 decoding
+            upcomingLessons = json.decode(utf8.decode(lessonsResponse.bodyBytes));
           });
         }
         if (lastLessonsResponse.statusCode == 200) {
           setState(() {
-            lastLessons = json.decode(utf8.decode(lastLessonsResponse.bodyBytes)); // ✅ UTF-8 decoding
+            lastLessons = json.decode(utf8.decode(lastLessonsResponse.bodyBytes));
           });
         }
         if (activePacksResponse.statusCode == 200) {
           setState(() {
-            activePacks = json.decode(utf8.decode(activePacksResponse.bodyBytes)); // ✅ UTF-8 decoding
+            activePacks = json.decode(utf8.decode(activePacksResponse.bodyBytes));
           });
         }
       }
@@ -100,32 +100,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        onTap: (index) {
-          switch (index) {
-            case 1:
-              Navigator.pushNamed(context, '/bookings');
-              break;
-            case 2:
-              Navigator.pushNamed(context, '/payments');
-              break;
-            case 3:
-              Navigator.pushNamed(context, '/profile');
-              break;
-          }
-        },
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Bookings'),
-          BottomNavigationBarItem(icon: Icon(Icons.payment), label: 'Payments'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
+      // No bottomNavigationBar here—the MainScreen handles it.
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -136,7 +111,9 @@ class _HomePageState extends State<HomePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Welcome back,', style: GoogleFonts.lato(fontSize: 18, color: Colors.black54)),
+                    Text('Welcome back,',
+                        style: GoogleFonts.lato(
+                            fontSize: 18, color: Colors.black54)),
                     Stack(
                       children: [
                         Icon(Icons.notifications_none, size: 28),
@@ -148,7 +125,7 @@ class _HomePageState extends State<HomePage> {
                               radius: 8,
                               backgroundColor: Colors.red,
                               child: Text('$notificationsCount',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold)),
@@ -159,17 +136,24 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
                 Text(firstName,
-                    style: GoogleFonts.lato(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black)),
-                SizedBox(height: 20),
+                    style: GoogleFonts.lato(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black)),
+                const SizedBox(height: 20),
                 _buildSectionTitle('Upcoming Lessons'),
-                ...upcomingLessons.map((lesson) => _buildLessonCard(lesson)).toList(),
-                SizedBox(height: 10),
+                ...upcomingLessons
+                    .map((lesson) => _buildLessonCard(lesson))
+                    .toList(),
+                const SizedBox(height: 10),
                 _buildSectionTitle('Last Lessons'),
-                ...lastLessons.map((lesson) => _buildLessonCard(lesson)).toList(),
-                SizedBox(height: 10),
+                ...lastLessons
+                    .map((lesson) => _buildLessonCard(lesson))
+                    .toList(),
+                const SizedBox(height: 10),
                 _buildSectionTitle('Active Packs'),
                 ...activePacks.map((pack) => _buildPackCard(pack)).toList(),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -178,35 +162,49 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Text(title, style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold)),
+      child: Text(title,
+          style: GoogleFonts.lato(
+              fontSize: 18, fontWeight: FontWeight.bold)),
     );
   }
 
   Widget _buildLessonCard(dynamic lesson) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(Icons.calendar_today, size: 30, color: Colors.black54),
-        title: Text(lesson['students_name'], style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
-        subtitle: Text('${lesson['date']} ${lesson['start_time']}', style: GoogleFonts.lato(fontSize: 14, color: Colors.black54)),
-        trailing: Icon(Icons.remove_red_eye, color: Colors.black54),
+        leading: Icon(Icons.calendar_today,
+            size: 30, color: Colors.black54),
+        title: Text(lesson['students_name'],
+            style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+            '${lesson['date']} ${lesson['start_time']}',
+            style: GoogleFonts.lato(
+                fontSize: 14, color: Colors.black54)),
+        trailing:
+            Icon(Icons.remove_red_eye, color: Colors.black54),
       ),
     );
   }
 
   Widget _buildPackCard(dynamic pack) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(Icons.calendar_today, size: 30, color: Colors.black54),
-        title: Text(pack['students_name'], style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
-        subtitle: Text('${pack['lessons_remaining']} lessons remaining\n${pack['unscheduled_lessons']} unscheduled lessons',
-            style: GoogleFonts.lato(fontSize: 14, color: Colors.black54)),
-        trailing: Icon(Icons.remove_red_eye, color: Colors.black54),
+        leading: Icon(Icons.calendar_today,
+            size: 30, color: Colors.black54),
+        title: Text(pack['students_name'],
+            style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+            '${pack['lessons_remaining']} lessons remaining\n${pack['unscheduled_lessons']} unscheduled lessons',
+            style: GoogleFonts.lato(
+                fontSize: 14, color: Colors.black54)),
+        trailing:
+            Icon(Icons.remove_red_eye, color: Colors.black54),
       ),
     );
   }
