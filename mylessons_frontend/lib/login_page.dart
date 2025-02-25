@@ -74,7 +74,8 @@ class _LoginPageState extends State<LoginPage> {
           print("Token stored successfully: $token"); // Debugging
 
           // Navigate to Home Page
-          Navigator.pushReplacementNamed(context, '/home');
+          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+
         } else {
           print("Login response does not contain a token");
           setState(() {
@@ -138,7 +139,8 @@ class _LoginPageState extends State<LoginPage> {
         print('Login com Google bem-sucedido: $data');
 
         // You can navigate to another page or store the token here
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage()));
+        // Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+
       } else {
         final data = jsonDecode(response.body);
         setState(() {

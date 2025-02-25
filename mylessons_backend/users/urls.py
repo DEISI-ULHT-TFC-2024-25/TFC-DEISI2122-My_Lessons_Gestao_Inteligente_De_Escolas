@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import login_view, google_oauth_start, register_user, user_profile, current_role, number_of_active_students, current_balance, change_role
+from .views import login_view, google_oauth_start, register_user, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -10,6 +10,7 @@ urlpatterns = [
     path('change_role/', change_role, name='change_role'),
     path('number_of_active_students/', number_of_active_students, name='number-of-students'),
     path("current_balance/", current_balance, name="current_balance"),
+    path("available_roles/", available_roles, name="available_roles"),
     
 
     # Add more paths (e.g., /google/callback) as needed

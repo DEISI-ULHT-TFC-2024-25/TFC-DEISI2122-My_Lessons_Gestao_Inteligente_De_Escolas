@@ -235,3 +235,27 @@ def current_balance(request):
     }
     
     return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def available_roles(request):
+    user = request.user
+    current_role = user.current_role
+
+    available_roles = []
+    
+    if user.instructor_profile and current_role != "Instructor":
+        available_roles.append("Instructor")
+    
+    if current_role != "Parent":
+        available_roles.append("Parent")
+    
+    if user.school_admins.exists() and current_role != "Admin":
+        available_roles.append("Admin")
+    
+    data = {
+        "available_roles": available_roles
+    }
+    
+    return Response(data)
+
