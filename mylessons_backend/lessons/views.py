@@ -160,7 +160,7 @@ def active_packs(request):
     elif current_role == "Instructor":
         packs = list(set(Pack.objects.filter(lessons__instructors__in=[user.instructor_profile], is_done=False))) # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
     elif current_role == "Admin":
-        packs = list(set(Pack.objects.filter(school__in=user.school_admins, is_done=False)))
+        packs = list(set(Pack.objects.filter(school__in=user.school_admins.all(), is_done=False)))
     else:
         packs = []
 
