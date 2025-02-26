@@ -63,7 +63,7 @@ def number_of_students_in_timeframe(request, school_id, start_date, end_date):
 
     total_students = lesson_students + activity_students
 
-    data = {"total_students": total_students}
+    data = {"total_students": str(total_students)}
     return Response(data)
 
 @api_view(['GET'])
@@ -101,7 +101,7 @@ def number_of_instructors_in_timeframe(request, school_id, start_date, end_date)
 
     total_instructors = lesson_instructors + activity_instructors
 
-    data = {"total_instructors": total_instructors}
+    data = {"total_instructors": str(total_instructors)}
     return Response(data)
 
 @api_view(['GET'])
@@ -133,7 +133,7 @@ def school_revenue_in_timeframe(request, school_id, start_date, end_date):
         monitor__isnull=True  # Only payments where monitors are null
     ).aggregate(total_income=Sum('value'))['total_income'] or 0  # Default to 0 if None
 
-    data = {"total_revenue": total_revenue}
+    data = {"total_revenue": str(total_revenue)}
     return Response(data)
 
 @api_view(['GET'])
@@ -162,7 +162,7 @@ def number_of_bookings_in_timeframe(request, school_id, start_date, end_date):
     ).count()
 
 
-    data = {"number_of_lessons_booked": number_of_lessons}
+    data = {"number_of_lessons_booked": str(number_of_lessons)}
     return Response(data)
 
 @api_view(['POST'])

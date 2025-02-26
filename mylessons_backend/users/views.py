@@ -127,7 +127,7 @@ def user_profile(request):
     data = {
         "id": user.id,
         "first_name": user.first_name,
-        "notifications_count": unread_notifications
+        "notifications_count": str(unread_notifications)
     }
 
     return Response(data)
@@ -142,6 +142,63 @@ def current_role(request):
     }
 
     return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def available_schools(request):
+    user = request.user
+    current_role = user.current_role
+    current_school_id = user.current_school_id if user.current_school_id else 0
+
+    available_schools = []
+
+    # Check and retrieve schools based on the user's role
+    if current_role == "Admin":
+        available_schools = [
+            {"id": school.id, "name": school.name} for school in user.school_admins.all().exclude(id=current_school_id)
+        ]
+    elif current_role == "Parent":
+        available_schools = [
+            {"id": school.id, "name": school.name} for school in user.schools.all() # TODO maybe follow the exclude above
+        ]
+    elif current_role == "Instructor":
+        if hasattr(user, "instructor_profile"):
+            available_schools = [
+                {"id": school.id, "name": school.name} for school in user.instructor_profile.schools.all()
+            ]
+
+    return Response({"available_schools": available_schools})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_school_id(request):
+    user = request.user  # Obtém o utilizador autenticado
+    current_school_id = user.current_school_id
+    school = School.objects.get(id=current_school_id) if current_school_id else None
+    current_school_name = school.name if school else None
+
+    data = {
+        "current_school_id": str(user.current_school_id),
+        "current_school_name": current_school_name
+    }
+
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_school_id(request):
+    user = request.user
+    new_school_id = request.data.get("new_school_id")
+    school = School.objects.get(id=new_school_id) if new_school_id else None
+    school_name = school.name if school else None
+    
+    if new_school_id and school and school_name:
+        user.current_school_id = new_school_id
+        user.save(update_fields=["current_school_id"])
+        return Response({"message": f"School changed to {school_name}!"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "School was not changed!"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -244,7 +301,7 @@ def available_roles(request):
 
     available_roles = []
     
-    if user.instructor_profile and current_role != "Instructor":
+    if hasattr(user, 'instructor_profile') and current_role != "Instructor":
         available_roles.append("Instructor")
     
     if current_role != "Parent":

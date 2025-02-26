@@ -27,6 +27,7 @@ class UserAccount(AbstractUser):
         verbose_name='user permissions',
     )
     current_role = models.CharField(max_length=255, default="Parent")
+    current_school_id = models.PositiveIntegerField(null=True, blank=True)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     balance_history = models.JSONField(null=True, blank=True, default=list)
     payment_types = models.JSONField(blank=True, null=True, default=list) 
