@@ -14,7 +14,7 @@ class CollapsibleSection extends StatelessWidget {
       return ExpansionTile(
         title: Text(
           title,
-          style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold),
+          style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         // Start expanded by default
         initiallyExpanded: true,
