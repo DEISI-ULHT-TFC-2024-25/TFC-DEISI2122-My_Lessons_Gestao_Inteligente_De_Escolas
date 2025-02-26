@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import time, timedelta, datetime
 from decimal import Decimal
 from django.db import models
 from events.models import Activity
@@ -248,6 +248,74 @@ class Lesson(models.Model):
     def __str__(self):
         return f"{self.type} class {self.class_number} on {self.date} at {self.start_time} id {self.id}"
     
+
+    def list_available_lesson_times(self, date, increment):
+        """
+        Returns a list of available start times (as strings in "HH:MM" format)
+        on the given date for a private lesson.
+        This method only applies to lessons of type "private".
+        """
+        # Only process lessons that are marked as "private"
+        if self.type != "private":
+            return []
+        
+        # Define the working hours for the day (adjust as needed)
+        day_start = time(8, 0)
+        day_end = time(20, 0)
+        
+        available_times = []
+        current_dt = datetime.combine(date, day_start)
+        end_of_day_dt = datetime.combine(date, day_end)
+        
+        # Iterate in 15-minute increments; ensure the lesson fits within the day.
+        while current_dt + timedelta(minutes=self.duration_in_minutes) <= end_of_day_dt:
+            start_time = current_dt.time()
+            end_time = (current_dt + timedelta(minutes=self.duration_in_minutes)).time()
+            
+            # Check availability for each instructor assigned to this lesson.
+            instructors = self.instructors.all()
+            slot_available = False
+            
+            for instructor in instructors:
+                # Check overlapping unavailabilities.
+                overlapping_unavailabilities = Unavailability.objects.filter(
+                    instructor=instructor,
+                    date=date,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time
+                )
+                
+                # Check overlapping lessons (excluding the current lesson).
+                overlapping_lessons = Lesson.objects.filter(
+                    instructors__in=[instructor],
+                    date=date,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time
+                ).exclude(id=self.id)
+                
+                # Check overlapping activities.
+                overlapping_activities = Activity.objects.filter(
+                    instructors__in=[instructor],
+                    date=date,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time
+                )
+                
+                # If no conflicts, the instructor is available for this slot.
+                if (not overlapping_unavailabilities.exists() and 
+                    not overlapping_lessons.exists() and 
+                    not overlapping_activities.exists()):
+                    slot_available = True
+                    break  # No need to check further instructors
+            
+            if slot_available:
+                # Convert start_time to a string in "HH:MM" format
+                available_times.append(start_time.strftime("%H:%M"))
+                
+            current_dt += timedelta(minutes=increment)
+        
+        return available_times
+
     def get_fixed_price(self, instructor):
         """
         Searches the instructor's fixed pricing list for a configuration matching:
@@ -540,7 +608,7 @@ class Lesson(models.Model):
                 return True, i
         return False, instructor
     
-    def can_still_reschedule(self):
+    def can_still_reschedule(self, role):
 
         """
         Determines if a lesson can still be rescheduled based on the school's reschedule time limit.
@@ -554,7 +622,7 @@ class Lesson(models.Model):
             # Convert time difference into hours
             number_of_hours = time_difference.total_seconds() / 3600
 
-            if number_of_hours < self.school.reschedule_time_limit:
+            if number_of_hours < self.school.reschedule_time_limit and role == "Parent":
                 return False
         return True
 

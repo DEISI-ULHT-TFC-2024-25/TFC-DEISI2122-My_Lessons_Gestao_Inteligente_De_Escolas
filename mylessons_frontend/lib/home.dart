@@ -44,9 +44,7 @@ class _HomePageState extends State<HomePage> {
 
   void setInitialDate() {
     final now = DateTime.now();
-    // First day of the current month
     startDate = DateTime(now.year, now.month, 1);
-    // Last day of the current month: day 0 of next month gives the last day of the current month.
     endDate = DateTime(now.year, now.month + 1, 0);
   }
 
@@ -64,8 +62,6 @@ class _HomePageState extends State<HomePage> {
   Future<void> fetchData() async {
     try {
       final headers = await getAuthHeaders();
-
-      // Fetch profile, role, and school id (needed for Admin)
       final profileResponse = await http.get(
         Uri.parse('http://127.0.0.1:8000/api/users/profile/'),
         headers: headers,
@@ -80,7 +76,8 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
-        final profileData = json.decode(utf8.decode(profileResponse.bodyBytes));
+        final profileData =
+            json.decode(utf8.decode(profileResponse.bodyBytes));
         final roleData = json.decode(utf8.decode(roleResponse.bodyBytes));
 
         setState(() {
@@ -95,14 +92,13 @@ class _HomePageState extends State<HomePage> {
                   0
               : 0;
           schoolName = schoolResponse.statusCode == 200
-              ? json.decode(utf8.decode(schoolResponse.bodyBytes))[
-                      'current_school_name']
+              ? json
+                  .decode(utf8.decode(schoolResponse.bodyBytes))['current_school_name']
                   .toString()
               : "";
         });
       }
 
-      // For Parent & Instructor, fetch lessons and packs
       if (currentRole == "Parent" ||
           currentRole == "Instructor" ||
           currentRole == "Admin") {
@@ -173,7 +169,6 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      // For Admin, fetch additional metrics
       if (currentRole == "Admin") {
         await fetchAdminMetrics();
       }
@@ -188,40 +183,302 @@ class _HomePageState extends State<HomePage> {
     final formattedEnd = DateFormat('yyyy-MM-dd').format(endDate);
 
     final bookingsResponse = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/schools/number_of_booked_lessons/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          'http://127.0.0.1:8000/api/schools/number_of_booked_lessons/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
     final studentsResponse = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/schools/number_of_students/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          'http://127.0.0.1:8000/api/schools/number_of_students/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
     final instructorsResponse = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/schools/number_of_instructors/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          'http://127.0.0.1:8000/api/schools/number_of_instructors/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
     final revenueResponse = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/schools/school-revenue/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          'http://127.0.0.1:8000/api/schools/school-revenue/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
 
     setState(() {
       numberOfBookings = bookingsResponse.statusCode == 200
-          ? int.tryParse(json.decode(utf8.decode(bookingsResponse.bodyBytes))['number_of_lessons_booked'].toString()) ?? 0
+          ? int.tryParse(json
+                  .decode(utf8.decode(bookingsResponse.bodyBytes))['number_of_lessons_booked']
+                  .toString()) ??
+              0
           : 0;
       numberOfStudents = studentsResponse.statusCode == 200
-          ? int.tryParse(json.decode(utf8.decode(studentsResponse.bodyBytes))['total_students'].toString()) ?? 0
+          ? int.tryParse(json
+                  .decode(utf8.decode(studentsResponse.bodyBytes))['total_students']
+                  .toString()) ??
+              0
           : 0;
       numberOfInstructors = instructorsResponse.statusCode == 200
-          ? int.tryParse(json.decode(utf8.decode(instructorsResponse.bodyBytes))['total_instructors'].toString()) ?? 0
+          ? int.tryParse(json
+                  .decode(utf8.decode(instructorsResponse.bodyBytes))['total_instructors']
+                  .toString()) ??
+              0
           : 0;
       totalRevenue = revenueResponse.statusCode == 200
-          ? double.tryParse(json.decode(utf8.decode(revenueResponse.bodyBytes))['total_revenue'].toString()) ?? 0.0
+          ? double.tryParse(json
+                  .decode(utf8.decode(revenueResponse.bodyBytes))['total_revenue']
+                  .toString()) ??
+              0.0
           : 0.0;
     });
   }
 
-  // Header widget that conditionally includes the school name if the role is Admin.
-  // The header is wrapped in extra horizontal padding so its width matches the inner content of the sections.
+  // NEW: Function to fetch available times for a given lesson/date/increment.
+  Future<List<String>> _fetchAvailableTimes(
+      int lessonId, DateTime date, int increment) async {
+    final headers = await getAuthHeaders();
+    final response = await http.post(
+      Uri.parse('http://127.0.0.1:8000/api/lessons/available_lesson_times/'),
+      headers: headers,
+      body: jsonEncode({
+        "lesson_id": lessonId,
+        "date": DateFormat('yyyy-MM-dd').format(date),
+        "increment": increment,
+      }),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return List<String>.from(data['available_times']);
+    } else {
+      return [];
+    }
+  }
+
+  Future<bool> _canStillReschedule(int lessonId) async {
+    final headers = await getAuthHeaders();
+    final response = await http.get(
+      Uri.parse('http://127.0.0.1:8000/api/lessons/can_still_reschedule/$lessonId/'),
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      // Assuming the API returns a JSON boolean (true/false)
+      return data;
+    } else {
+      // In case of error, assume scheduling is not allowed.
+      return false;
+    }
+  }
+
+
+  Future<String?> _schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) async {
+    final headers = await getAuthHeaders();
+    final newDateStr = DateFormat('yyyy-MM-dd').format(newDate);
+    final payload = {
+      "lesson_id": lessonId,
+      "new_date": newDateStr,
+      "new_time": newTime,
+    };
+    print("Scheduling payload: $payload");
+    
+    final response = await http.post(
+      Uri.parse('http://127.0.0.1:8000/api/lessons/schedule_private_lesson/'),
+      headers: headers,
+      body: jsonEncode(payload),
+    );
+    print("Response: ${response.statusCode} ${response.body}");
+    
+    if (response.statusCode == 200) {
+      return null;
+    } else {
+      // Extract the error message from the response.
+      final data = jsonDecode(response.body);
+      return data['error'] ?? "Failed to schedule lesson";
+    }
+  }
+
+  void _showScheduleLessonModal(dynamic lesson) {
+    final int lessonId = lesson['id'] ?? lesson['lesson_id'];
+
+    DateTime? selectedDate;
+    int increment = 60;
+    List<String> availableTimes = [];
+    bool isLoading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Calendar Picker with past dates disabled.
+                    Container(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SfDateRangePicker(
+                        view: DateRangePickerView.month,
+                        selectionMode: DateRangePickerSelectionMode.single,
+                        initialDisplayDate: DateTime.now(),
+                        minDate: DateTime.now(),
+                        maxDate: lesson['expiration_date'] != "None" 
+                            ? DateTime.parse(lesson['expiration_date']) 
+                            : null,
+                        onSelectionChanged: (DateRangePickerSelectionChangedArgs args) {
+                          if (args.value is DateTime) {
+                            setModalState(() {
+                              selectedDate = args.value;
+                              availableTimes = [];
+                              isLoading = true;
+                            });
+                            _fetchAvailableTimes(lessonId, selectedDate!, increment)
+                                .then((times) {
+                              setModalState(() {
+                                availableTimes = times;
+                                isLoading = false;
+                              });
+                            });
+                          }
+                        },
+                        monthViewSettings: const DateRangePickerMonthViewSettings(
+                          firstDayOfWeek: 1,
+                          showTrailingAndLeadingDates: true,
+                        ),
+                        headerStyle: const DateRangePickerHeaderStyle(
+                          textAlign: TextAlign.center,
+                          textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    // Dropdown to change increment value.
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        children: [
+                          const Text("Increment: "),
+                          DropdownButton<int>(
+                            value: increment,
+                            items: [15, 30, 60].map((value) {
+                              return DropdownMenuItem<int>(
+                                value: value,
+                                child: Text("$value minutes"),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) {
+                              if (newValue != null) {
+                                setModalState(() {
+                                  increment = newValue;
+                                  if (selectedDate != null) {
+                                    isLoading = true;
+                                    availableTimes = [];
+                                  }
+                                });
+                                if (selectedDate != null) {
+                                  _fetchAvailableTimes(lessonId, selectedDate!, increment)
+                                      .then((times) {
+                                    setModalState(() {
+                                      availableTimes = times;
+                                      isLoading = false;
+                                    });
+                                  });
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Loading indicator.
+                    if (isLoading) const CircularProgressIndicator(),
+                    // Grid view of available times.
+                    if (!isLoading && availableTimes.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemCount: availableTimes.length,
+                          itemBuilder: (context, index) {
+                            String timeStr = availableTimes[index];
+                            return InkWell(
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text("Confirm Reschedule"),
+                                      content: Text(
+                                        "Reschedule lesson to ${DateFormat('d MMM yyyy').format(selectedDate!).toLowerCase()} at $timeStr?",
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(),
+                                          child: const Text("Cancel"),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop(); // Dismiss confirmation.
+                                            _schedulePrivateLesson(lessonId, selectedDate!, timeStr)
+                                                .then((errorMessage) {
+                                              if (errorMessage == null) {
+                                                Navigator.of(context).pop(); // Dismiss modal.
+                                                fetchData(); // Refresh upcoming lessons.
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text("Lesson successfully rescheduled"),
+                                                  ),
+                                                );
+                                              } else {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(errorMessage),
+                                                  ),
+                                                );
+                                              }
+                                            });
+                                          },
+                                          child: const Text("Confirm"),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  timeStr,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Header widget.
   Widget _buildHeader() {
     String welcomeText = currentRole == "Admin"
         ? 'Welcome back to $schoolName,'
@@ -240,7 +497,7 @@ class _HomePageState extends State<HomePage> {
               ),
               Stack(
                 children: [
-                  Icon(Icons.notifications_none, size: 28),
+                  const Icon(Icons.notifications_none, size: 28),
                   if (notificationsCount > 0)
                     Positioned(
                       right: 0,
@@ -263,7 +520,8 @@ class _HomePageState extends State<HomePage> {
           ),
           Text(
             firstName,
-            style: GoogleFonts.lato(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+            style: GoogleFonts.lato(
+                fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
           ),
           const SizedBox(height: 20),
         ],
@@ -271,7 +529,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Encapsulated Admin UI using collapsible sections
+  // Build Admin UI.
   Widget _buildAdmin() {
     final formattedStart = DateFormat('MMM dd, yyyy').format(startDate);
     final formattedEnd = DateFormat('MMM dd, yyyy').format(endDate);
@@ -283,80 +541,100 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "$formattedStart - $formattedEnd",
-                    style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.calendar_today),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (context) {
-                          return Container(
-                            height: 400,
-                            padding: EdgeInsets.all(16),
-                            child: SfDateRangePicker(
-                              view: DateRangePickerView.month,
-                              selectionMode: DateRangePickerSelectionMode.range,
-                              initialSelectedRange: PickerDateRange(startDate, endDate),
-                              showActionButtons: true,
-                              onSubmit: (Object? val) {
-                                if (val is PickerDateRange) {
-                                  setState(() {
-                                    startDate = val.startDate!;
-                                    endDate = val.endDate ?? val.startDate!;
-                                  });
-                                  fetchAdminMetrics();
-                                }
-                                Navigator.pop(context);
-                              },
-                              onCancel: () {
-                                Navigator.pop(context);
-                              },
-                              // Additional customization options:
-                              monthViewSettings: DateRangePickerMonthViewSettings(
-                                firstDayOfWeek: 1,
-                                showTrailingAndLeadingDates: true,
-                              ),
-                              headerStyle: DateRangePickerHeaderStyle(
-                                textAlign: TextAlign.center,
-                                textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                            ),
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "$formattedStart - $formattedEnd",
+                          style: GoogleFonts.lato(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.calendar_today),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            builder: (context) {
+                              return Container(
+                                height: 400,
+                                padding: const EdgeInsets.all(16),
+                                child: SfDateRangePicker(
+                                  view: DateRangePickerView.month,
+                                  selectionMode:
+                                      DateRangePickerSelectionMode.range,
+                                  initialSelectedRange:
+                                      PickerDateRange(startDate, endDate),
+                                  showActionButtons: true,
+                                  onSubmit: (Object? val) {
+                                    if (val is PickerDateRange) {
+                                      setState(() {
+                                        startDate = val.startDate!;
+                                        endDate =
+                                            val.endDate ?? val.startDate!;
+                                      });
+                                      fetchAdminMetrics();
+                                    }
+                                    Navigator.pop(context);
+                                  },
+                                  onCancel: () {
+                                    Navigator.pop(context);
+                                  },
+                                  monthViewSettings:
+                                      const DateRangePickerMonthViewSettings(
+                                    firstDayOfWeek: 1,
+                                    showTrailingAndLeadingDates: true,
+                                  ),
+                                  headerStyle: const DateRangePickerHeaderStyle(
+                                    textAlign: TextAlign.center,
+                                    textStyle: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                  )
-                ],
-              ),
-            ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard("Booked Lessons", numberOfBookings.toString()),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8.0),
-                  Expanded(
-                    child: _buildStatCard("Active Students", numberOfStudents.toString()),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard("Active Instructors", numberOfInstructors.toString()),
+                    child: _buildStatCard("Booked Lessons",
+                        numberOfBookings.toString()),
                   ),
                   const SizedBox(width: 8.0),
                   Expanded(
-                    child: _buildStatCard("Total Revenue", "€${totalRevenue.toStringAsFixed(2)}"),
+                    child: _buildStatCard(
+                        "Active Students", numberOfStudents.toString()),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard("Active Instructors",
+                        numberOfInstructors.toString()),
+                  ),
+                  const SizedBox(width: 8.0),
+                  Expanded(
+                    child: _buildStatCard("Total Revenue",
+                        "€${totalRevenue.toStringAsFixed(2)}"),
                   ),
                 ],
               ),
@@ -366,20 +644,24 @@ class _HomePageState extends State<HomePage> {
         CollapsibleSection(
           title: 'Upcoming Lessons',
           child: Column(
-            children: upcomingLessons.map<Widget>((lesson) => _buildLessonCard(lesson)).toList(),
+            children: upcomingLessons
+                .map<Widget>((lesson) => _buildLessonCard(lesson))
+                .toList(),
           ),
         ),
         CollapsibleSection(
           title: 'Active Packs',
           child: Column(
-            children: activePacks.map<Widget>((pack) => _buildPackCard(pack)).toList(),
+            children: activePacks
+                .map<Widget>((pack) => _buildPackCard(pack))
+                .toList(),
           ),
         ),
       ],
     );
   }
 
-  // Encapsulated Instructor UI using collapsible sections
+  // Build Instructor UI.
   Widget _buildInstructor() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,11 +671,13 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               Expanded(
-                child: _buildStatCard("Active Students", numberOfActiveStudents.toString()),
+                child:
+                    _buildStatCard("Active Students", numberOfActiveStudents.toString()),
               ),
               const SizedBox(width: 8.0),
               Expanded(
-                child: _buildStatCard("Current Balance", "€${currentBalance.toStringAsFixed(2)}"),
+                child: _buildStatCard(
+                    "Current Balance", "€${currentBalance.toStringAsFixed(2)}"),
               ),
             ],
           ),
@@ -401,20 +685,24 @@ class _HomePageState extends State<HomePage> {
         CollapsibleSection(
           title: 'Upcoming Lessons',
           child: Column(
-            children: upcomingLessons.map<Widget>((lesson) => _buildLessonCard(lesson)).toList(),
+            children: upcomingLessons
+                .map<Widget>((lesson) => _buildLessonCard(lesson))
+                .toList(),
           ),
         ),
         CollapsibleSection(
           title: 'Active Packs',
           child: Column(
-            children: activePacks.map<Widget>((pack) => _buildPackCard(pack)).toList(),
+            children: activePacks
+                .map<Widget>((pack) => _buildPackCard(pack))
+                .toList(),
           ),
         ),
       ],
     );
   }
 
-  // Encapsulated Parent UI using collapsible sections
+  // Parent UI
   Widget _buildParent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,13 +710,18 @@ class _HomePageState extends State<HomePage> {
         CollapsibleSection(
           title: 'Upcoming Lessons',
           child: Column(
-            children: upcomingLessons.map<Widget>((lesson) => _buildLessonCard(lesson)).toList(),
+            children: upcomingLessons
+                .map<Widget>((lesson) => _buildLessonCard(lesson))
+                .toList(),
           ),
         ),
         CollapsibleSection(
           title: 'Last Lessons',
           child: Column(
-            children: lastLessons.map<Widget>((lesson) => _buildLessonCard(lesson)).toList(),
+            // Pass isLastLesson: true so that the calendar icon is omitted.
+            children: lastLessons
+                .map<Widget>((lesson) => _buildLessonCard(lesson, isLastLesson: true))
+                .toList(),
           ),
         ),
         CollapsibleSection(
@@ -441,18 +734,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-                // Render content based on the current role
                 if (currentRole == "Admin")
                   _buildAdmin()
                 else if (currentRole == "Instructor")
@@ -468,48 +762,98 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Text(
-        title,
-        style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  Widget _buildLessonCard(dynamic lesson) {
+  Widget _buildLessonCard(dynamic lesson, {bool isLastLesson = false}) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(Icons.calendar_today, size: 30, color: Colors.black54),
+        // For last lessons, no calendar icon is shown.
+        leading: isLastLesson
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: () async {
+                  final int lessonId = lesson['id'] ?? lesson['lesson_id'];
+                  if (lesson['type'] != "private") {
+                    // Group lesson: show warning dialog.
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text("Cannot Reschedule Group Lesson"),
+                          content: const Text(
+                            "To reschedule a group lesson, please contact the school or instructor.",
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text("OK"),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  } else {
+                    // For private lessons, first check if rescheduling is still allowed.
+                    bool canReschedule = await _canStillReschedule(lessonId);
+                    if (!canReschedule) {
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          return AlertDialog(
+                            title: const Text("Cannot Reschedule"),
+                            content: const Text(
+                              "The reschedule period has already passed. Please contact the school or instructor.",
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text("OK"),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    } else {
+                      // If allowed, show the scheduling modal.
+                      _showScheduleLessonModal(lesson);
+                    }
+                  }
+                },
+              ),
         title: Text(
           lesson['students_name'],
           style: GoogleFonts.lato(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${lesson['date']} ${lesson['start_time']}',
+          '${lesson['date']} at ${lesson['start_time']}',
           style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
         ),
-        trailing: Icon(Icons.more_vert, color: Colors.black54),
+        trailing: const Icon(Icons.more_vert, color: Colors.black54),
       ),
     );
   }
+
+
 
   Widget _buildPackCard(dynamic pack) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(Icons.calendar_today, size: 30, color: Colors.black54),
+        leading: IconButton(
+          icon: const Icon(Icons.calendar_today),
+          onPressed: () {
+            // Add similar scheduling logic for packs if needed.
+          },
+        ),
         title: Text(
           pack['students_name'],
           style: GoogleFonts.lato(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${pack['lessons_remaining']} lessons remaining\n${pack['unscheduled_lessons']} unscheduled lessons',
+          '${pack['lessons_remaining']} lessons remaining\n${pack['unscheduled_lessons']} unscheduled lessons\n${pack['days_until_expiration']} days until expiration',
           style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
         ),
-        trailing: Icon(Icons.more_vert, color: Colors.black54),
+        trailing: const Icon(Icons.more_vert, color: Colors.black54),
       ),
     );
   }

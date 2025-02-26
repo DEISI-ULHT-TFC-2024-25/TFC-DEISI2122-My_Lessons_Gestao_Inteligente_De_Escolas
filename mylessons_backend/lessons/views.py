@@ -39,13 +39,14 @@ def get_lessons_data(user, date_lookup, is_done_flag):
     lessons_data = [
         {
             "lesson_id": lesson.id,
-            "date": lesson.date.strftime("%d %b") if lesson.date else "None",
-            "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
+            "date": lesson.date.strftime("%d %b %Y") if lesson.date else "None",
+            "start_time": lesson.start_time.strftime("%H:%M") if lesson.start_time else "None",
             "lesson_number": lesson.class_number if lesson.class_number else "None", # TODO fix for group lessons
             "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None", # TODO fix for group lessons
             "students_name": lesson.get_students_name(),
             "type": lesson.type,
             "duration_in_minutes": lesson.duration_in_minutes,
+            "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None"
         }
         for lesson in lessons
     ]
@@ -362,3 +363,50 @@ def mark_lesson_as_not_done(request):
     Permite aos instrutores ou admins marcar uma aula como não realizada.
     """
     return process_lesson_status(request, mark_as_done=False)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def available_lesson_times(request):
+    """
+    Receives a lesson_id and a date (YYYY-MM-DD) and returns a list of available times for the lesson.
+    Only works for lessons of type "private".
+    """
+    lesson_id = request.data.get("lesson_id")
+    date_str = request.data.get("date")
+    increment = request.data.get("increment")
+    
+    # Validate required parameters.
+    if not lesson_id or not date_str or not increment:
+        return Response({"error": "Missing lesson_id or date parameter."}, status=400)
+    
+    try:
+        # Convert the date string to a date object.
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"error": "Invalid date format. Expected YYYY-MM-DD."}, status=400)
+    
+    try:
+        lesson = Lesson.objects.get(pk=lesson_id)
+    except Lesson.DoesNotExist:
+        return Response({"error": "Lesson not found."}, status=404)
+    
+    # Get available times from the lesson method.
+    available_times = lesson.list_available_lesson_times(date_obj, increment)
+    
+    return Response({"available_times": available_times})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def can_still_reschedule(request, id):
+    try:
+        lesson = Lesson.objects.get(pk=id)
+    except Lesson.DoesNotExist:
+        return Response({"error": "Lesson not found."}, status=404)
+    
+    # Call the lesson's method which returns a boolean.
+    result = lesson.can_still_reschedule(role=request.user.current_role)
+    
+    # Return the boolean value directly.
+    return Response(result, status=200)
