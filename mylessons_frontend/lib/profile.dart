@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mylessons_frontend/modals/schoolSetupModal.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -218,7 +219,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     const SizedBox(height: 20),
                   ],
-
+                  if (currentRole == "Admin")
+                    ElevatedButton(
+                      onPressed: () {
+                        showSchoolSetupModal(context);
+                      },
+                      child: Text("Manage School"),
+                    ),
                   // Logout Button
                   ElevatedButton(
                     onPressed: logout,

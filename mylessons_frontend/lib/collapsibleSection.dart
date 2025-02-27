@@ -6,8 +6,7 @@ class CollapsibleSection extends StatelessWidget {
     final String title;
     final Widget child;
 
-    const CollapsibleSection({Key? key, required this.title, required this.child})
-        : super(key: key);
+    const CollapsibleSection({super.key, required this.title, required this.child});
 
     @override
     Widget build(BuildContext context) {

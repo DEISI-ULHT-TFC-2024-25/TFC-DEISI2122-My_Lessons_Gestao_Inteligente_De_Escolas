@@ -122,7 +122,7 @@ def user_profile(request):
     user = request.user  # Obtém o utilizador autenticado
 
     # Conta as notificações não lidas
-    unread_notifications = Notification.objects.filter(user=user, date_read=None).count()
+    unread_notifications = Notification.objects.filter(user=user, type=user.current_role, date_read=None).count()
 
     data = {
         "id": user.id,
