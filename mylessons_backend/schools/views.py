@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render
 from payments.models import Payment
 from users.models import Instructor
@@ -19,6 +20,93 @@ from events.models import Activity
 from schools.models import School
 from django.db.models import Q, Sum
 from django.utils.timezone import now
+from django.http import JsonResponse
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def school_details_view(request):
+    
+    # TODO TEST
+    user = request.user
+    school = School.objects.get(pk = user.current_school_id)
+    if not school:
+        return Response({
+            'success': True,
+            'school_id': None,
+            'school_name': "",
+            'pack_prices': {},
+            'currency': ""
+        })
+    return Response({
+        'success': True,
+        'school_id': school.id,
+        'school_name': school.name,
+        'pack_prices': school.pack_prices,
+        'currency': school.currency,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_pack_price_view(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    # Retrieve the school by ID or create one if a school_name is provided.
+    school_id = data.get('school_id')
+    school_name = data.get('school_name')
+    user = request.user
+    
+    if school_id:
+        try:
+            school = School.objects.get(id=school_id)
+        except School.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'School not found'}, status=404)
+    elif school_name:
+        # Create a new school with the given name and add request.user to admins.
+        school = School.objects.create(name=school_name)
+        school.admins.add(user)
+        user.current_school_id = school.id
+        user.save()
+        
+    else:
+        return JsonResponse({'success': False, 'error': 'Either school_id or school_name must be provided'}, status=400)
+    
+    # Extract pack price details from the request data.
+    pack_type = data.get('pack_type')
+    duration = data.get('duration')
+    number_of_people = data.get('number_of_people')
+    number_of_classes = data.get('number_of_classes')
+    price = data.get('price')
+    expiration_date = data.get('expiration_date')  # computed on the client based on time limit
+    currency = data.get('currency')
+    
+    # Set the school's currency if provided.
+    if currency:
+        school.currency = currency
+        school.save()
+
+    try:
+        school.update_pack_price(
+            pack_type=pack_type,
+            duration=duration,
+            number_of_people=number_of_people,
+            number_of_classes=number_of_classes,
+            price=price,
+            expiration_date=expiration_date
+        )
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({
+        'success': True,
+        'school_id': school.id,
+        'school_name': school.name,
+        'pack_prices': school.pack_prices
+    })
 
 
 @api_view(['GET'])

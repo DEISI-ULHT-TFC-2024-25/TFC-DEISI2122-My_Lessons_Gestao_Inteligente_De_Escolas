@@ -58,33 +58,33 @@ def default_extra_prices():
         "wristpads" : 2,
     }
 
-def default_group_lessons_pack_prices():
+def default_pack_prices():
     return {
-        "60m": {
-            "1": 25,
-            "4": 70,
-        }
-    }
-
-def default_private_lessons_pack_prices():
-    return {
-        "30m": {
-            "1p": {"1c": 20, "4c": 55},
-            "2p": {},
-            "3p": {},
-            "4p": {},
+        "private": {
+            "30m": {
+                "1p": {"1c": 20, "4c": 55},
+                "2p": {},
+                "3p": {},
+                "4p": {},
+            },
+            "60m": {
+                "1p": {"1c": 30, "4c": 90, "8c": 165},
+                "2p": {"1c": 40, "4c": 130, "8c": 235},
+                "3p": {"1c": 55, "4c": 175, "8c": 310},
+                "4p": {"1c": 65, "4c": 210, "8c": 375},
+            },
+            "90m": {
+                "1p": {"1c": 40, "4c": 140, "8c": 235},
+                "2p": {"1c": 55, "4c": 190, "8c": 330},
+                "3p": {"1c": 65, "4c": 230, "8c": 420},
+                "4p": {"1c": 75, "4c": 260, "8c": 470},
+            }
         },
-        "60m": {
-            "1p": {"1c": 30, "4c": 90, "8c": 165},
-            "2p": {"1c": 40, "4c": 130, "8c": 235},
-            "3p": {"1c": 55, "4c": 175, "8c": 310},
-            "4p": {"1c": 65, "4c": 210, "8c": 375},
-        },
-        "90m": {
-            "1p": {"1c": 40, "4c": 140, "8c": 235},
-            "2p": {"1c": 55, "4c": 190, "8c": 330},
-            "3p": {"1c": 65, "4c": 230, "8c": 420},
-            "4p": {"1c": 75, "4c": 260, "8c": 470},
+        "group": {
+            "60m": {
+                "1": 25,
+                "4": 70,
+            }
         }
     }
 
@@ -227,8 +227,7 @@ class Review(models.Model):
         ordering = ['-date']  # Newest reviews appear first
 
 class School(models.Model):
-    private_lessons_pack_prices = models.JSONField(default=default_private_lessons_pack_prices, blank=True) # TODO merge private and group into one
-    group_lessons_pack_prices = models.JSONField(default=default_group_lessons_pack_prices, blank=True)
+    pack_prices = models.JSONField(default=dict, blank=True)
     name = models.CharField(max_length=255)
     payment_types = models.JSONField(default=default_payment_types, blank=True, null=True)
     extra_prices = models.JSONField(blank=True, null=True)  # Example: {"extra_time": 10, "private_lesson": 50}
@@ -330,82 +329,74 @@ class School(models.Model):
     def get_unpaid_packs(self):
         return list(self.packs.filter(is_paid=False))
     
-    def update_pack_price(self, pack_type, duration, number_of_people=None, number_of_classes=None, price=None):
-        """
-        Updates or adds a price to the specified pack type (private or group).
-
-        Args:
-            pack_type (str): Either "private" or "group" to specify the type of pack.
-            duration (str): Duration of the lesson (e.g., "30m", "60m", "90m").
-            number_of_people (str): Number of people (e.g., "1p", "2p"), required for private packs.
-            number_of_classes (str): Number of classes (e.g., "1c", "4c"), required for private packs.
-            price (float): The price to set for the specified pack configuration.
-
-        Returns:
-            bool: True if the update was successful, False otherwise.
-        """
+    def update_pack_price(self, pack_type, duration, number_of_people=None, number_of_classes=None, price=None, expiration_date=None):
         if pack_type not in ["private", "group"]:
             raise ValueError("pack_type must be either 'private' or 'group'")
-
         if not price:
             raise ValueError("A price must be specified")
-
+        
+        pack_prices = self.pack_prices or {}
+        
+        # Ensure the key for pack_type exists.
+        if pack_type not in pack_prices:
+            pack_prices[pack_type] = {}
+        
         if pack_type == "private":
             if not number_of_people or not number_of_classes:
                 raise ValueError("For private packs, number_of_people and number_of_classes must be specified")
-
-            private_prices = self.private_lessons_pack_prices
-            if duration not in private_prices:
-                private_prices[duration] = {}
-
-            if number_of_people not in private_prices[duration]:
-                private_prices[duration][number_of_people] = {}
-
-            private_prices[duration][number_of_people][number_of_classes] = price
-            self.private_lessons_pack_prices = private_prices
-
+            if duration not in pack_prices[pack_type]:
+                pack_prices[pack_type][duration] = {}
+            if number_of_people not in pack_prices[pack_type][duration]:
+                pack_prices[pack_type][duration][number_of_people] = {}
+            pack_prices[pack_type][duration][number_of_people][number_of_classes] = {
+                'price': price,
+                'expiration_date': expiration_date
+            }
         elif pack_type == "group":
-            group_prices = self.group_lessons_pack_prices
-            if duration not in group_prices:
-                group_prices[duration] = {}
-            group_prices[duration][number_of_classes] = price
-            self.group_lessons_pack_prices = group_prices
-
+            if not number_of_classes:
+                raise ValueError("For group packs, number_of_classes must be specified")
+            if duration not in pack_prices[pack_type]:
+                pack_prices[pack_type][duration] = {}
+            pack_prices[pack_type][duration][number_of_classes] = {
+                'price': price,
+                'expiration_date': expiration_date
+            }
+        
+        self.pack_prices = pack_prices
         self.save()
         return True
-    
+
     def delete_pack_option(self, pack_type, duration=None, number_of_people=None, number_of_classes=None):
-        """
-        Deletes a specific pricing option for private or group lessons and removes empty dictionaries.
-        """
         if pack_type not in ["private", "group"]:
             raise ValueError("Invalid lesson type. Use 'private' or 'group'.")
-
+        
+        pack_prices = self.pack_prices
+        
         if pack_type == "private":
             if not duration or not number_of_people or not number_of_classes:
                 raise ValueError("Duration, number of people, and number of classes must be specified for private lessons.")
-
-            prices = self.private_lessons_pack_prices
-            if duration in prices and number_of_people in prices[duration]:
-                if number_of_classes in prices[duration][number_of_people]:
-                    del prices[duration][number_of_people][number_of_classes]
-
-                    if not prices[duration][number_of_people]:
-                        del prices[duration][number_of_people]
-                    if not prices[duration]:
-                        del prices[duration]
-
+            
+            if duration in pack_prices[pack_type] and number_of_people in pack_prices[pack_type][duration]:
+                if number_of_classes in pack_prices[pack_type][duration][number_of_people]:
+                    del pack_prices[pack_type][duration][number_of_people][number_of_classes]
+                    
+                    if not pack_prices[pack_type][duration][number_of_people]:
+                        del pack_prices[pack_type][duration][number_of_people]
+                    if not pack_prices[pack_type][duration]:
+                        del pack_prices[pack_type][duration]
+        
         elif pack_type == "group":
             if not duration or not number_of_classes:
                 raise ValueError("Duration and number of classes must be specified for group lessons.")
-
-            prices = self.group_lessons_pack_prices
-            if duration in prices and number_of_classes in prices[duration]:
-                del prices[duration][number_of_classes]
-                if not prices[duration]:
-                    del prices[duration]
-
+            
+            if duration in pack_prices[pack_type] and number_of_classes in pack_prices[pack_type][duration]:
+                del pack_prices[pack_type][duration][number_of_classes]
+                if not pack_prices[pack_type][duration]:
+                    del pack_prices[pack_type][duration]
+        
+        self.pack_prices = pack_prices
         self.save()
+        return True
     
     def get_notification_template(self, key):
         """

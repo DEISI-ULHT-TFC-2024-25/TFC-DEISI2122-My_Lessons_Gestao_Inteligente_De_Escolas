@@ -5,7 +5,7 @@ import 'bookings_page.dart';
 import 'payments_page.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
   
   @override
   _MainScreenState createState() => _MainScreenState();

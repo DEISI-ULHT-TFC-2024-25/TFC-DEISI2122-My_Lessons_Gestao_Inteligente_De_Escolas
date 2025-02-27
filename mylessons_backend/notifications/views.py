@@ -6,18 +6,19 @@ from .models import Notification
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def mark_notification_as_read(request, id):
+def mark_notification_as_read(request):
     """
     Marks a notification as read.
     """
-    notification = get_object_or_404(Notification, id=id, user=request.user)
+    notifications = []
+    notifications_ids = request.data.get("notifications_ids", [])
 
-    if notification.date_read:
-        return Response({"message": "Notification already read."}, status=200)
+    for id in notifications_ids:
+        notification = get_object_or_404(Notification, id=id, user=request.user)
+        notifications.append(notification)
+        notification.mark_as_read()
 
-    notification.mark_as_read()
-
-    return Response({"message": "Notification marked as read."}, status=200)
+    return Response({"message": "All notifications marked as read."}, status=200)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
