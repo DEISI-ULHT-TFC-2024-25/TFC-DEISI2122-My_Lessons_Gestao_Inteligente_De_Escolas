@@ -4,6 +4,7 @@ import copy
 import logging
 from django.db import models
 from django.apps import apps
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,7 @@ class Review(models.Model):
 
 class School(models.Model):
     pack_prices = models.JSONField(default=dict, blank=True)
+    services = models.JSONField(default=list, blank=True)
     name = models.CharField(max_length=255)
     payment_types = models.JSONField(default=dict, blank=True, null=True)
     extra_prices = models.JSONField(blank=True, null=True)  # Example: {"extra_time": 10, "private_lesson": 50}
@@ -255,6 +257,54 @@ class School(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def add_or_edit_service(self, service_data: dict) -> list:
+        """
+        Add or edit a service in this school's services list based on the 'id' field.
+
+        Validation:
+          - The service's "type" field must contain either a "pack" or an "activity", but not both.
+        
+        If 'id' is not provided, a new one is generated.
+        If a service with that 'id' exists, it is updated; otherwise, appended.
+        
+        Returns the updated list of services.
+        """
+        services_list = self.services or []
+
+        # Validate the "type" field.
+        service_type = service_data.get("type", {})
+        has_pack = "pack" in service_type and bool(service_type["pack"])
+        has_activity = "activity" in service_type and bool(service_type["activity"])
+
+        if has_pack and has_activity:
+            raise ValueError("Service 'type' must contain either a 'pack' or an 'activity', not both.")
+        if not (has_pack or has_activity):
+            raise ValueError("Service 'type' must contain either a 'pack' or an 'activity'.")
+
+        # Generate an id if missing.
+        if "id" not in service_data or not service_data["id"]:
+            service_data["id"] = str(uuid.uuid4())
+
+        incoming_id = service_data["id"]
+
+        # Find if there's an existing service with the same id.
+        found_index = None
+        for i, svc in enumerate(services_list):
+            if svc.get("id") == incoming_id:
+                found_index = i
+                break
+
+        if found_index is not None:
+            # Update existing service.
+            services_list[found_index].update(service_data)
+        else:
+            # Add a new service.
+            services_list.append(service_data)
+
+        self.services = services_list
+        self.save()
+        return self.services
 
     def update_payment_type_value(self, key_path, new_value, user_obj=None):
         """
