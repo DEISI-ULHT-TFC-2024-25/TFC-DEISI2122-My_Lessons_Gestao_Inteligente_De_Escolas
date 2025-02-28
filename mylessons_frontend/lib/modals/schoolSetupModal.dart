@@ -100,7 +100,6 @@ String computeExpirationDate(String? timeLimit) {
   return "";
 }
 
-
 Widget buildPaymentTypesWidget(Map<String, dynamic> paymentTypes) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,12 +107,14 @@ Widget buildPaymentTypesWidget(Map<String, dynamic> paymentTypes) {
       String role = roleEntry.key;
       Map<String, dynamic> roleData = roleEntry.value;
       return ExpansionTile(
-        title: Text(role.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(role.toUpperCase(),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         children: roleData.entries.map<Widget>((paymentEntry) {
           String paymentType = paymentEntry.key;
           var paymentDetails = paymentEntry.value;
-          
-          if (paymentType == "private lesson" && paymentDetails is Map<String, dynamic>) {
+
+          if (paymentType == "private lesson" &&
+              paymentDetails is Map<String, dynamic>) {
             return ExpansionTile(
               title: Text("Private Lesson"),
               children: [
@@ -122,7 +123,8 @@ Widget buildPaymentTypesWidget(Map<String, dynamic> paymentTypes) {
                 ),
                 ExpansionTile(
                   title: Text("Fixed Pricing"),
-                  children: (paymentDetails["fixed"] as List<dynamic>).map<Widget>((fixedEntry) {
+                  children: (paymentDetails["fixed"] as List<dynamic>)
+                      .map<Widget>((fixedEntry) {
                     return ListTile(
                       title: Text("${fixedEntry["duration"]} min"),
                       subtitle: Text(
@@ -144,7 +146,6 @@ Widget buildPaymentTypesWidget(Map<String, dynamic> paymentTypes) {
   );
 }
 
-
 /// Build an accordion-like widget to display pack_prices.
 Widget buildPackPricesWidget(Map<String, dynamic> packPrices) {
   return Column(
@@ -153,24 +154,30 @@ Widget buildPackPricesWidget(Map<String, dynamic> packPrices) {
       String packType = packTypeEntry.key;
       Map<String, dynamic> durations = packTypeEntry.value;
       return ExpansionTile(
-        title: Text(packType.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(packType.toUpperCase(),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         children: durations.entries.map<Widget>((durationEntry) {
           String duration = durationEntry.key.toString();
           var subData = durationEntry.value;
           if (packType == "private") {
             return ExpansionTile(
               title: Text("$duration min"),
-              children: (subData as Map<String, dynamic>).entries.map<Widget>((peopleEntry) {
+              children: (subData as Map<String, dynamic>)
+                  .entries
+                  .map<Widget>((peopleEntry) {
                 String people = peopleEntry.key.toString();
                 var classesData = peopleEntry.value;
                 return ExpansionTile(
                   title: Text("$people person(s)"),
-                  children: (classesData as Map<String, dynamic>).entries.map<Widget>((classEntry) {
+                  children: (classesData as Map<String, dynamic>)
+                      .entries
+                      .map<Widget>((classEntry) {
                     String classes = classEntry.key.toString();
                     var details = classEntry.value;
                     return ListTile(
                       title: Text("$classes class(es)"),
-                      subtitle: Text("Price: ${details['price']} €, Expires: ${details['expiration_date']}"),
+                      subtitle: Text(
+                          "Price: ${details['price']} €, Expires: ${details['expiration_date']}"),
                     );
                   }).toList(),
                 );
@@ -180,12 +187,15 @@ Widget buildPackPricesWidget(Map<String, dynamic> packPrices) {
             // group pack
             return ExpansionTile(
               title: Text("$duration min"),
-              children: (subData as Map<String, dynamic>).entries.map<Widget>((classEntry) {
+              children: (subData as Map<String, dynamic>)
+                  .entries
+                  .map<Widget>((classEntry) {
                 String classes = classEntry.key.toString();
                 var details = classEntry.value;
                 return ListTile(
                   title: Text("$classes class(es)"),
-                  subtitle: Text("Price: ${details['price']} €, Expires: ${details['expiration_date']}"),
+                  subtitle: Text(
+                      "Price: ${details['price']} €, Expires: ${details['expiration_date']}"),
                 );
               }).toList(),
             );
@@ -204,7 +214,6 @@ class SchoolSetupModal extends StatefulWidget {
 }
 
 class _SchoolSetupModalState extends State<SchoolSetupModal> {
-
   @override
   void initState() {
     super.initState();
@@ -230,77 +239,100 @@ class _SchoolSetupModalState extends State<SchoolSetupModal> {
   }
 
   // Helper function to post payment type data.
-Future<Map<String, dynamic>> postPaymentTypeDataCustom(Map<String, dynamic> payload) async {
-  final url = Uri.parse('$baseUrl/api/schools/update_payment_type/');
-  final headers = await getAuthHeaders();
-  final response = await http.post(url, headers: headers, body: jsonEncode(payload));
+  Future<Map<String, dynamic>> postPaymentTypeDataCustom(
+      Map<String, dynamic> payload) async {
+    final url = Uri.parse('$baseUrl/api/schools/update_payment_type/');
+    final headers = await getAuthHeaders();
+    final response =
+        await http.post(url, headers: headers, body: jsonEncode(payload));
 
-  if (response.statusCode == 200) {
-    return jsonDecode(response.body);
-  } else {
-    throw Exception('Failed to update payment type: ${response.body}');
-  }
-}
-
-/// The addPaymentType modal function.
-/// 
-/// [context] - BuildContext for showing the modal.
-/// [schoolDetails] - A Map containing at least "school_id".
-/// [schoolNameController] - Controller for the school name (if needed).
-/// [refreshSchoolDetails] - A callback to refresh the details after an update.
-void addPaymentType(
-  BuildContext context,
-  Map<String, dynamic> schoolDetails,
-  TextEditingController schoolNameController,
-  Future<void> Function() refreshSchoolDetails,
-) {
-  // Local state variables.
-  String? selectedRole;
-  String? selectedPaymentMode; // "fixed" or "lesson"
-  String? selectedLessonType; // "private" or "group"
-  final TextEditingController fixedMonthlyRateController = TextEditingController();
-  final TextEditingController commissionController = TextEditingController();
-  bool showFixedPricing = false;
-  // A list to hold any manually added fixed pricing entries.
-  List<Map<String, dynamic>> fixedPricingEntries = [];
-
-  // Helper function to update payment fields via separate API calls.
-  Future<void> updatePaymentTypeFields() async {
-    // For Fixed Monthly Rate mode.
-    if (selectedPaymentMode == "fixed") {
-      if (fixedMonthlyRateController.text.isEmpty) {
-        throw Exception("Monthly rate is required.");
-      }
-      double monthlyRate = double.tryParse(fixedMonthlyRateController.text) ?? 0.0;
-      String keyPath = "$selectedRole[fixed monthly rate]";
-      Map<String, dynamic> payload = {
-        'school_id': schoolDetails["school_id"]?.toString(),
-        'key_path': keyPath,
-        'new_value': monthlyRate,
-      };
-      await postPaymentTypeDataCustom(payload);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to update payment type: ${response.body}');
     }
-    // For Lesson Based mode.
-    else if (selectedPaymentMode == "lesson") {
-      if (selectedLessonType == null) {
-        throw Exception("Lesson type must be selected.");
-      }
-      // Update commission if provided.
-      if (commissionController.text.isNotEmpty) {
-        int commission = int.tryParse(commissionController.text) ?? 0;
-        String keyPath = "$selectedRole[$selectedLessonType][commission]";
+  }
+
+  /// The addPaymentType modal function.
+  ///
+  /// [context] - BuildContext for showing the modal.
+  /// [schoolDetails] - A Map containing at least "school_id".
+  /// [schoolNameController] - Controller for the school name (if needed).
+  /// [refreshSchoolDetails] - A callback to refresh the details after an update.
+  void addPaymentType(
+    BuildContext context,
+    Map<String, dynamic> schoolDetails,
+    TextEditingController schoolNameController,
+    Future<void> Function() refreshSchoolDetails,
+  ) {
+    // Local state variables.
+    String? selectedRole;
+    String? selectedPaymentMode; // "fixed" or "lesson"
+    String? selectedLessonType; // "private" or "group"
+
+    // Controllers for fixed mode and lesson mode.
+    final TextEditingController fixedMonthlyRateController =
+        TextEditingController();
+    final TextEditingController commissionController = TextEditingController();
+
+    // For lesson mode fixed pricing editing (only one fixed pricing entry allowed)
+    bool editFixedPricing = false;
+    final TextEditingController fixedPricingDurationController =
+        TextEditingController();
+    final TextEditingController fixedPricingMinStudentsController =
+        TextEditingController();
+    final TextEditingController fixedPricingMaxStudentsController =
+        TextEditingController();
+    final TextEditingController fixedPricingPriceController =
+        TextEditingController();
+
+    // Scroll controller for auto-scrolling.
+    final ScrollController scrollController = ScrollController();
+
+    // Helper function to update payment fields via separate API calls.
+    Future<void> updatePaymentTypeFields() async {
+      // For Fixed Monthly Rate mode.
+      if (selectedPaymentMode == "fixed") {
+        if (fixedMonthlyRateController.text.isEmpty) {
+          throw Exception("Monthly rate is required.");
+        }
+        double monthlyRate =
+            double.tryParse(fixedMonthlyRateController.text) ?? 0.0;
+        String keyPath = "$selectedRole[fixed monthly rate]";
         Map<String, dynamic> payload = {
           'school_id': schoolDetails["school_id"]?.toString(),
           'key_path': keyPath,
-          'new_value': commission,
+          'new_value': monthlyRate,
         };
         await postPaymentTypeDataCustom(payload);
       }
-      // Update each fixed pricing entry (if any).
-      if (showFixedPricing && fixedPricingEntries.isNotEmpty) {
-        String keyPath = "$selectedRole[$selectedLessonType][fixed]";
-        for (var pricingEntry in fixedPricingEntries) {
-          // pricingEntry should include: duration, min_students, max_students, and price.
+      // For Lesson Based mode.
+      else if (selectedPaymentMode == "lesson") {
+        if (selectedLessonType == null) {
+          throw Exception("Lesson type must be selected.");
+        }
+        // Update commission if provided.
+        if (commissionController.text.isNotEmpty) {
+          int commission = int.tryParse(commissionController.text) ?? 0;
+          String keyPath = "$selectedRole[$selectedLessonType][commission]";
+          Map<String, dynamic> payload = {
+            'school_id': schoolDetails["school_id"]?.toString(),
+            'key_path': keyPath,
+            'new_value': commission,
+          };
+          await postPaymentTypeDataCustom(payload);
+        }
+        // Update fixed pricing if editing is enabled.
+        if (editFixedPricing) {
+          String keyPath = "$selectedRole[$selectedLessonType][fixed]";
+          Map<String, dynamic> pricingEntry = {
+            'duration': int.tryParse(fixedPricingDurationController.text),
+            'min_students':
+                int.tryParse(fixedPricingMinStudentsController.text),
+            'max_students':
+                int.tryParse(fixedPricingMaxStudentsController.text),
+            'price': double.tryParse(fixedPricingPriceController.text),
+          };
           await postPaymentTypeDataCustom({
             'school_id': schoolDetails["school_id"]?.toString(),
             'key_path': keyPath,
@@ -309,358 +341,413 @@ void addPaymentType(
         }
       }
     }
-  }
 
-  // Display the modal bottom sheet.
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              left: 16,
-              right: 16,
-              top: 16,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Modal header.
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: 8),
+    // Display the modal bottom sheet.
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Function to scroll to the bottom.
+            void scrollToBottom() {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (scrollController.hasClients) {
+                  scrollController.animateTo(
+                    scrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              });
+            }
+
+            // Determine if we can show the Save button.
+            bool canSave = false;
+            if (selectedPaymentMode == "fixed") {
+              canSave = fixedMonthlyRateController.text.trim().isNotEmpty;
+            } else if (selectedPaymentMode == "lesson") {
+              bool commissionProvided =
+                  commissionController.text.trim().isNotEmpty;
+              bool fixedPricingProvided = false;
+              if (editFixedPricing) {
+                fixedPricingProvided = fixedPricingDurationController.text
+                        .trim()
+                        .isNotEmpty &&
+                    fixedPricingMinStudentsController.text.trim().isNotEmpty &&
+                    fixedPricingMaxStudentsController.text.trim().isNotEmpty &&
+                    fixedPricingPriceController.text.trim().isNotEmpty;
+              }
+              canSave = commissionProvided || fixedPricingProvided;
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                left: 16,
+                right: 16,
+                top: 16,
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Modal header.
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Edit Payment Type",
+                          style: GoogleFonts.lato(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Step 1: Select a Role (always visible).
+                    Text(
+                      "Select Role:",
+                      style: GoogleFonts.lato(
+                          fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              selectedRole = "admin";
+                            });
+                            scrollToBottom();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                selectedRole == "admin" ? Colors.blue : null,
+                            foregroundColor:
+                                selectedRole == "admin" ? Colors.white : null,
+                          ),
+                          child: const Text("Admin"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              selectedRole = "instructor";
+                            });
+                            scrollToBottom();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedRole == "instructor"
+                                ? Colors.blue
+                                : null,
+                            foregroundColor: selectedRole == "instructor"
+                                ? Colors.white
+                                : null,
+                          ),
+                          child: const Text("Instructor"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              selectedRole = "monitor";
+                            });
+                            scrollToBottom();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                selectedRole == "monitor" ? Colors.blue : null,
+                            foregroundColor:
+                                selectedRole == "monitor" ? Colors.white : null,
+                          ),
+                          child: const Text("Monitor"),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Step 2: Select Payment Mode (visible only after role is selected).
+                    if (selectedRole != null) ...[
                       Text(
-                        "Edit Payment Type",
+                        "Select Payment Mode:",
                         style: GoogleFonts.lato(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 18, fontWeight: FontWeight.w600),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Step 1: Select a Role.
-                  Text(
-                    "Select Role:",
-                    style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 10,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            selectedRole = "admin";
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedRole == "admin" ? Colors.blue : null,
-                        ),
-                        child: const Text("Admin"),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            selectedRole = "instructor";
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedRole == "instructor" ? Colors.blue : null,
-                        ),
-                        child: const Text("Instructor"),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            selectedRole = "monitor";
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedRole == "monitor" ? Colors.blue : null,
-                        ),
-                        child: const Text("Monitor"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Step 2: Select Payment Mode.
-                  Text(
-                    "Select Payment Mode:",
-                    style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 10,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            selectedPaymentMode = "fixed";
-                            selectedLessonType = null;
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedPaymentMode == "fixed" ? Colors.blue : null,
-                        ),
-                        child: const Text("Fixed Monthly Rate"),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            selectedPaymentMode = "lesson";
-                            fixedMonthlyRateController.clear();
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedPaymentMode == "lesson" ? Colors.blue : null,
-                        ),
-                        child: const Text("Lesson Based"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Step 3: Inputs based on payment mode.
-                  if (selectedPaymentMode == "fixed") ...[
-                    TextField(
-                      controller: fixedMonthlyRateController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: "Monthly Rate",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                  if (selectedPaymentMode == "lesson") ...[
-                    // Select Lesson Type.
-                    Text(
-                      "Select Lesson Type:",
-                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            setModalState(() {
-                              selectedLessonType = "private";
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: selectedLessonType == "private" ? Colors.blue : null,
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 10,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                selectedPaymentMode = "fixed";
+                                selectedLessonType = null;
+                              });
+                              scrollToBottom();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: selectedPaymentMode == "fixed"
+                                  ? Colors.blue
+                                  : null,
+                              foregroundColor: selectedPaymentMode == "fixed"
+                                  ? Colors.white
+                                  : null,
+                            ),
+                            child: const Text("Fixed Monthly Rate"),
                           ),
-                          child: const Text("Private"),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            setModalState(() {
-                              selectedLessonType = "group";
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: selectedLessonType == "group" ? Colors.blue : null,
+                          ElevatedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                selectedPaymentMode = "lesson";
+                                fixedMonthlyRateController.clear();
+                              });
+                              scrollToBottom();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: selectedPaymentMode == "lesson"
+                                  ? Colors.blue
+                                  : null,
+                              foregroundColor: selectedPaymentMode == "lesson"
+                                  ? Colors.white
+                                  : null,
+                            ),
+                            child: const Text("Lesson Based"),
                           ),
-                          child: const Text("Group"),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 16),
-                    // Commission input.
-                    Text(
-                      "Commission Percentage (0-100):",
-                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: commissionController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: "Commission %",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Fixed Pricing Section (optional).
-                    Text(
-                      "Fixed Pricing per Lesson (optional):",
-                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            setModalState(() {
-                              showFixedPricing = !showFixedPricing;
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: showFixedPricing ? Colors.blue : null,
-                          ),
-                          child: Text(showFixedPricing ? "Hide Fixed Pricing" : "Show Fixed Pricing"),
+                    // Step 3: Inputs based on payment mode.
+                    if (selectedPaymentMode == "fixed") ...[
+                      // For fixed mode, show monthly rate input.
+                      TextField(
+                        controller: fixedMonthlyRateController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: "Monthly Rate",
+                          border: OutlineInputBorder(),
                         ),
-                      ],
-                    ),
-                    if (showFixedPricing) ...[
+                        onChanged: (val) {
+                          // As soon as user types, update state and scroll to bottom.
+                          setModalState(() {});
+                          scrollToBottom();
+                        },
+                      ),
+                    ],
+                    if (selectedPaymentMode == "lesson") ...[
+                      // Step 3a: Select Lesson Type.
+                      Text(
+                        "Select Lesson Type:",
+                        style: GoogleFonts.lato(
+                            fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 10,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                selectedLessonType = "private";
+                              });
+                              scrollToBottom();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: selectedLessonType == "private"
+                                  ? Colors.blue
+                                  : null,
+                              foregroundColor: selectedLessonType == "private"
+                                  ? Colors.white
+                                  : null,
+                            ),
+                            child: const Text("Private"),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                selectedLessonType = "group";
+                              });
+                              scrollToBottom();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: selectedLessonType == "group"
+                                  ? Colors.blue
+                                  : null,
+                              foregroundColor: selectedLessonType == "group"
+                                  ? Colors.white
+                                  : null,
+                            ),
+                            child: const Text("Group"),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 16),
-                      // List of fixed pricing entries.
-                      Column(
-                        children: fixedPricingEntries.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          Map<String, dynamic> pricing = entry.value;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      // Step 3b: Commission input (visible only after lesson type is selected).
+                      if (selectedLessonType != null) ...[
+                        Text(
+                          "Commission Percentage (0-100):",
+                          style: GoogleFonts.lato(
+                              fontSize: 18, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: commissionController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: "Commission %",
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (val) {
+                            setModalState(() {});
+                            scrollToBottom();
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Step 3c: Fixed Pricing Editing for Lesson mode.
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              editFixedPricing = !editFixedPricing;
+                            });
+                            scrollToBottom();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                editFixedPricing ? Colors.blue : null,
+                            foregroundColor:
+                                editFixedPricing ? Colors.white : null,
+                          ),
+                          child: Text(editFixedPricing
+                              ? "Hide Fixed Pricing"
+                              : "Edit Fixed Pricing"),
+                        ),
+                        const SizedBox(height: 16),
+                        if (editFixedPricing) ...[
+                          // Fixed pricing inputs arranged in a 2x2 grid.
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
-                              Text("Pricing Entry ${index + 1}"),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: "Duration (min)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (val) {
-                                        setModalState(() {
-                                          pricing['duration'] = int.tryParse(val);
-                                        });
-                                      },
-                                      controller: TextEditingController(
-                                        text: pricing['duration']?.toString() ?? "",
-                                      ),
-                                    ),
+                              SizedBox(
+                                width:
+                                    (MediaQuery.of(context).size.width - 32) /
+                                            2 -
+                                        8,
+                                child: TextField(
+                                  controller: fixedPricingDurationController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: "Duration (min)",
+                                    border: OutlineInputBorder(),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: "Min Students",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (val) {
-                                        setModalState(() {
-                                          pricing['min_students'] = int.tryParse(val);
-                                        });
-                                      },
-                                      controller: TextEditingController(
-                                        text: pricing['min_students']?.toString() ?? "",
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: "Max Students",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (val) {
-                                        setModalState(() {
-                                          pricing['max_students'] = int.tryParse(val);
-                                        });
-                                      },
-                                      controller: TextEditingController(
-                                        text: pricing['max_students']?.toString() ?? "",
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: "Price",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (val) {
-                                        setModalState(() {
-                                          pricing['price'] = double.tryParse(val);
-                                        });
-                                      },
-                                      controller: TextEditingController(
-                                        text: pricing['price']?.toString() ?? "",
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () {
-                                    setModalState(() {
-                                      fixedPricingEntries.removeAt(index);
-                                    });
+                                  onChanged: (val) {
+                                    setModalState(() {});
+                                    scrollToBottom();
                                   },
                                 ),
                               ),
-                              const Divider(),
+                              SizedBox(
+                                width:
+                                    (MediaQuery.of(context).size.width - 32) /
+                                            2 -
+                                        8,
+                                child: TextField(
+                                  controller: fixedPricingMinStudentsController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: "Min Students",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (val) {
+                                    setModalState(() {});
+                                    scrollToBottom();
+                                  },
+                                ),
+                              ),
+                              SizedBox(
+                                width:
+                                    (MediaQuery.of(context).size.width - 32) /
+                                            2 -
+                                        8,
+                                child: TextField(
+                                  controller: fixedPricingMaxStudentsController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: "Max Students",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (val) {
+                                    setModalState(() {});
+                                    scrollToBottom();
+                                  },
+                                ),
+                              ),
+                              SizedBox(
+                                width:
+                                    (MediaQuery.of(context).size.width - 32) /
+                                            2 -
+                                        8,
+                                child: TextField(
+                                  controller: fixedPricingPriceController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: "Price",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (val) {
+                                    setModalState(() {});
+                                    scrollToBottom();
+                                  },
+                                ),
+                              ),
                             ],
-                          );
-                        }).toList(),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            fixedPricingEntries.add({});
-                          });
-                        },
-                        child: const Text("Add Pricing Entry"),
-                      ),
+                          ),
+                        ],
+                      ],
                     ],
+                    const SizedBox(height: 24),
+                    // Final Save Button (only visible when required fields are filled).
+                    if (canSave)
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            try {
+                              await updatePaymentTypeFields();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        "Payment type updated successfully!")),
+                              );
+                              await refreshSchoolDetails();
+                              Navigator.pop(context);
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(
+                                        "Failed to update payment type: $e")),
+                              );
+                            }
+                          },
+                          child: const Text("Save Payment Type"),
+                        ),
+                      ),
                   ],
-                  const SizedBox(height: 24),
-                  // Final Save Button.
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await updatePaymentTypeFields();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Payment type updated successfully!")),
-                          );
-                          await refreshSchoolDetails();
-                          Navigator.pop(context);
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Failed to update payment type: $e")),
-                          );
-                        }
-                      },
-                      child: const Text("Save Payment Type"),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+            );
+          },
+        );
+      },
+    );
+  }
 
   void addPack() {
     // Require that a school name is entered.
@@ -680,10 +767,14 @@ void addPaymentType(
     String selectedCurrency = "EUR"; // Default is EUR
 
     // Controllers for custom inputs
-    final TextEditingController customDurationController = TextEditingController();
-    final TextEditingController customPeopleController = TextEditingController();
-    final TextEditingController customClassesController = TextEditingController();
-    final TextEditingController customTimeLimitController = TextEditingController();
+    final TextEditingController customDurationController =
+        TextEditingController();
+    final TextEditingController customPeopleController =
+        TextEditingController();
+    final TextEditingController customClassesController =
+        TextEditingController();
+    final TextEditingController customTimeLimitController =
+        TextEditingController();
     final TextEditingController priceController = TextEditingController();
 
     // Create a ScrollController to auto-scroll when new fields appear
@@ -749,7 +840,8 @@ void addPaymentType(
                         padding: const EdgeInsets.only(bottom: 8.0),
                         child: Text(
                           "Select Pack Type:",
-                          style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.lato(
+                              fontSize: 18, fontWeight: FontWeight.w600),
                         ),
                       ),
                       Wrap(
@@ -763,8 +855,12 @@ void addPaymentType(
                               });
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: selectedType == "private" ? Colors.blue : null,
-                              foregroundColor: selectedType == "private" ? Colors.white : null,
+                              backgroundColor: selectedType == "private"
+                                  ? Colors.blue
+                                  : null,
+                              foregroundColor: selectedType == "private"
+                                  ? Colors.white
+                                  : null,
                             ),
                             child: const Text("Private"),
                           ),
@@ -775,8 +871,10 @@ void addPaymentType(
                               });
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: selectedType == "group" ? Colors.blue : null,
-                              foregroundColor: selectedType == "group" ? Colors.white : null,
+                              backgroundColor:
+                                  selectedType == "group" ? Colors.blue : null,
+                              foregroundColor:
+                                  selectedType == "group" ? Colors.white : null,
                             ),
                             child: const Text("Group"),
                           ),
@@ -790,7 +888,8 @@ void addPaymentType(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
                             "Duration (minutes):",
-                            style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.lato(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Wrap(
@@ -805,8 +904,11 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedDuration == 30 ? Colors.blue : null,
-                                foregroundColor: selectedDuration == 30 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedDuration == 30 ? Colors.blue : null,
+                                foregroundColor: selectedDuration == 30
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("30"),
                             ),
@@ -818,8 +920,11 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedDuration == 60 ? Colors.blue : null,
-                                foregroundColor: selectedDuration == 60 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedDuration == 60 ? Colors.blue : null,
+                                foregroundColor: selectedDuration == 60
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("60"),
                             ),
@@ -831,8 +936,11 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedDuration == 90 ? Colors.blue : null,
-                                foregroundColor: selectedDuration == 90 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedDuration == 90 ? Colors.blue : null,
+                                foregroundColor: selectedDuration == 90
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("90"),
                             ),
@@ -843,7 +951,8 @@ void addPaymentType(
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: "Other",
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 16),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -869,7 +978,8 @@ void addPaymentType(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
                             "Number of People:",
-                            style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.lato(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Wrap(
@@ -884,8 +994,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedPeople == 1 ? Colors.blue : null,
-                                foregroundColor: selectedPeople == 1 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedPeople == 1 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedPeople == 1 ? Colors.white : null,
                               ),
                               child: const Text("1"),
                             ),
@@ -897,8 +1009,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedPeople == 2 ? Colors.blue : null,
-                                foregroundColor: selectedPeople == 2 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedPeople == 2 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedPeople == 2 ? Colors.white : null,
                               ),
                               child: const Text("2"),
                             ),
@@ -910,8 +1024,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedPeople == 3 ? Colors.blue : null,
-                                foregroundColor: selectedPeople == 3 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedPeople == 3 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedPeople == 3 ? Colors.white : null,
                               ),
                               child: const Text("3"),
                             ),
@@ -923,8 +1039,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedPeople == 4 ? Colors.blue : null,
-                                foregroundColor: selectedPeople == 4 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedPeople == 4 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedPeople == 4 ? Colors.white : null,
                               ),
                               child: const Text("4"),
                             ),
@@ -935,7 +1053,8 @@ void addPaymentType(
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: "Other",
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 16),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -961,7 +1080,8 @@ void addPaymentType(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
                             "Number of Classes:",
-                            style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.lato(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Wrap(
@@ -976,8 +1096,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedClasses == 1 ? Colors.blue : null,
-                                foregroundColor: selectedClasses == 1 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedClasses == 1 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedClasses == 1 ? Colors.white : null,
                               ),
                               child: const Text("1"),
                             ),
@@ -989,8 +1111,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedClasses == 4 ? Colors.blue : null,
-                                foregroundColor: selectedClasses == 4 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedClasses == 4 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedClasses == 4 ? Colors.white : null,
                               ),
                               child: const Text("4"),
                             ),
@@ -1002,8 +1126,10 @@ void addPaymentType(
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedClasses == 8 ? Colors.blue : null,
-                                foregroundColor: selectedClasses == 8 ? Colors.white : null,
+                                backgroundColor:
+                                    selectedClasses == 8 ? Colors.blue : null,
+                                foregroundColor:
+                                    selectedClasses == 8 ? Colors.white : null,
                               ),
                               child: const Text("8"),
                             ),
@@ -1014,7 +1140,8 @@ void addPaymentType(
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: "Other",
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 16),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -1040,7 +1167,8 @@ void addPaymentType(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
                             "Time Limit:",
-                            style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.lato(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Wrap(
@@ -1056,8 +1184,12 @@ void addPaymentType(
                                 scrollToBottom();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedTimeLimit == "None" ? Colors.blue : null,
-                                foregroundColor: selectedTimeLimit == "None" ? Colors.white : null,
+                                backgroundColor: selectedTimeLimit == "None"
+                                    ? Colors.blue
+                                    : null,
+                                foregroundColor: selectedTimeLimit == "None"
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("None"),
                             ),
@@ -1070,8 +1202,12 @@ void addPaymentType(
                                 scrollToBottom();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedTimeLimit == "1 month" ? Colors.blue : null,
-                                foregroundColor: selectedTimeLimit == "1 month" ? Colors.white : null,
+                                backgroundColor: selectedTimeLimit == "1 month"
+                                    ? Colors.blue
+                                    : null,
+                                foregroundColor: selectedTimeLimit == "1 month"
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("1 Month"),
                             ),
@@ -1084,8 +1220,12 @@ void addPaymentType(
                                 scrollToBottom();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedTimeLimit == "2 months" ? Colors.blue : null,
-                                foregroundColor: selectedTimeLimit == "2 months" ? Colors.white : null,
+                                backgroundColor: selectedTimeLimit == "2 months"
+                                    ? Colors.blue
+                                    : null,
+                                foregroundColor: selectedTimeLimit == "2 months"
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("2 Months"),
                             ),
@@ -1098,8 +1238,12 @@ void addPaymentType(
                                 scrollToBottom();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: selectedTimeLimit == "3 months" ? Colors.blue : null,
-                                foregroundColor: selectedTimeLimit == "3 months" ? Colors.white : null,
+                                backgroundColor: selectedTimeLimit == "3 months"
+                                    ? Colors.blue
+                                    : null,
+                                foregroundColor: selectedTimeLimit == "3 months"
+                                    ? Colors.white
+                                    : null,
                               ),
                               child: const Text("3 Months"),
                             ),
@@ -1110,7 +1254,8 @@ void addPaymentType(
                                 keyboardType: TextInputType.text,
                                 decoration: InputDecoration(
                                   labelText: "Other",
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 16),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -1136,7 +1281,8 @@ void addPaymentType(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
                             "Price:",
-                            style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.lato(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Row(
@@ -1147,7 +1293,8 @@ void addPaymentType(
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: "Price",
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 16),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -1191,9 +1338,11 @@ void addPaymentType(
                             onPressed: () async {
                               try {
                                 // Compute expiration date based on the selected time limit.
-                                final String expirationDate = computeExpirationDate(selectedTimeLimit);
+                                final String expirationDate =
+                                    computeExpirationDate(selectedTimeLimit);
                                 final result = await postPackData(
-                                  schoolId: schoolDetails!["school_id"]?.toString(),
+                                  schoolId:
+                                      schoolDetails!["school_id"]?.toString(),
                                   schoolName: _schoolNameController.text,
                                   packType: selectedType!,
                                   duration: selectedDuration!,
@@ -1207,13 +1356,17 @@ void addPaymentType(
                                 // Instead of closing the modal, refresh the school details so the new info shows.
                                 await fetchAndDisplaySchoolDetails();
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Pack updated successfully!")),
+                                  const SnackBar(
+                                      content:
+                                          Text("Pack updated successfully!")),
                                 );
                                 Navigator.pop(context);
                               } catch (e) {
                                 print('Error updating pack price: $e');
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to update pack price: $e')),
+                                  SnackBar(
+                                      content: Text(
+                                          'Failed to update pack price: $e')),
                                 );
                               }
                             },
@@ -1260,7 +1413,8 @@ void addPaymentType(
               // Ensure a school name has been entered.
               if (_schoolNameController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Please input a school name first.")),
+                  const SnackBar(
+                      content: Text("Please input a school name first.")),
                 );
                 return;
               }
@@ -1274,11 +1428,13 @@ void addPaymentType(
               // Ensure a school name has been entered.
               if (_schoolNameController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Please input a school name first.")),
+                  const SnackBar(
+                      content: Text("Please input a school name first.")),
                 );
                 return;
               }
-              addPaymentType(context, schoolDetails!, _schoolNameController, fetchAndDisplaySchoolDetails);
+              addPaymentType(context, schoolDetails!, _schoolNameController,
+                  fetchAndDisplaySchoolDetails);
             },
           ),
           const SizedBox(height: 16),
@@ -1290,7 +1446,8 @@ void addPaymentType(
                   children: [
                     Text(
                       "PACKS",
-                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.lato(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Use our accordion widget to display pack_prices
@@ -1300,7 +1457,8 @@ void addPaymentType(
                       const Text("No pack prices available."),
                     Text(
                       "STAFF PAYMENTS",
-                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.lato(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Use our accordion widget to display pack_prices

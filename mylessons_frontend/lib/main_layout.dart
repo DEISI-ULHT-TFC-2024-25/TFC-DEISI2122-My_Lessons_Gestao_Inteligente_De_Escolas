@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home.dart';      // Your HomePage widget
 import 'profile.dart';   // Your ProfilePage widget
-import 'bookings_page.dart';
+import 'pages/schools_page.dart';
 import 'payments_page.dart';
 
 class MainScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   // List of pages corresponding to the navbar items.
   final List<Widget> _pages = [
     const HomePage(),
-    const BookingsPage(),
+    const SchoolsPage(),
     const PaymentsPage(),
     const ProfilePage(),
   ];
@@ -45,7 +45,7 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
               icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today), label: 'Bookings'),
+              icon: Icon(Icons.school), label: 'Schools'),
           BottomNavigationBarItem(
               icon: Icon(Icons.payment), label: 'Payments'),
           BottomNavigationBarItem(

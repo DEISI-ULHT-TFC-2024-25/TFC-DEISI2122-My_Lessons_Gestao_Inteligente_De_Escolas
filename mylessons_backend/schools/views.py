@@ -1,5 +1,5 @@
 import json
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from payments.models import Payment
 from users.models import Instructor
 from .models import School
@@ -23,6 +23,76 @@ from django.utils.timezone import now
 from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
+
+@permission_classes([IsAuthenticated])
+@api_view(['GET'])
+def get_services(request, school_id):
+    """
+    GET /api/schools/<school_id>/services/
+    Returns the list of services for the specified school.
+    """
+    school = get_object_or_404(School, pk=school_id)
+    return Response(school.services, status=200)
+
+
+@permission_classes([IsAuthenticated])
+@api_view(['POST'])
+def add_edit_service(request, school_id):
+    """
+    POST /api/schools/<school_id>/services/add_edit/
+    
+    Request Body (JSON):
+    {
+      "id": "optional-service-id",  // Omit or provide to update an existing service.
+      "name": "Private Lessons",
+      "photos": ["https://link1", "https://link2"],
+      "benefits": ["One-on-one coaching", "Customized curriculum"],
+      "description": "Intensive private lessons for faster skill development.",
+      "sports": ["tennis", "soccer"],
+      "locations": ["Court 1", "Room 101"],
+      "type": {
+        // Provide EITHER "pack" OR "activity", not both.
+        "pack": "private"
+        // OR
+        // "activity": "birthday party"
+      }
+    }
+
+    If a service with the given 'id' exists, it will be updated.
+    Otherwise, a new service is appended.
+
+    Returns the updated list of services.
+    """
+    school = get_object_or_404(School, pk=school_id)
+    service_data = request.data  # JSON payload
+
+    try:
+        updated_services = school.add_or_edit_service(service_data)
+    except ValueError as e:
+        return Response({"detail": str(e)}, status=400)
+
+    return Response(updated_services, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def all_schools(request):
+    schools = School.objects.all()
+    data = []
+    for school in schools:
+        data.append({
+            'school_id': school.id,
+            'school_name': school.name,
+            'list_of_locations': [
+                {'id': location.id, 'name': location.name}
+                for location in school.locations.all()
+            ],
+            'list_of_activities': [
+                {'id': sport.id, 'name': sport.name}
+                for sport in school.sports.all()
+            ],
+            'services': school.services
+        })
+    return Response(data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
