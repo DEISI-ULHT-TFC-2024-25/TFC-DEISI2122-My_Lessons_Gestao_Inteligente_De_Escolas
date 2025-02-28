@@ -22,6 +22,7 @@ from django.db.models import Q, Sum
 from django.utils.timezone import now
 from django.http import JsonResponse
 
+logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -36,6 +37,7 @@ def school_details_view(request):
             'school_id': None,
             'school_name': "",
             'pack_prices': {},
+            'payment_types': {},
             'currency': ""
         })
     return Response({
@@ -43,9 +45,67 @@ def school_details_view(request):
         'school_id': school.id,
         'school_name': school.name,
         'pack_prices': school.pack_prices,
+        'payment_types': school.payment_types,
         'currency': school.currency,
     })
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_payment_type_view(request):
+    """
+    Update the default payment types for the school, not a specific user
+    """
+    try:
+        data = json.loads(request.body)
+        logger.debug("Received payload: %s", data)
+    except json.JSONDecodeError as e:
+        logger.error("JSON decode error: %s", str(e))
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    school_id = data.get('school_id')
+    school_name = data.get('school_name')
+    user = request.user
+    logger.debug("User: %s", user)
+    
+    if school_id:
+        try:
+            school = School.objects.get(id=school_id)
+            logger.debug("Found school by id: %s", school)
+        except School.DoesNotExist:
+            logger.error("School not found for id: %s", school_id)
+            return JsonResponse({'success': False, 'error': 'School not found'}, status=404)
+    elif school_name:
+        school = School.objects.create(name=school_name)
+        school.admins.add(user)
+        user.current_school_id = school.id
+        user.save()
+        logger.debug("Created school with name: %s", school_name)
+    else:
+        logger.error("Neither school_id nor school_name provided.")
+        return JsonResponse({'success': False, 'error': 'Either school_id or school_name must be provided'}, status=400)
+    
+    key_path = data.get('key_path')
+    new_value = data.get('new_value')
+    logger.debug("key_path: %s, new_value: %s", key_path, new_value)
+    
+    if not key_path or new_value is None:
+        logger.error("Missing key_path or new_value. key_path=%s, new_value=%s", key_path, new_value)
+        return JsonResponse({'success': False, 'error': 'key_path and new_value must be provided'}, status=400)
+    
+    try:
+        result = school.update_payment_type_value(key_path, new_value, user_obj=None)
+        logger.debug("update_payment_type_value result: %s", result)
+    except Exception as e:
+        logger.exception("Error during update_payment_type_value:")
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    logger.debug("Updated payment_types: %s", school.payment_types)
+    return JsonResponse({
+        'success': True,
+        'school_id': school.id,
+        'school_name': school.name,
+        'payment_types': school.payment_types
+    })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

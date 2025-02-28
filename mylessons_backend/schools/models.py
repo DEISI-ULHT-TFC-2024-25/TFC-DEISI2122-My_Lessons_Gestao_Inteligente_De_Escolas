@@ -1,8 +1,11 @@
 import random
 import re
 import copy
+import logging
 from django.db import models
 from django.apps import apps
+
+logger = logging.getLogger(__name__)
 
 def default_payment_types():
     """
@@ -229,7 +232,7 @@ class Review(models.Model):
 class School(models.Model):
     pack_prices = models.JSONField(default=dict, blank=True)
     name = models.CharField(max_length=255)
-    payment_types = models.JSONField(default=default_payment_types, blank=True, null=True)
+    payment_types = models.JSONField(default=dict, blank=True, null=True)
     extra_prices = models.JSONField(blank=True, null=True)  # Example: {"extra_time": 10, "private_lesson": 50}
     logo = models.ImageField(upload_to="school_logos/")
     description = models.TextField(blank=True, null=True)
@@ -270,58 +273,83 @@ class School(models.Model):
             user_obj (optional): If provided, update that user's payment_types for this school.
                             Otherwise, update the school's default payment_types.
         """
+        logger.debug("update_payment_type_value called with key_path: %s and new_value: %s", key_path, new_value)
         # Parse the key_path into parts. For example, "instructor[private lesson][fixed]" -> 
         # ["instructor", "private lesson", "fixed"]
         keys = re.findall(r'\w[\w\s-]*', key_path)
+        logger.debug("Parsed keys: %s", keys)
         
         # Determine the target: either user-specific (keyed by school name) or the school's own payment_types.
         if user_obj:
             if not user_obj.payment_types or not isinstance(user_obj.payment_types, dict):
+                logger.debug("Initializing user_obj.payment_types as an empty dict")
                 user_obj.payment_types = {}
             if self.name not in user_obj.payment_types or not user_obj.payment_types[self.name]:
+                logger.debug("Copying default payment_types for school %s into user_obj.payment_types", self.name)
                 user_obj.payment_types[self.name] = copy.deepcopy(self.payment_types) if self.payment_types else {}
             target = user_obj.payment_types[self.name]
+            logger.debug("User-specific target structure before update: %s", target)
         else:
             if not self.payment_types or not isinstance(self.payment_types, dict):
-                self.payment_types = default_payment_types()
+                logger.debug("Initializing self.payment_types")
+                self.payment_types = {}
             target = self.payment_types
-
+            logger.debug("School default target structure before update: %s", target)
+        
         # Traverse the nested structure for all keys except the last.
         current = target
         for key in keys[:-1]:
+            logger.debug("Traversing key '%s'. Current structure: %s", key, current)
             if key not in current or not isinstance(current[key], (dict, list)):
+                logger.debug("Key '%s' not found or not a dict/list. Initializing it as empty dict.", key)
                 current[key] = {}
             current = current[key]
+        logger.debug("Structure at final level before update: %s", current)
         
         last_key = keys[-1]
         
         # If the current node for last_key is a list, we assume it is the "fixed" pricing list.
         if isinstance(current.get(last_key), list):
+            logger.debug("Target for key '%s' is a list; expecting fixed pricing update.", last_key)
             # In this case, new_value must be a dict with required keys.
             if not isinstance(new_value, dict):
-                raise ValueError("For updating a list field (fixed pricing), new_value must be a dictionary.")
+                error_msg = "For updating a list field (fixed pricing), new_value must be a dictionary."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             required_keys = {"duration", "min_students", "max_students", "price"}
             if not required_keys.issubset(new_value.keys()):
-                raise ValueError(f"new_value must contain keys: {required_keys}")
+                error_msg = f"new_value must contain keys: {required_keys}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             updated = False
             for rule in current[last_key]:
+                logger.debug("Checking rule: %s", rule)
                 if (rule.get("duration") == new_value["duration"] and
                     rule.get("min_students") == new_value["min_students"] and
                     rule.get("max_students") == new_value["max_students"]):
+                    logger.debug("Matching rule found. Updating price from %s to %s", rule.get("price"), new_value["price"])
                     rule["price"] = new_value["price"]
                     updated = True
                     break
             if not updated:
+                logger.debug("No matching rule found. Appending new_value: %s", new_value)
                 current[last_key].append(new_value)
         else:
             # Otherwise, simply update the field.
+            logger.debug("Updating key '%s' from %s to %s", last_key, current.get(last_key), new_value)
             current[last_key] = new_value
 
+        logger.debug("Final updated target structure: %s", target)
+        
         # Save the changes.
         if user_obj:
+            logger.debug("Saving user_obj.payment_types")
             user_obj.save(update_fields=["payment_types"])
         else:
+            logger.debug("Saving self.payment_types")
             self.save(update_fields=["payment_types"])
+        logger.debug("Update successful.")
+        return True
     
     def get_unpaid_camp_orders(self):
         return list(self.camp_orders.filter(is_fully_paid=False))

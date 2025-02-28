@@ -100,6 +100,51 @@ String computeExpirationDate(String? timeLimit) {
   return "";
 }
 
+
+Widget buildPaymentTypesWidget(Map<String, dynamic> paymentTypes) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: paymentTypes.entries.map<Widget>((roleEntry) {
+      String role = roleEntry.key;
+      Map<String, dynamic> roleData = roleEntry.value;
+      return ExpansionTile(
+        title: Text(role.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
+        children: roleData.entries.map<Widget>((paymentEntry) {
+          String paymentType = paymentEntry.key;
+          var paymentDetails = paymentEntry.value;
+          
+          if (paymentType == "private lesson" && paymentDetails is Map<String, dynamic>) {
+            return ExpansionTile(
+              title: Text("Private Lesson"),
+              children: [
+                ListTile(
+                  title: Text("Commission: ${paymentDetails["commission"]} %"),
+                ),
+                ExpansionTile(
+                  title: Text("Fixed Pricing"),
+                  children: (paymentDetails["fixed"] as List<dynamic>).map<Widget>((fixedEntry) {
+                    return ListTile(
+                      title: Text("${fixedEntry["duration"]} min"),
+                      subtitle: Text(
+                          "Min students: ${fixedEntry["min_students"]}, Max students: ${fixedEntry["max_students"]}, Price: ${fixedEntry["price"]} €"),
+                    );
+                  }).toList(),
+                )
+              ],
+            );
+          } else {
+            return ListTile(
+              title: Text(paymentType),
+              subtitle: Text(paymentDetails?.toString() ?? "N/A"),
+            );
+          }
+        }).toList(),
+      );
+    }).toList(),
+  );
+}
+
+
 /// Build an accordion-like widget to display pack_prices.
 Widget buildPackPricesWidget(Map<String, dynamic> packPrices) {
   return Column(
@@ -184,6 +229,439 @@ class _SchoolSetupModalState extends State<SchoolSetupModal> {
     }
   }
 
+  // Helper function to post payment type data.
+Future<Map<String, dynamic>> postPaymentTypeDataCustom(Map<String, dynamic> payload) async {
+  final url = Uri.parse('$baseUrl/api/schools/update_payment_type/');
+  final headers = await getAuthHeaders();
+  final response = await http.post(url, headers: headers, body: jsonEncode(payload));
+
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception('Failed to update payment type: ${response.body}');
+  }
+}
+
+/// The addPaymentType modal function.
+/// 
+/// [context] - BuildContext for showing the modal.
+/// [schoolDetails] - A Map containing at least "school_id".
+/// [schoolNameController] - Controller for the school name (if needed).
+/// [refreshSchoolDetails] - A callback to refresh the details after an update.
+void addPaymentType(
+  BuildContext context,
+  Map<String, dynamic> schoolDetails,
+  TextEditingController schoolNameController,
+  Future<void> Function() refreshSchoolDetails,
+) {
+  // Local state variables.
+  String? selectedRole;
+  String? selectedPaymentMode; // "fixed" or "lesson"
+  String? selectedLessonType; // "private" or "group"
+  final TextEditingController fixedMonthlyRateController = TextEditingController();
+  final TextEditingController commissionController = TextEditingController();
+  bool showFixedPricing = false;
+  // A list to hold any manually added fixed pricing entries.
+  List<Map<String, dynamic>> fixedPricingEntries = [];
+
+  // Helper function to update payment fields via separate API calls.
+  Future<void> updatePaymentTypeFields() async {
+    // For Fixed Monthly Rate mode.
+    if (selectedPaymentMode == "fixed") {
+      if (fixedMonthlyRateController.text.isEmpty) {
+        throw Exception("Monthly rate is required.");
+      }
+      double monthlyRate = double.tryParse(fixedMonthlyRateController.text) ?? 0.0;
+      String keyPath = "$selectedRole[fixed monthly rate]";
+      Map<String, dynamic> payload = {
+        'school_id': schoolDetails["school_id"]?.toString(),
+        'key_path': keyPath,
+        'new_value': monthlyRate,
+      };
+      await postPaymentTypeDataCustom(payload);
+    }
+    // For Lesson Based mode.
+    else if (selectedPaymentMode == "lesson") {
+      if (selectedLessonType == null) {
+        throw Exception("Lesson type must be selected.");
+      }
+      // Update commission if provided.
+      if (commissionController.text.isNotEmpty) {
+        int commission = int.tryParse(commissionController.text) ?? 0;
+        String keyPath = "$selectedRole[$selectedLessonType][commission]";
+        Map<String, dynamic> payload = {
+          'school_id': schoolDetails["school_id"]?.toString(),
+          'key_path': keyPath,
+          'new_value': commission,
+        };
+        await postPaymentTypeDataCustom(payload);
+      }
+      // Update each fixed pricing entry (if any).
+      if (showFixedPricing && fixedPricingEntries.isNotEmpty) {
+        String keyPath = "$selectedRole[$selectedLessonType][fixed]";
+        for (var pricingEntry in fixedPricingEntries) {
+          // pricingEntry should include: duration, min_students, max_students, and price.
+          await postPaymentTypeDataCustom({
+            'school_id': schoolDetails["school_id"]?.toString(),
+            'key_path': keyPath,
+            'new_value': pricingEntry,
+          });
+        }
+      }
+    }
+  }
+
+  // Display the modal bottom sheet.
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Modal header.
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Edit Payment Type",
+                        style: GoogleFonts.lato(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Step 1: Select a Role.
+                  Text(
+                    "Select Role:",
+                    style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            selectedRole = "admin";
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedRole == "admin" ? Colors.blue : null,
+                        ),
+                        child: const Text("Admin"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            selectedRole = "instructor";
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedRole == "instructor" ? Colors.blue : null,
+                        ),
+                        child: const Text("Instructor"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            selectedRole = "monitor";
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedRole == "monitor" ? Colors.blue : null,
+                        ),
+                        child: const Text("Monitor"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Step 2: Select Payment Mode.
+                  Text(
+                    "Select Payment Mode:",
+                    style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            selectedPaymentMode = "fixed";
+                            selectedLessonType = null;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedPaymentMode == "fixed" ? Colors.blue : null,
+                        ),
+                        child: const Text("Fixed Monthly Rate"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            selectedPaymentMode = "lesson";
+                            fixedMonthlyRateController.clear();
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedPaymentMode == "lesson" ? Colors.blue : null,
+                        ),
+                        child: const Text("Lesson Based"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Step 3: Inputs based on payment mode.
+                  if (selectedPaymentMode == "fixed") ...[
+                    TextField(
+                      controller: fixedMonthlyRateController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Monthly Rate",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                  if (selectedPaymentMode == "lesson") ...[
+                    // Select Lesson Type.
+                    Text(
+                      "Select Lesson Type:",
+                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              selectedLessonType = "private";
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedLessonType == "private" ? Colors.blue : null,
+                          ),
+                          child: const Text("Private"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              selectedLessonType = "group";
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedLessonType == "group" ? Colors.blue : null,
+                          ),
+                          child: const Text("Group"),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Commission input.
+                    Text(
+                      "Commission Percentage (0-100):",
+                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: commissionController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Commission %",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Fixed Pricing Section (optional).
+                    Text(
+                      "Fixed Pricing per Lesson (optional):",
+                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              showFixedPricing = !showFixedPricing;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: showFixedPricing ? Colors.blue : null,
+                          ),
+                          child: Text(showFixedPricing ? "Hide Fixed Pricing" : "Show Fixed Pricing"),
+                        ),
+                      ],
+                    ),
+                    if (showFixedPricing) ...[
+                      const SizedBox(height: 16),
+                      // List of fixed pricing entries.
+                      Column(
+                        children: fixedPricingEntries.asMap().entries.map((entry) {
+                          int index = entry.key;
+                          Map<String, dynamic> pricing = entry.value;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("Pricing Entry ${index + 1}"),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: "Duration (min)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (val) {
+                                        setModalState(() {
+                                          pricing['duration'] = int.tryParse(val);
+                                        });
+                                      },
+                                      controller: TextEditingController(
+                                        text: pricing['duration']?.toString() ?? "",
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: "Min Students",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (val) {
+                                        setModalState(() {
+                                          pricing['min_students'] = int.tryParse(val);
+                                        });
+                                      },
+                                      controller: TextEditingController(
+                                        text: pricing['min_students']?.toString() ?? "",
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: "Max Students",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (val) {
+                                        setModalState(() {
+                                          pricing['max_students'] = int.tryParse(val);
+                                        });
+                                      },
+                                      controller: TextEditingController(
+                                        text: pricing['max_students']?.toString() ?? "",
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: "Price",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (val) {
+                                        setModalState(() {
+                                          pricing['price'] = double.tryParse(val);
+                                        });
+                                      },
+                                      controller: TextEditingController(
+                                        text: pricing['price']?.toString() ?? "",
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    setModalState(() {
+                                      fixedPricingEntries.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ),
+                              const Divider(),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            fixedPricingEntries.add({});
+                          });
+                        },
+                        child: const Text("Add Pricing Entry"),
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 24),
+                  // Final Save Button.
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await updatePaymentTypeFields();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Payment type updated successfully!")),
+                          );
+                          await refreshSchoolDetails();
+                          Navigator.pop(context);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Failed to update payment type: $e")),
+                          );
+                        }
+                      },
+                      child: const Text("Save Payment Type"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
   void addPack() {
     // Require that a school name is entered.
     if (_schoolNameController.text.trim().isEmpty) {
@@ -256,7 +734,7 @@ class _SchoolSetupModalState extends State<SchoolSetupModal> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            "Add a New Pack",
+                            "Edit Pack",
                             style: GoogleFonts.lato(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -777,7 +1255,7 @@ class _SchoolSetupModalState extends State<SchoolSetupModal> {
           const SizedBox(height: 16),
           ListTile(
             leading: const Icon(Icons.add, color: Colors.blue),
-            title: const Text("Adicionar Pacote"),
+            title: const Text("Edit Pack"),
             onTap: () {
               // Ensure a school name has been entered.
               if (_schoolNameController.text.trim().isEmpty) {
@@ -787,6 +1265,20 @@ class _SchoolSetupModalState extends State<SchoolSetupModal> {
                 return;
               }
               addPack();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.add, color: Colors.blue),
+            title: const Text("Edit Payment Type"),
+            onTap: () {
+              // Ensure a school name has been entered.
+              if (_schoolNameController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Please input a school name first.")),
+                );
+                return;
+              }
+              addPaymentType(context, schoolDetails!, _schoolNameController, fetchAndDisplaySchoolDetails);
             },
           ),
           const SizedBox(height: 16),
@@ -806,6 +1298,16 @@ class _SchoolSetupModalState extends State<SchoolSetupModal> {
                       buildPackPricesWidget(schoolDetails!['pack_prices'])
                     else
                       const Text("No pack prices available."),
+                    Text(
+                      "STAFF PAYMENTS",
+                      style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    // Use our accordion widget to display pack_prices
+                    if (schoolDetails!['payment_types'] != null)
+                      buildPaymentTypesWidget(schoolDetails!['payment_types'])
+                    else
+                      const Text("No payment types available."),
                   ],
                 ),
               ),
