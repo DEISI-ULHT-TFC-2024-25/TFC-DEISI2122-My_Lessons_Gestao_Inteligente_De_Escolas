@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 from rest_framework.authtoken.models import Token
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
@@ -10,8 +11,8 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import UserAccount, Instructor
-from .serializers import UserAccountSerializer
+from .models import Student, UserAccount, Instructor
+from .serializers import UserAccountSerializer, StudentSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
 from schools.models import School
@@ -316,3 +317,167 @@ def available_roles(request):
     
     return Response(data)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_student(request):
+
+    print("Incoming data:", request.data)
+
+
+    # Expecting only first_name, last_name, and birthday in the request data.
+    first_name = request.data.get('first_name')
+    last_name = request.data.get('last_name')
+    birthday_str = request.data.get('birthday')
+
+    if not all([first_name, last_name, birthday_str]):
+        return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Convert the birthday string (expected in 'YYYY-MM-DD') to a date object.
+        birthday_date = datetime.strptime(birthday_str, '%Y-%m-%d').date()
+    except ValueError:
+        return Response({'error': 'Birthday must be in YYYY-MM-DD format.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    try:
+        # Create the student.
+        student = Student.objects.create(
+            first_name=first_name,
+            last_name=last_name,
+            birthday=birthday_date,
+            level=1
+        )
+        # Add the current user as a parent.
+        student.parents.add(request.user)
+        # Prepare a response with the created student's details.
+        response_data = {
+            "id": student.id,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "birthday": birthday_str
+        }
+        return Response(response_data, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def students(request):
+    user = request.user
+
+    # Assuming user.students.all() returns the associated students.
+    associated_students = user.students.all()  
+    all_students = Student.objects.all()
+
+    data = {
+        "associated_students": StudentSerializer(associated_students, many=True).data,
+        "all_students": StudentSerializer(all_students, many=True).data,
+    }
+
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def book_pack_view(request):
+    """
+    Expects a JSON payload with a key "packs" that is a list of booking requests.
+    Each booking request should include:
+      - students (list of dicts with at least an "id" key)
+      - school (School id or a valid identifier; if 'default_school_id' or 'Test School' is provided, use a fallback)
+      - expiration_date (in YYYY-MM-DD format)
+      - number_of_classes
+      - duration_in_minutes
+      - instructors
+      - price
+      - payment (if "cash", will be converted to 0)
+      - discount_id (optional)
+      - type (e.g. either a string like "private" or a dict with a key "pack")
+    """
+    data = request.data
+    logger.debug("Received payload: %s", data)
+    
+    packs_data = data.get('packs', None)
+    if packs_data is None or not isinstance(packs_data, list):
+        error_msg = "Invalid payload. Expected a 'packs' list."
+        logger.error(error_msg)
+        return Response({"error": error_msg},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    booked_packs = []
+    errors = []
+
+    for pack_req in packs_data:
+        logger.debug("Processing pack request: %s", pack_req)
+        try:
+            # Convert student dicts to Student model instances.
+            raw_students = pack_req.get('students', [])
+            students = []
+            for student_data in raw_students:
+                if isinstance(student_data, dict):
+                    student_obj = get_object_or_404(Student, id=student_data.get('id'))
+                    students.append(student_obj)
+                else:
+                    students.append(student_data)
+            
+            # Convert school id (or identifier) to a School instance.
+            school_identifier = pack_req.get('school')
+            if school_identifier in ['default_school_id', 'Test School']:
+                # Fallback: use the first available School instance.
+                school_obj = School.objects.first()
+                if not school_obj:
+                    raise ValueError("No School available for fallback.")
+            else:
+                # Assume school_identifier is a numeric ID.
+                school_obj = get_object_or_404(School, id=school_identifier)
+            
+            # Convert the expiration_date if needed.
+            # (Assuming it's already in YYYY-MM-DD format from the payload.)
+            expiration_date = pack_req.get('expiration_date')
+            if not expiration_date:
+                expiration_date = now().date().strftime("%Y-%m-%d")
+            
+            # Convert payment: if payment is "cash", use 0.
+            payment_value = pack_req.get('payment')
+            if isinstance(payment_value, str) and payment_value.lower() == 'cash':
+                payment_value = 0
+
+            # Ensure the booking type is a string.
+            final_type = "private"  # default value
+            raw_type = pack_req.get('type')
+            if isinstance(raw_type, dict) and raw_type.get('pack'):
+                final_type = raw_type.get('pack')
+            elif isinstance(raw_type, str):
+                final_type = raw_type
+
+            raw_expiration_date = pack_req.get('expiration_date')
+            if raw_expiration_date:
+                expiration_date = datetime.strptime(raw_expiration_date, "%Y-%m-%d").date()
+
+            new_pack = Pack.book_new_pack(
+                students=students,
+                school=school_obj,
+                date=expiration_date,  # using expiration_date if that is what you want as the booking date
+                number_of_classes=pack_req.get('number_of_classes'),
+                duration_in_minutes=pack_req.get('duration_in_minutes'),
+                instructors=pack_req.get('instructors'),
+                price=pack_req.get('price'),
+                payment=payment_value,
+                discount_id=pack_req.get('discount_id'),
+                type=final_type,
+                expiration_date=expiration_date if expiration_date else None
+            )
+            booked_packs.append(new_pack.id)
+            logger.debug("Successfully booked pack with ID: %s", new_pack.id)
+        except Exception as e:
+            error_str = f"Error processing pack request {pack_req}: {str(e)}"
+            errors.append(error_str)
+            logger.exception(error_str)
+
+    if errors:
+        logger.error("Booking errors: %s", errors)
+        return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+    
+    logger.debug("Booked packs successfully: %s", booked_packs)
+    return Response({"booked_packs": booked_packs}, status=status.HTTP_201_CREATED)

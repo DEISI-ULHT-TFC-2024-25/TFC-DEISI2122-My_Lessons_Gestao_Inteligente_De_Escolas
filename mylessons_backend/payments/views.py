@@ -118,8 +118,6 @@ def new_payment(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=400)
-    
-
 
 
 

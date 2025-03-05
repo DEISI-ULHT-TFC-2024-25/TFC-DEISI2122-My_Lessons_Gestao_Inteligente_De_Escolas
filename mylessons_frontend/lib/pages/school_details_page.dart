@@ -158,6 +158,7 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
   Widget build(BuildContext context) {
     // Updated: Expect services to follow the new structure.
     final services = widget.school['services'] as List<dynamic>? ?? defaultServices;
+    final reviews = widget.school['reviews'] as List<dynamic>? ?? [];
     final lastPurchases = widget.school['lastPurchases'] as List<dynamic>? ?? [];
     return Stack(
       children: [
@@ -270,7 +271,13 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
                                   ),
                                   title: Text(service['name'] ?? 'Service'),
                                   subtitle: Text(service['description'] ?? 'No description provided.'),
-                                  onTap: () => widget.onServiceSelected(service),
+                                  onTap: () {
+                                    // Pass the service to the onServiceSelected callback,
+                                    // but inject the school name as well.
+                                    final updatedService = Map<String, dynamic>.from(service);
+                                    updatedService['school_name'] = widget.school['name'] ?? 'N/A';
+                                    widget.onServiceSelected(updatedService);
+                                  },
                                 ),
                               );
                             },

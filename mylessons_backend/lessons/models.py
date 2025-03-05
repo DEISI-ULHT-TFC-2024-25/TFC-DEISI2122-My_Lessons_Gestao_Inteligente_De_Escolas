@@ -73,7 +73,7 @@ class Pack(models.Model):
         return get_instructors_ids(self.instructors.all())
     
     @classmethod
-    def book_new_pack(cls, students, school, date, number_of_classes, duration_in_minutes, instructors, price, payment, discount_id = None, type = None):
+    def book_new_pack(cls, students, school, date, number_of_classes, duration_in_minutes, instructors, price, payment, discount_id = None, type = None, expiration_date=None):
         """
         Books a new private pack, creates the necessary associations, and sends notifications.
         """
@@ -98,6 +98,7 @@ class Pack(models.Model):
             price=price,
             debt=price, 
             type=type,
+            expiration_date=expiration_date
         )
 
         # TODO expiration date
