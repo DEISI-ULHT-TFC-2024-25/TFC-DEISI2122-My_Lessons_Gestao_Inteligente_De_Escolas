@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io' show Platform; // Import for platform detection
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:mylessons_frontend/modals/schoolSetupModal.dart';
+import '../../services/register_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -23,7 +25,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final String _selectedCountryCode = "+351"; // Default Portugal
+  final String _selectedCountryCode = "+351"; // Default for Portugal
 
   // State for checkboxes.
   bool _dontReceiveMarketing = false;
@@ -32,7 +34,9 @@ class _RegisterPageState extends State<RegisterPage> {
   void _nextPage() {
     if ((_currentPage == 0 && _emailController.text.isNotEmpty) ||
         (_currentPage == 1 && _passwordController.text.isNotEmpty) ||
-        (_currentPage == 2 && _firstNameController.text.isNotEmpty && _lastNameController.text.isNotEmpty) ||
+        (_currentPage == 2 &&
+            _firstNameController.text.isNotEmpty &&
+            _lastNameController.text.isNotEmpty) ||
         (_currentPage == 3 && _phoneController.text.isNotEmpty)) {
       setState(() {
         _currentPage++;
@@ -42,7 +46,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // Navigate to the previous page.
   void _previousPage() {
     if (_currentPage > 0) {
       setState(() {
@@ -61,33 +64,20 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    // Dynamically determine the correct API base URL
-    final String apiBaseUrl = kIsWeb
-        ? "http://127.0.0.1:8000" // Web (localhost)
-        : (Platform.isAndroid ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000"); // Mobile
-
-    final Uri registerUrl = Uri.parse("$apiBaseUrl/api/users/register/");
-
     try {
-      final response = await http.post(
-        registerUrl,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": _emailController.text.trim(),
-          "password": _passwordController.text,
-          "first_name": _firstNameController.text.trim(),
-          "last_name": _lastNameController.text.trim(),
-          "country_code": _selectedCountryCode,
-          "phone": _phoneController.text.trim(),
-        }),
+      final response = await registerUser(
+        email: _emailController.text,
+        password: _passwordController.text,
+        firstName: _firstNameController.text,
+        lastName: _lastNameController.text,
+        phone: _phoneController.text,
+        countryCode: _selectedCountryCode,
       );
 
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Registration successful!")),
         );
-
-        // Redirect to login page
         Navigator.pushReplacementNamed(context, "/login_success_page");
       } else {
         final errorMessage = jsonDecode(response.body)['error'] ?? "An error occurred.";
@@ -101,7 +91,6 @@ class _RegisterPageState extends State<RegisterPage> {
       );
     }
   }
-
 
   @override
   void dispose() {
@@ -117,15 +106,12 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // An app bar with a centered title.
       appBar: AppBar(
         title: const Text("Register on MyLessons"),
         centerTitle: true,
       ),
       body: SafeArea(
         child: Center(
-          // A container that limits the maximum width (helpful for web)
-          // and applies generous padding.
           child: Container(
             constraints: const BoxConstraints(maxWidth: 600),
             padding: const EdgeInsets.all(24.0),
@@ -146,7 +132,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  /// Page 1: Email Registration Screen
+  /// Page 1: Email Registration Screen.
   Widget _buildEmailPage() {
     return SingleChildScrollView(
       child: Column(
@@ -172,7 +158,6 @@ class _RegisterPageState extends State<RegisterPage> {
             child: const Text("Next"),
           ),
           const SizedBox(height: 24),
-          // Divider with an "or" in between.
           Row(
             children: const <Widget>[
               Expanded(child: Divider()),
@@ -203,12 +188,11 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  /// Page 2 (Step 1 of 4): Create a Password
+  /// Page 2: Create a Password.
   Widget _buildPasswordPage() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Step header with a back arrow and step indicator.
           Row(
             children: [
               IconButton(
@@ -234,7 +218,6 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Password requirements list.
           Align(
             alignment: Alignment.centerLeft,
             child: Column(
@@ -255,8 +238,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     Icon(Icons.check_box_outline_blank, size: 16),
                     SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                          "1 number or special character (example: # ? ! &)"),
+                      child: Text("1 number or special character (example: # ? ! &)"),
                     )
                   ],
                 ),
@@ -281,12 +263,11 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  /// Page 3 (Step 2 of 4): Tell Us About Yourself
+  /// Page 3: Tell Us About Yourself.
   Widget _buildNamePage() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Step header.
           Row(
             children: [
               IconButton(
@@ -328,12 +309,11 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  /// Page 4 (Step 3 of 4): Stay in Touch
+  /// Page 4: Stay in Touch.
   Widget _buildContactPage() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Step header.
           Row(
             children: [
               IconButton(
@@ -350,8 +330,6 @@ class _RegisterPageState extends State<RegisterPage> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          // A placeholder for an ID field with flag. For a full implementation,
-          // you might use a package like intl_phone_field.
           TextField(
             decoration: const InputDecoration(
               labelText: "ID (with flag)",
@@ -377,12 +355,11 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  /// Page 5 (Step 4 of 4): Terms and Conditions
+  /// Page 5: Terms and Conditions.
   Widget _buildTermsPage() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Step header.
           Row(
             children: [
               IconButton(
@@ -419,8 +396,7 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           const SizedBox(height: 16),
           const Text(
-            "To learn more about how we collect, use, share and protect your personal data, "
-            "check out our privacy policy.",
+            "To learn more about how we collect, use, share and protect your personal data, check out our privacy policy.",
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),

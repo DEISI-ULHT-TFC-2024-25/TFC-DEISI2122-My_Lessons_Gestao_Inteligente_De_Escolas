@@ -1,15 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:convert';
+import 'package:intl/intl.dart';
+import 'package:mylessons_frontend/widgets/collapsible_section.dart';
+import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:intl/intl.dart';
-import 'package:mylessons_frontend/collapsibleSection.dart';
-import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import '../services/api_service.dart'; // Import our API services
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
+  
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -48,17 +49,7 @@ class _HomePageState extends State<HomePage> {
     endDate = DateTime(now.year, now.month + 1, 0);
   }
 
-  Future<Map<String, String>> getAuthHeaders() async {
-    String? token = await storage.read(key: 'auth_token');
-    if (token == null) {
-      throw Exception("No auth token found");
-    }
-    return {
-      'Authorization': 'Token $token',
-      'Content-Type': 'application/json',
-    };
-  }
-
+  // The fetchData and fetchAdminMetrics functions remain here as they use setState.
   Future<void> fetchData() async {
     try {
       final headers = await getAuthHeaders();
@@ -213,127 +204,26 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // Fetch lesson details from the backend.
-  Future<Map<String, dynamic>?> _fetchLessonDetails(int lessonId) async {
-    final headers = await getAuthHeaders();
-    final response = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/lessons/lesson_details/$lessonId/'),
-      headers: headers,
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(utf8.decode(response.bodyBytes));
-    } else {
-      return null;
-    }
-  }
+  // These API functions are now moved to services/api_service.dart.
+  // We call them here as needed.
+  Future<Map<String, dynamic>?> _fetchLessonDetails(int lessonId) =>
+      fetchLessonDetails(lessonId);
 
-  // Fetch pack details from the backend.
-  Future<Map<String, dynamic>?> _fetchPackDetails(int packId) async {
-    final headers = await getAuthHeaders();
-    final response = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/lessons/pack_details/$packId/'),
-      headers: headers,
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(utf8.decode(response.bodyBytes));
-    } else {
-      return null;
-    }
-  }
+  Future<Map<String, dynamic>?> _fetchPackDetails(int packId) =>
+      fetchPackDetails(packId);
 
-  // Helper to format keys nicely (e.g. "lesson_number" -> "Lesson Number").
-  String _formatKey(String key) {
-    return key
-        .split('_')
-        .map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : "")
-        .join(' ');
-  }
+  Future<List<String>> _fetchAvailableTimes(int lessonId, DateTime date, int increment) =>
+      fetchAvailableTimes(lessonId, date, increment);
 
-  // Function to fetch available times for a given lesson/date/increment.
-  Future<List<String>> _fetchAvailableTimes(int lessonId, DateTime date, int increment) async {
-    final headers = await getAuthHeaders();
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:8000/api/lessons/available_lesson_times/'),
-      headers: headers,
-      body: jsonEncode({
-        "lesson_id": lessonId,
-        "date": DateFormat('yyyy-MM-dd').format(date),
-        "increment": increment,
-      }),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      return List<String>.from(data['available_times']);
-    } else {
-      return [];
-    }
-  }
+  Future<bool> _canStillReschedule(int lessonId) => canStillReschedule(lessonId);
 
-  Future<bool> _canStillReschedule(int lessonId) async {
-    final headers = await getAuthHeaders();
-    final response = await http.get(
-      Uri.parse('http://127.0.0.1:8000/api/lessons/can_still_reschedule/$lessonId/'),
-      headers: headers,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      // Assuming the API returns a JSON boolean.
-      return data;
-    } else {
-      // In case of error, assume scheduling is not allowed.
-      return false;
-    }
-  }
+  Future<String?> _schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) =>
+      schedulePrivateLesson(lessonId, newDate, newTime);
 
-  Future<String?> _schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) async {
-    final headers = await getAuthHeaders();
-    final newDateStr = DateFormat('yyyy-MM-dd').format(newDate);
-    final payload = {
-      "lesson_id": lessonId,
-      "new_date": newDateStr,
-      "new_time": newTime,
-    };
-    print("Scheduling payload: $payload");
-    
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:8000/api/lessons/schedule_private_lesson/'),
-      headers: headers,
-      body: jsonEncode(payload),
-    );
-    print("Response: ${response.statusCode} ${response.body}");
-    
-    if (response.statusCode == 200) {
-      return null;
-    } else {
-      final data = jsonDecode(response.body);
-      return data['error'] ?? "Failed to schedule lesson";
-    }
-  }
+  Future<void> _markNotificationsAsRead(List<int> notificationIds) =>
+      markNotificationsAsRead(notificationIds);
 
-  Future<void> _markNotificationsAsRead(List<int> notificationIds) async {
-    if (notificationIds.isEmpty) return; // Se não houver notificações, não faz nada
-
-    try {
-      final headers = await getAuthHeaders();
-      final response = await http.post(
-        Uri.parse('http://127.0.0.1:8000/api/notifications/read/'),
-        headers: headers,
-        body: jsonEncode({"notifications_ids": notificationIds}),
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          notificationsCount = 0; // Zera o contador no sino
-        });
-      } else {
-        print("Erro ao marcar notificações como lidas: ${response.body}");
-      }
-    } catch (e) {
-      print("Erro ao enviar requisição: $e");
-    }
-  }
-
-  // Show lesson details in a bottom sheet modal.
+  // UI and modal methods remain as before.
   void _showLessonDetailsModal(dynamic lesson) {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
     showModalBottomSheet(
@@ -378,7 +268,6 @@ class _HomePageState extends State<HomePage> {
               );
             }
             final details = snapshot.data!;
-            // Filter out entries with null, "None", "Unknown", or ignored keys.
             final ignoredKeys = {"students_ids", "instructors_ids"};
             final filteredDetails = details.entries.where((entry) {
               final valueStr = entry.value?.toString() ?? "";
@@ -439,7 +328,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Show pack details in a bottom sheet modal.
   void _showPackDetailsModal(dynamic pack) {
     final int packId = pack['pack_id'] ?? pack['id'];
     showModalBottomSheet(
@@ -546,7 +434,6 @@ class _HomePageState extends State<HomePage> {
 
   void _showScheduleLessonModal(dynamic lesson) {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
-
     DateTime? selectedDate;
     int increment = 60;
     List<String> availableTimes = [];
@@ -564,7 +451,6 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Calendar Picker with past dates disabled.
                     Container(
                       padding: const EdgeInsets.all(8.0),
                       child: SfDateRangePicker(
@@ -601,7 +487,6 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-                    // Dropdown to change increment value.
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: Row(
@@ -638,9 +523,7 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     ),
-                    // Loading indicator.
                     if (isLoading) const CircularProgressIndicator(),
-                    // Grid view of available times.
                     if (!isLoading && availableTimes.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -673,12 +556,12 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         TextButton(
                                           onPressed: () {
-                                            Navigator.of(context).pop(); // Dismiss confirmation.
+                                            Navigator.of(context).pop();
                                             _schedulePrivateLesson(lessonId, selectedDate!, timeStr)
                                                 .then((errorMessage) {
                                               if (errorMessage == null) {
-                                                Navigator.of(context).pop(); // Dismiss modal.
-                                                fetchData(); // Refresh upcoming lessons.
+                                                Navigator.of(context).pop();
+                                                fetchData();
                                                 ScaffoldMessenger.of(context).showSnackBar(
                                                   const SnackBar(
                                                     content: Text("Lesson successfully rescheduled"),
@@ -726,7 +609,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showNotificationsModal() async {
+  Future<void> _showNotificationsModal() async {
     final headers = await getAuthHeaders();
     final response = await http.get(
       Uri.parse('http://127.0.0.1:8000/api/notifications/unread/'),
@@ -735,11 +618,7 @@ class _HomePageState extends State<HomePage> {
 
     if (response.statusCode == 200) {
       final List<dynamic> notifications = jsonDecode(utf8.decode(response.bodyBytes));
-
-      // Extrai os IDs das notificações para marcar como lidas
       List<int> notificationIds = notifications.map<int>((n) => n['id']).toList();
-
-      // Marca as notificações como lidas
       _markNotificationsAsRead(notificationIds);
 
       showModalBottomSheet(
@@ -806,65 +685,69 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  String _formatKey(String key) {
+    return key
+        .split('_')
+        .map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : "")
+        .join(' ');
+  }
 
-  // Header widget.
+  // UI Widgets for Header, Admin, Instructor, Parent.
   Widget _buildHeader() {
     String welcomeText = currentRole == "Admin"
         ? 'Welcome back to $schoolName,'
         : 'Welcome back,';
     return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                welcomeText,
-                style: GoogleFonts.lato(fontSize: 18, color: Colors.black54),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  welcomeText,
+                  style: GoogleFonts.lato(fontSize: 18, color: Colors.black54),
+                ),
               ),
-            ),
-            Center( // 🔥 Centraliza verticalmente dentro do Row
-              child: Stack(
-                clipBehavior: Clip.none, // 🔥 Evita corte do contador vermelho
-                children: [
-                  GestureDetector(
-                    onTap: _showNotificationsModal,
-                    child: const Icon(Icons.notifications_none, size: 28),
-                  ),
-                  if (notificationsCount > 0)
-                    Positioned(
-                      right: -2, // Pequeno ajuste fino para melhor alinhamento
-                      top: -2,
-                      child: CircleAvatar(
-                        radius: 8,
-                        backgroundColor: Colors.red,
-                        child: Text(
-                          '$notificationsCount',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GestureDetector(
+                      onTap: _showNotificationsModal,
+                      child: const Icon(Icons.notifications_none, size: 28),
+                    ),
+                    if (notificationsCount > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: CircleAvatar(
+                          radius: 8,
+                          backgroundColor: Colors.red,
+                          child: Text(
+                            '$notificationsCount',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
-                    )
-                ],
+                      )
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        Text(
-          firstName,
-          style: GoogleFonts.lato(
-              fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-        const SizedBox(height: 20),
-      ],
-    ),
-  );
-}
+            ],
+          ),
+          Text(
+            firstName,
+            style: GoogleFonts.lato(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
 
-  // Build Admin UI.
   Widget _buildAdmin() {
     final formattedStart = DateFormat('MMM dd, yyyy').format(startDate);
     final formattedEnd = DateFormat('MMM dd, yyyy').format(endDate);
@@ -980,7 +863,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Build Instructor UI.
   Widget _buildInstructor() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1015,7 +897,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Build Parent UI.
   Widget _buildParent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1069,74 +950,64 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildLessonCard(dynamic lesson, {bool isLastLesson = false}) {
-  return Card(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0), // 🔥 Padding uniforme
-      child: Row(
-        children: [
-          const SizedBox(width: 16), // 🔥 Espaçamento lateral esquerdo
-
-          // 🔥 Ícone com mesma largura e altura, mantendo-o clicável
-          SizedBox(
-            width: 40, // 🔥 Garante que ambos os ícones ocupem o mesmo espaço
-            height: 40,
-            child: IconButton(
-              icon: Icon(
-                isLastLesson ? Icons.article : Icons.calendar_today,
-                size: 28,
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: IconButton(
+                icon: Icon(
+                  isLastLesson ? Icons.article : Icons.calendar_today,
+                  size: 28,
+                ),
+                onPressed: () {
+                  if (isLastLesson) {
+                    //_showLessonReport(lesson);
+                  } else {
+                    _showScheduleLessonModal(lesson);
+                  }
+                },
               ),
-              onPressed: () {
-                if (isLastLesson) {
-                  //_showLessonReport(lesson); // 🔥 Clica no ícone do relatório
-                } else {
-                  _showScheduleLessonModal(lesson); // 🔥 Clica no ícone do calendário
-                }
-              },
             ),
-          ),
-
-          const SizedBox(width: 16), // 🔥 Espaçamento fixo entre ícone e texto
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lesson['students_name'],
-                  style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${lesson['date']} at ${lesson['start_time']}',
-                  style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
-                ),
-              ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lesson['students_name'],
+                    style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${lesson['date']} at ${lesson['start_time']}',
+                    style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
+                  ),
+                ],
+              ),
             ),
-          ),
-
-          // 🔥 Ícone de menu também clicável
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: IconButton(
-              icon: const Icon(Icons.more_vert, size: 28),
-              onPressed: () {
-                _showLessonDetailsModal(lesson); // 🔥 Abre detalhes para outras aulas
-              },
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: IconButton(
+                icon: const Icon(Icons.more_vert, size: 28),
+                onPressed: () {
+                  _showLessonDetailsModal(lesson);
+                },
+              ),
             ),
-          ),
-
-          const SizedBox(width: 8), // 🔥 Mantém espaçamento uniforme com a lateral direita
-        ],
+            const SizedBox(width: 8),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-
-
-  /// Build Pack Card – includes a trailing details icon that shows pack details.
   Widget _buildPackCard(dynamic pack) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1157,7 +1028,6 @@ class _HomePageState extends State<HomePage> {
           '${pack['days_until_expiration']} days until expiration',
           style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
         ),
-        // Trailing icon for pack details.
         trailing: IconButton(
           icon: const Icon(Icons.more_vert, color: Colors.black54),
           onPressed: () {

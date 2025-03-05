@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 const String baseUrl = 'http://127.0.0.1:8000';
 final FlutterSecureStorage storage = const FlutterSecureStorage();
@@ -43,6 +44,99 @@ Future<List<Map<String, dynamic>>> fetchSchools() async {
     }).toList();
   } else {
     throw Exception('Failed to load schools');
+  }
+}
+
+Future<Map<String, dynamic>?> fetchLessonDetails(int lessonId) async {
+  final headers = await getAuthHeaders();
+  final response = await http.get(
+    Uri.parse('$baseUrl/api/lessons/lesson_details/$lessonId/'),
+    headers: headers,
+  );
+  if (response.statusCode == 200) {
+    return jsonDecode(utf8.decode(response.bodyBytes));
+  } else {
+    return null;
+  }
+}
+
+Future<Map<String, dynamic>?> fetchPackDetails(int packId) async {
+  final headers = await getAuthHeaders();
+  final response = await http.get(
+    Uri.parse('$baseUrl/api/lessons/pack_details/$packId/'),
+    headers: headers,
+  );
+  if (response.statusCode == 200) {
+    return jsonDecode(utf8.decode(response.bodyBytes));
+  } else {
+    return null;
+  }
+}
+
+Future<List<String>> fetchAvailableTimes(int lessonId, DateTime date, int increment) async {
+  final headers = await getAuthHeaders();
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/lessons/available_lesson_times/'),
+    headers: headers,
+    body: jsonEncode({
+      "lesson_id": lessonId,
+      "date": DateFormat('yyyy-MM-dd').format(date),
+      "increment": increment,
+    }),
+  );
+  if (response.statusCode == 200) {
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return List<String>.from(data['available_times']);
+  } else {
+    return [];
+  }
+}
+
+Future<bool> canStillReschedule(int lessonId) async {
+  final headers = await getAuthHeaders();
+  final response = await http.get(
+    Uri.parse('$baseUrl/api/lessons/can_still_reschedule/$lessonId/'),
+    headers: headers,
+  );
+  if (response.statusCode == 200) {
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data;
+  } else {
+    return false;
+  }
+}
+
+Future<String?> schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) async {
+  final headers = await getAuthHeaders();
+  final newDateStr = DateFormat('yyyy-MM-dd').format(newDate);
+  final payload = {
+    "lesson_id": lessonId,
+    "new_date": newDateStr,
+    "new_time": newTime,
+  };
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/lessons/schedule_private_lesson/'),
+    headers: headers,
+    body: jsonEncode(payload),
+  );
+  if (response.statusCode == 200) {
+    return null;
+  } else {
+    final data = jsonDecode(response.body);
+    return data['error'] ?? "Failed to schedule lesson";
+  }
+}
+
+Future<void> markNotificationsAsRead(List<int> notificationIds) async {
+  if (notificationIds.isEmpty) return;
+  final headers = await getAuthHeaders();
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/notifications/read/'),
+    headers: headers,
+    body: jsonEncode({"notifications_ids": notificationIds}),
+  );
+  if (response.statusCode != 200) {
+    print("Error marking notifications as read: ${response.body}");
   }
 }
 

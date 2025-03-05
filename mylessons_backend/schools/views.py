@@ -90,7 +90,8 @@ def all_schools(request):
                 {'id': sport.id, 'name': sport.name}
                 for sport in school.sports.all()
             ],
-            'services': school.services
+            'services': school.services,
+            'currency': school.currency if school.currency else "EUR"
         })
     return Response(data, status=status.HTTP_200_OK)
 

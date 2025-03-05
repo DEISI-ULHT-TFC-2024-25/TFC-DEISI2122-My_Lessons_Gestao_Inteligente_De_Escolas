@@ -134,7 +134,7 @@ def schedule_private_lesson(request):
         return Response({"error": "Não é possível agendar para uma data no passado."},
                         status=status.HTTP_400_BAD_REQUEST)
     
-    if current_role == "Parent" and not lesson.can_still_reschedule():
+    if current_role == "Parent" and not lesson.can_still_reschedule(current_role):
         return Response({"error": "O período permitido para agendamento já passou."},
                         status=status.HTTP_400_BAD_REQUEST)
 
