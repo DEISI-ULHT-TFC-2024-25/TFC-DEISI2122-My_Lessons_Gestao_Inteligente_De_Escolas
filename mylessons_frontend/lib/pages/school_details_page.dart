@@ -4,8 +4,7 @@ import 'package:intl/intl.dart';
 class SchoolDetailsContent extends StatefulWidget {
   final Map<String, dynamic> school;
   final Function(Map<String, dynamic>) onServiceSelected;
-  const SchoolDetailsContent({Key? key, required this.school, required this.onServiceSelected})
-      : super(key: key);
+  const SchoolDetailsContent({super.key, required this.school, required this.onServiceSelected});
 
   @override
   _SchoolDetailsContentState createState() => _SchoolDetailsContentState();

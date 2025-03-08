@@ -1,10 +1,11 @@
 from django.urls import path
-from .views import upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, mark_lesson_as_done, mark_lesson_as_not_done, available_lesson_times, can_still_reschedule
+from .views import upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, mark_lesson_as_done, mark_lesson_as_not_done, available_lesson_times, can_still_reschedule, schedule_multiple_lessons
 
 urlpatterns = [
     path('upcoming_lessons/', upcoming_lessons, name='upcoming_lessons'),
     path('last_lessons/', last_lessons, name='last_lessons'),
     path('schedule_private_lesson/', schedule_private_lesson, name='schedule_private_lesson'),
+    path('schedule_multiple_lessons/', schedule_multiple_lessons, name='schedule_multiple_lessons'),
     path('active_packs/', active_packs, name='active_packs'),
     path('pack_details/<int:id>/', pack_details, name='pack_details'),
     path('lesson_details/<int:id>/', lesson_details, name='lesson_details'),

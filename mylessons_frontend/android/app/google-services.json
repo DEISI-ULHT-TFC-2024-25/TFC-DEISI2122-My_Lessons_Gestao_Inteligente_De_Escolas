@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "368273500882",
+    "project_id": "mylessons-7b4ed",
+    "storage_bucket": "mylessons-7b4ed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:368273500882:android:be6411a9765c0f93f15b0b",
+        "android_client_info": {
+          "package_name": "com.example.mylessons_frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhZLl-1j99yImJd2HM-7pG9gP8sTbKxPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

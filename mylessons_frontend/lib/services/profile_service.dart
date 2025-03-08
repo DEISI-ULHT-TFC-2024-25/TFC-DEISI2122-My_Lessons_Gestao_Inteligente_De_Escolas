@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+
+import 'auth_service.dart';
 
 const String _baseUrl = 'http://127.0.0.1:8000';
 
@@ -24,17 +25,7 @@ class ProfileData {
 class ProfileService {
   static final _storage = const FlutterSecureStorage();
 
-  static Future<Map<String, String>> getAuthHeaders() async {
-    String? token = await _storage.read(key: 'auth_token');
-    if (token == null) {
-      throw Exception("No auth token found");
-    }
-    return {
-      'Authorization': 'Token $token',
-      'Content-Type': 'application/json',
-    };
-  }
-
+  
   /// Fetch profile data including available roles, current role,
   /// available schools (if Admin), and current school info.
   static Future<ProfileData> fetchProfileData() async {

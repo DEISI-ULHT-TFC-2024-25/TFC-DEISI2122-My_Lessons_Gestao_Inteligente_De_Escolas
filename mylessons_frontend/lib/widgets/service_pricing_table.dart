@@ -11,9 +11,9 @@ class ServicePricingTable extends StatelessWidget {
   final Map<String, dynamic> service;
 
   const ServicePricingTable({
-    Key? key,
+    super.key,
     required this.service,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

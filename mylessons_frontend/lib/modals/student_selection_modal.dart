@@ -26,7 +26,7 @@ class StudentSelectionModal extends StatefulWidget {
   final Function(int)? onSelectionUpdated;
 
   const StudentSelectionModal({
-    Key? key,
+    super.key,
     required this.service,
     this.requiredCount,
     this.selectedDuration,
@@ -35,7 +35,7 @@ class StudentSelectionModal extends StatefulWidget {
     this.currentPrice,
     this.currentTimeLimit,
     this.onSelectionUpdated,
-  }) : super(key: key);
+  });
 
   @override
   _StudentSelectionModalState createState() => _StudentSelectionModalState();

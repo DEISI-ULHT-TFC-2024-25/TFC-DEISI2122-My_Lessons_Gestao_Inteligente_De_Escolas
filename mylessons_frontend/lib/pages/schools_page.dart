@@ -4,7 +4,7 @@ import 'school_details_page.dart';
 import 'service_details_page.dart';
 
 class SchoolsPage extends StatefulWidget {
-  const SchoolsPage({Key? key}) : super(key: key);
+  const SchoolsPage({super.key});
 
   @override
   _SchoolsPageState createState() => _SchoolsPageState();
