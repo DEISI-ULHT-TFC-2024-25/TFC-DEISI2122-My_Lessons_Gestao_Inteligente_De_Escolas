@@ -63,6 +63,9 @@ def add_edit_service(request, school_id):
 
     Returns the updated list of services.
     """
+
+    # TODO checks for conflicts with missing payment types, for example a service for private lessons with pricing option for 60min 4 people and not payment types for all the roles for those details 
+
     school = get_object_or_404(School, pk=school_id)
     service_data = request.data  # JSON payload
 
@@ -107,7 +110,7 @@ def school_details_view(request):
             'success': True,
             'school_id': None,
             'school_name': "",
-            'pack_prices': {},
+            'services': {},
             'payment_types': {},
             'currency': ""
         })
@@ -115,7 +118,7 @@ def school_details_view(request):
         'success': True,
         'school_id': school.id,
         'school_name': school.name,
-        'pack_prices': school.pack_prices,
+        'services': school.services,
         'payment_types': school.payment_types,
         'currency': school.currency,
     })
@@ -125,7 +128,12 @@ def school_details_view(request):
 def update_payment_type_view(request):
     """
     Update the default payment types for the school, not a specific user
+    
     """
+
+    # TODO check for conflicts within the payment types, example an instructor payment type for private lessons for 60 min 1 to 4 people and an other for private lessons 60 min 1 to 2 people, if so, asks to override or edit
+    # TODO it has to go through the school services and checks if there are any conflicts example having a service and not having a payment type to cover for that service details
+    
     try:
         data = json.loads(request.body)
         logger.debug("Received payload: %s", data)
@@ -437,3 +445,5 @@ def remove_instructor(request):
         return Response({'message': 'Instrutor removido com sucesso!'}, status=status.HTTP_200_OK)
     else:
         return Response({"error": "Impossivel remover o instrutor."}, status=status.HTTP_400_BAD_REQUEST)
+
+

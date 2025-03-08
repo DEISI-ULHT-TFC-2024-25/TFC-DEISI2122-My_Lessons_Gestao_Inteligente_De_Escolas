@@ -12,6 +12,7 @@ from django.utils.timezone import now, make_aware
 
 class Pack(models.Model):
     date = models.DateField()
+    date_time = models.DateTimeField(auto_now_add=True)
     type = models.CharField(max_length=255, default='private')
     number_of_classes = models.PositiveIntegerField()
     number_of_classes_left = models.PositiveIntegerField()
@@ -247,7 +248,16 @@ class Lesson(models.Model):
     sport = models.ForeignKey('sports.Sport', related_name='lessons', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.type} class {self.class_number} on {self.date} at {self.start_time} id {self.id}"
+        if self.date and self.start_time:
+            if self.pack != None and self.class_number != None:
+                return f"{self.get_students_name()} {self.type} lesson {self.class_number}/{self.pack.number_of_classes} on {self.date} at {self.start_time}"
+            else: 
+                return f"{self.get_students_name()} {self.type} lesson on {self.date} at {self.start_time}"
+        else:
+            if self.pack != None and self.class_number != None:
+                return f"{self.get_students_name()} {self.type} lesson {self.class_number}/{self.pack.number_of_classes}"
+            else: 
+                return f"{self.get_students_name()} {self.type} lesson"
     
 
     def list_available_lesson_times(self, date, increment):
@@ -274,8 +284,15 @@ class Lesson(models.Model):
             end_time = (current_dt + timedelta(minutes=self.duration_in_minutes)).time()
             
             # Check availability for each instructor assigned to this lesson.
-            instructors = self.instructors.all()
+            
+            instructors = []
             slot_available = False
+            
+            if self.instructors.exists():
+                instructors = self.instructors.all()
+            elif self.school and self.school.instructors.exists():
+                instructors = self.school.instructors.all()
+            
             
             for instructor in instructors:
                 # Check overlapping unavailabilities.
@@ -566,7 +583,7 @@ class Lesson(models.Model):
             return True
         return False
 
-    def is_available(self, instructor, date, start_time):
+    def is_available(self, date, start_time, instructor = None):
 
         instructors = []
 
@@ -635,19 +652,28 @@ class Lesson(models.Model):
         unavailable_instructors = []
         new_instructors = []
 
-        for instructor in self.instructors.all():
+        if self.instructors.exists():
+            for instructor in self.instructors.all():
 
-            is_available, instructor = self.is_available(instructor, date, time)
+                is_available, instructor = self.is_available(instructor=instructor, date=date, start_time=time)
 
+                if is_available:
+                    available_instructors.append(instructor)
+                else:
+                    unavailable_instructors.append(instructor)
+        else:
+            is_available, instructor = self.is_available(instructor=None, date=date, start_time=time)
             if is_available:
                 available_instructors.append(instructor)
+                new_instructors.append(instructor)
             else:
                 unavailable_instructors.append(instructor)
+                
 
 
         if len(available_instructors) > 0:
             if len(self.instructors.all()) == 0:
-                self.instructors.add(new_instructors) # TODO it never passes here as it iterates through the instructors
+                self.instructors.set(new_instructors) # TODO it never passes here as it iterates through the instructors
             self.date = date
             self.start_time = time
             self.end_time = (datetime.combine(self.date, time) + timedelta(minutes=self.duration_in_minutes)).time()

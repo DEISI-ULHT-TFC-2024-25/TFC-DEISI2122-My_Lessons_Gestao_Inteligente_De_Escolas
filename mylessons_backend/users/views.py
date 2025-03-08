@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -11,15 +12,19 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import Student, UserAccount, Instructor
+from .models import GoogleCredential, Student, UserAccount, Instructor
 from .serializers import UserAccountSerializer, StudentSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
 from schools.models import School
 from django.db.models import Q
 from django.utils.timezone import now
+import firebase_admin
+from firebase_admin import auth as firebase_auth, initialize_app, credentials as firebase_credentials
+import os
 
 logger = logging.getLogger(__name__)
+
 
 
 User = get_user_model()
@@ -397,6 +402,7 @@ def book_pack_view(request):
     """
     data = request.data
     logger.debug("Received payload: %s", data)
+    today = now().date()
     
     packs_data = data.get('packs', None)
     if packs_data is None or not isinstance(packs_data, list):
@@ -468,7 +474,24 @@ def book_pack_view(request):
                 type=final_type,
                 expiration_date=expiration_date if expiration_date else None
             )
-            booked_packs.append(new_pack.id)
+            booked_packs.append(
+                {
+                    "pack_id": new_pack.id,
+                    "lessons": [
+                                    {
+                                        "lesson_id" : lesson.id,
+                                        "lesson_str": str(lesson),
+                                        "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
+                                    }
+                                    for lesson in new_pack.lessons.all()
+                                ],
+                    "lessons_remaining": str(new_pack.number_of_classes_left),
+                    "unscheduled_lessons": str(new_pack.get_number_of_unscheduled_lessons()),
+                    "days_until_expiration": str((new_pack.expiration_date - today).days) if new_pack.expiration_date else None,
+                    "students_name": new_pack.get_students_name(),
+                    "type": new_pack.type
+                }
+            )
             logger.debug("Successfully booked pack with ID: %s", new_pack.id)
         except Exception as e:
             error_str = f"Error processing pack request {pack_req}: {str(e)}"
@@ -481,3 +504,62 @@ def book_pack_view(request):
     
     logger.debug("Booked packs successfully: %s", booked_packs)
     return Response({"booked_packs": booked_packs}, status=status.HTTP_201_CREATED)
+
+
+# Initialize Firebase Admin using the service account key from an environment variable
+if not firebase_admin._apps:
+    service_account_path = os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY')
+    if service_account_path is None:
+        raise Exception("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.")
+    cred = firebase_credentials.Certificate(service_account_path)
+    firebase_admin.initialize_app(cred)
+
+
+@api_view(['POST'])
+def store_google_credentials(request):
+    id_token_value = request.data.get('idToken')
+    access_token = request.data.get('accessToken')
+
+    if not id_token_value or not access_token:
+        return Response({'error': 'Missing tokens'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Verify the ID token using Firebase Admin SDK
+    try:
+        decoded_token = firebase_auth.verify_id_token(id_token_value)
+    except Exception as e:
+        return Response({'error': 'Invalid token', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Extract user details from the decoded token
+    email = decoded_token.get('email')
+    if not email:
+        return Response({'error': 'Email not found in token'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Optionally extract additional info (e.g., display name)
+    display_name = decoded_token.get('name', email.split('@')[0])
+    
+    # Create or retrieve the user
+    user, created = UserAccount.objects.get_or_create(
+        email=email,
+        defaults={'username': email.split('@')[0], 'first_name': display_name}
+    )
+    
+    # Serialize the tokens as a JSON string (or any format you prefer)
+    serialized_credentials = json.dumps({
+        'idToken': id_token_value,
+        'accessToken': access_token,
+    })
+    
+    # Create or update the GoogleCredential for the user
+    google_credential, created_gc = GoogleCredential.objects.update_or_create(
+        user=user,
+        defaults={'credentials': serialized_credentials},
+    )
+    
+    return Response(
+        {
+            'message': 'Credentials stored successfully.',
+            'user_created': created,
+            'google_credential_created': created_gc,
+        },
+        status=status.HTTP_200_OK
+    )

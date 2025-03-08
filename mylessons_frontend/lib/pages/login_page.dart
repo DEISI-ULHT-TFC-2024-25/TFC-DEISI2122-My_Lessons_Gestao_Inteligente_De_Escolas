@@ -1,11 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import '../../services/auth_service.dart';
+import '../widgets/google_sign_in_widget.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,9 +21,85 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final storage = const FlutterSecureStorage();
+  bool _isSigningIn = false;
 
   bool _isLoading = false;
   String? _errorMessage;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isSigningIn = true;
+    });
+
+    try {
+      // Trigger the Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      if (googleUser == null) {
+        // User canceled the sign-in
+        setState(() {
+          _isSigningIn = false;
+        });
+        return;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential for Firebase
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // Send tokens to your Django backend if needed
+      await _sendCredentialsToBackend(
+        googleAuth.idToken,
+        googleAuth.accessToken,
+      );
+
+      final user = userCredential.user;
+      if (user != null) {
+        print('Signed in as: ${user.displayName}, ${user.email}');
+      }
+    } catch (e) {
+      print('Error during Google sign-in: $e');
+    } finally {
+      setState(() {
+        _isSigningIn = false;
+      });
+    }
+  }
+
+  Future<void> _sendCredentialsToBackend(String? idToken, String? accessToken) async {
+    if (idToken == null || accessToken == null) return;
+
+    final url = Uri.parse('http://127.0.0.1:8000/api/users/store_google_credentials/');
+    final payload = jsonEncode({
+      'idToken': idToken,
+      'accessToken': accessToken,
+    });
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: payload,
+      );
+
+      if (response.statusCode == 200) {
+        print('Credentials stored successfully on Django backend.');
+      } else {
+        print('Failed to store credentials. Status code: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('Error sending credentials to backend: $error');
+    }
+  }
 
   /// Handles the email/password login.
   Future<void> _handleLogin() async {
@@ -54,18 +133,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  /// Handles the Google Sign-In process.
-  Future<void> _handleGoogleSignIn() async {
-    try {
-      final data = await googleSignInAuth();
-      // Optionally store token or navigate.
-      // Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-      });
-    }
-  }
 
   // Dynamic API base URL (if needed in UI; otherwise, it's handled in auth_service.dart)
   String get _apiBaseUrl {
@@ -114,7 +181,7 @@ class _LoginPageState extends State<LoginPage> {
                       height: 24,
                     ),
                     label: const Text('Continuar com Google'),
-                    onPressed: _handleGoogleSignIn,
+                    onPressed: _signInWithGoogle,
                   ),
                   const SizedBox(height: 16),
 

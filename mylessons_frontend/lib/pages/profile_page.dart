@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
-import 'package:mylessons_frontend/modals/schoolSetupModal.dart';
 import '../../services/profile_service.dart';
+import 'school_setup_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -100,10 +98,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 20),
 
                   // School Switching Buttons (only for Admin).
-                  if (currentRole == "Admin" && availableSchools.isNotEmpty) ...[
+                  if (currentRole == "Admin" &&
+                      availableSchools.isNotEmpty) ...[
                     Text(
                       "Current School: ${currentSchoolName ?? 'Not Set'}",
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
                     for (var school in availableSchools)
@@ -116,15 +116,21 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (currentRole == "Admin")
                     ElevatedButton(
                       onPressed: () {
-                        showSchoolSetupModal(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SchoolSetupPage()),
+                        );
                       },
                       child: const Text("Manage School"),
                     ),
                   // Logout Button.
                   ElevatedButton(
                     onPressed: logout,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    child: const Text("Logout", style: TextStyle(color: Colors.white)),
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text("Logout",
+                        style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),

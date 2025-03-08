@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -29,11 +30,11 @@ def get_lessons_data(user, date_lookup, is_done_flag):
     student_ids = user.students.values_list('id', flat=True)
     
     # Adjust the private class filters with the given parameters.
-    lessons = list(set(Lesson.objects.filter(
+    lessons = Lesson.objects.filter(
         students__id__in=student_ids,
         is_done=is_done_flag,
         **date_lookup  # expects key like date__gte or date__lte with value today
-    ).order_by('date', 'start_time')))
+    ).order_by('date', 'start_time').distinct()
 
     # Process private lessons data.
     lessons_data = [
@@ -80,72 +81,6 @@ def last_lessons(request):
     )
     return Response(lessons_data)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def schedule_private_lesson(request):
-    """
-    Permite aos pais/instrutores reagendarem uma aula privada.
-    """
-    user = request.user
-    current_role = user.current_role
-    lesson_id = request.data.get("lesson_id")
-    new_date = request.data.get("new_date")  # Formato esperado: 'YYYY-MM-DD'
-    new_time = request.data.get("new_time")  # Formato esperado: 'HH:MM'
-    """
-    {
-    "lesson_id": 1,
-    "new_date": "2025-02-21",
-    "new_time": "16:00"
-}
-
-    """
-    
-
-    # Validação inicial
-    if not lesson_id or not new_date or not new_time:
-        return Response({"error": "É necessário fornecer lesson_id, date e time."},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        lesson = Lesson.objects.get(id=lesson_id)
-    except Lesson.DoesNotExist:
-        return Response({"error": "Aula não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-    # Verifica se o utilizador pode reagendar esta aula (somente pais da pack ou instrutores ou admins)
-    if not lesson.pack.parents.filter(id=user.id).exists() and not lesson.instructors.filter(user=user).exists():
-        return Response({"error": "Não tem permissão para agendar esta aula."},
-                        status=status.HTTP_403_FORBIDDEN)
-
-    # Converte strings para objetos `datetime`
-    try:
-        new_date_obj = datetime.strptime(new_date, "%Y-%m-%d").date()
-        new_time_obj = datetime.strptime(new_time, "%H:%M").time()
-    except ValueError:
-        return Response({"error": "Formato de data ou hora inválido."}, status=status.HTTP_400_BAD_REQUEST)
-
-
-    # Verifica se ainda é possível reagendar esta aula
-
-    # Verifica se ainda é possível reagendar esta aula
-
-    # TODO make aware
-
-    if new_date_obj < now().date():
-        return Response({"error": "Não é possível agendar para uma data no passado."},
-                        status=status.HTTP_400_BAD_REQUEST)
-    
-    if current_role == "Parent" and not lesson.can_still_reschedule(current_role):
-        return Response({"error": "O período permitido para agendamento já passou."},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-    # Tenta reagendar a aula
-    reschedule_success = lesson.schedule_lesson(new_date_obj, new_time_obj)
-
-    if reschedule_success:
-        return Response({"message": "Aula agendada com sucesso!"}, status=status.HTTP_200_OK)
-    else:
-        return Response({"error": "Não foi possível agendar. Data e horário não disponíveis."},
-                        status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -157,17 +92,24 @@ def active_packs(request):
     if current_role == "Parent":
         # Fetch active packs
         student_ids = user.students.values_list('id', flat=True)
-        packs = list(set(Pack.objects.filter(students__id__in=student_ids, is_done=False)))
+        packs = Pack.objects.filter(students__id__in=student_ids, is_done=False).order_by("-date_time").distinct()
     elif current_role == "Instructor":
-        packs = list(set(Pack.objects.filter(lessons__instructors__in=[user.instructor_profile], is_done=False))) # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
+        packs = Pack.objects.filter(lessons__instructors__in=[user.instructor_profile], is_done=False).order_by("-date_time").distinct() # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
     elif current_role == "Admin":
-        packs = list(set(Pack.objects.filter(school__in=user.school_admins.all(), is_done=False)))
+        packs = Pack.objects.filter(school__in=user.school_admins.all(), is_done=False).order_by("-date_time").distinct()
     else:
         packs = []
 
     packs_data = [
         {
             "pack_id": pack.id,
+            "lessons": [
+                            {
+                                "lesson_id" : str(lesson.id),
+                                "lesson_str": str(lesson)
+                            }
+                            for lesson in pack.lessons.all()
+                        ],
             "lessons_remaining": pack.number_of_classes_left,
             "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
             "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
@@ -410,3 +352,265 @@ def can_still_reschedule(request, id):
     
     # Return the boolean value directly.
     return Response(result, status=200)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def schedule_private_lesson(request):
+    """
+    Permite aos pais/instrutores reagendarem uma aula privada.
+    """
+    user = request.user
+    current_role = user.current_role
+    lesson_id = request.data.get("lesson_id")
+    new_date = request.data.get("new_date")  # Formato esperado: 'YYYY-MM-DD'
+    new_time = request.data.get("new_time")  # Formato esperado: 'HH:MM'
+    """
+    {
+    "lesson_id": 1,
+    "new_date": "2025-02-21",
+    "new_time": "16:00"
+}
+
+    """
+    
+
+    # Validação inicial
+    if not lesson_id or not new_date or not new_time:
+        return Response({"error": "É necessário fornecer lesson_id, date e time."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        lesson = Lesson.objects.get(id=lesson_id)
+    except Lesson.DoesNotExist:
+        return Response({"error": "Aula não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Verifica se o utilizador pode reagendar esta aula (somente pais da pack ou instrutores ou admins)
+    if not lesson.pack.parents.filter(id=user.id).exists() and not lesson.instructors.filter(user=user).exists():
+        return Response({"error": "Não tem permissão para agendar esta aula."},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    # Converte strings para objetos `datetime`
+    try:
+        new_date_obj = datetime.strptime(new_date, "%Y-%m-%d").date()
+        new_time_obj = datetime.strptime(new_time, "%H:%M").time()
+    except ValueError:
+        return Response({"error": "Formato de data ou hora inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    # Verifica se ainda é possível reagendar esta aula
+
+    # Verifica se ainda é possível reagendar esta aula
+
+    # TODO make aware
+
+    if new_date_obj < now().date():
+        return Response({"error": "Não é possível agendar para uma data no passado."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    if current_role == "Parent" and not lesson.can_still_reschedule(current_role):
+        return Response({"error": "O período permitido para agendamento já passou."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Tenta reagendar a aula
+    reschedule_success = lesson.schedule_lesson(new_date_obj, new_time_obj)
+
+    if reschedule_success:
+        return Response({"message": "Aula agendada com sucesso!"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "Não foi possível agendar. Data e horário não disponíveis."},
+                        status=status.HTTP_400_BAD_REQUEST)
+        
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def schedule_multiple_lessons(request):
+    """
+    Simula o agendamento múltiplo de aulas utilizando vários blocos de Data.
+    
+    Se o campo schedule_flag for verdadeiro, para cada aula o método
+    lesson.schedule_lesson(date_obj, time_obj) é chamado para agendar a aula.
+    Caso contrário, utiliza-se lesson.is_available para simular a disponibilidade.
+    
+    O payload de resposta para cada aula inclui:
+      - "new_date", "new_time", "weekday"
+      - "instructor_ids": lista dos IDs dos instrutores disponíveis (ou o utilizado no agendamento)
+      - "instructors_str": lista dos respectivos valores de string
+    """
+    schedule_flag = request.data.get("schedule_flag", False)
+    if isinstance(schedule_flag, str):
+        schedule_flag = schedule_flag.lower() in ["true", "1"]
+
+    # Obter os IDs das aulas
+    lesson_ids = request.data.get("lesson_ids")
+    if not lesson_ids:
+        return Response({"error": "É necessário fornecer lesson_ids"}, status=400)
+    if isinstance(lesson_ids, str):
+        try:
+            lesson_ids = json.loads(lesson_ids)
+        except Exception:
+            return Response({"error": "Formato inválido para lesson_ids"}, status=400)
+
+    # Obter os dados de agendamento (blocos)
+    schedule_data = request.data.get("Data")
+    if not schedule_data or not isinstance(schedule_data, list) or len(schedule_data) == 0:
+        return Response({"error": "É necessário fornecer a chave 'Data' com uma lista de opções."}, status=400)
+    
+    # Ordena os blocos por from_date (assumindo formato "YYYY-MM-DD")
+    try:
+        sorted_blocks = sorted(schedule_data, key=lambda b: datetime.strptime(b.get("from_date", ""), "%Y-%m-%d").date())
+    except Exception:
+        return Response({"error": "Erro ao ordenar os blocos de Data."}, status=400)
+    
+    # Mapeamento de nomes de dias para números (Monday=0, ..., Sunday=6)
+    weekday_map = {
+        "monday": 0, "tuesday": 1, "wednesday": 2,
+        "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6
+    }
+    
+    def get_date_for_weekday(from_date_str, to_date_str, weekday_str):
+        try:
+            from_date = datetime.strptime(from_date_str, "%Y-%m-%d").date()
+            to_date = datetime.strptime(to_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+        
+        target_weekday = weekday_map.get(weekday_str.lower())
+        if target_weekday is None:
+            return None
+        
+        days_ahead = (target_weekday - from_date.weekday() + 7) % 7
+        candidate_date = from_date + timedelta(days=days_ahead)
+        if candidate_date > to_date:
+            return None
+        return candidate_date
+
+    # Busca as aulas (na ordem dada)
+    lessons = []
+    for lesson_id in lesson_ids:
+        try:
+            lesson = Lesson.objects.get(id=lesson_id)
+            lessons.append(lesson)
+        except Lesson.DoesNotExist:
+            return Response({"error": f"Aula com id {lesson_id} não encontrada."}, status=404)
+    
+    scheduled_results = {}
+    unscheduled_lessons = lessons[:]
+    
+    for block in sorted_blocks:
+        if not unscheduled_lessons:
+            break
+        block_from = block.get("from_date")
+        block_to = block.get("to_date")
+        options = block.get("options", [])
+        if not block_from or not block_to or not options:
+            continue
+        
+        try:
+            block_from_date = datetime.strptime(block_from, "%Y-%m-%d").date()
+            block_to_date = datetime.strptime(block_to, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        
+        block_options = []
+        for option in options:
+            weekday_str = option.get("weekday")
+            time_str = option.get("time")
+            if not weekday_str or not time_str:
+                continue
+            base_date = get_date_for_weekday(block_from, block_to, weekday_str)
+            if base_date:
+                block_options.append((base_date, time_str))
+        if not block_options:
+            continue
+        
+        sorted_options = sorted(block_options, key=lambda x: x[0])
+        num_options = len(sorted_options)
+        
+        scheduled_this_block = []
+        for j, lesson in enumerate(unscheduled_lessons):
+            option_index = j % num_options
+            cycle_count = j // num_options
+            base_date, time_str = sorted_options[option_index]
+            candidate_date = base_date + timedelta(days=7 * cycle_count)
+            if candidate_date > block_to_date:
+                break
+            try:
+                candidate_time = datetime.strptime(time_str, "%H:%M").time()
+            except ValueError:
+                continue
+            
+            available_instructors = []
+            if schedule_flag:
+                # Actually schedule the lesson.
+                scheduled_success = lesson.schedule_lesson(candidate_date, candidate_time)
+                if not scheduled_success:
+                    continue
+                # Use a default instructor (e.g., the first one) if available.
+                if lesson.instructors.exists():
+                    available_instructors = [lesson.instructors.first()]
+                else:
+                    available_instructors = []
+            else:
+                if lesson.instructors.exists():
+                    for instructor in lesson.instructors.all():
+                        available, ret_instructor = lesson.is_available(
+                            date=candidate_date,
+                            start_time=candidate_time,
+                            instructor=instructor
+                        )
+                        if available:
+                            available_instructors.append(ret_instructor)
+                    if not available_instructors:
+                        continue
+                else:
+                    available, ret_instructor = lesson.is_available(
+                        date=candidate_date,
+                        start_time=candidate_time,
+                        instructor=None
+                    )
+                    if available:
+                        available_instructors = [ret_instructor]
+                    else:
+                        continue
+            
+            weekday_out = candidate_date.strftime("%A")
+            old_date_str = lesson.date.strftime("%Y-%m-%d") if lesson.date else ""
+            old_time_str = lesson.start_time.strftime("%H:%M") if lesson.start_time else ""
+            lesson_str = f"{lesson.get_students_name()} lesson number {lesson.class_number}/{lesson.pack.number_of_classes}"
+            scheduled_results[lesson.id] = {
+                "lesson_id": str(lesson.id),
+                "lesson_str": lesson_str,
+                "new_date": candidate_date.strftime("%Y-%m-%d"),
+                "new_time": candidate_time.strftime("%H:%M"),
+                "old_date": old_date_str,
+                "old_time": old_time_str,
+                "weekday": weekday_out,
+                "instructor_ids": [str(instr.id) for instr in available_instructors],
+                "instructors_str": [str(instr) for instr in available_instructors]
+            }
+            scheduled_this_block.append(lesson)
+        
+        unscheduled_lessons = [l for l in unscheduled_lessons if l not in scheduled_this_block]
+    
+    for lesson in unscheduled_lessons:
+        old_date_str = lesson.date.strftime("%Y-%m-%d") if lesson.date else ""
+        old_time_str = lesson.start_time.strftime("%H:%M") if lesson.start_time else ""
+        lesson_str = f"{lesson.get_students_name()} lesson number {lesson.class_number}/{lesson.pack.number_of_classes}"
+        scheduled_results[lesson.id] = {
+            "lesson_id": str(lesson.id),
+            "lesson_str": lesson_str,
+            "new_date": "",
+            "new_time": "",
+            "old_date": old_date_str,
+            "old_time": old_time_str,
+            "weekday": "",
+            "instructor_ids": [],
+            "instructors_str": []
+        }
+    
+    final_results = []
+    for lesson in lessons:
+        final_results.append(scheduled_results.get(lesson.id))
+    
+    return Response(final_results, status=200)

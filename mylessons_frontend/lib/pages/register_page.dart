@@ -1,10 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:mylessons_frontend/modals/schoolSetupModal.dart';
-import '../../services/register_service.dart';
+import '../services/register_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

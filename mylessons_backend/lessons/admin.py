@@ -1,7 +1,11 @@
 from django.contrib import admin
 from .models import  Lesson, Pack, Voucher
 
-
+# Inline model for ClassTicket
+class LessonInline(admin.TabularInline):  # You can also use StackedInline if you prefer that style
+    model = Lesson
+    extra = 0  # No extra empty ticket forms
+    
 @admin.register(Pack)
 class PackAdmin(admin.ModelAdmin):
     list_display = ('date', "type", 'number_of_classes', 'number_of_classes_left', 'is_done', 'is_paid', 'debt')
@@ -9,6 +13,7 @@ class PackAdmin(admin.ModelAdmin):
     search_fields = ('students__first_name', 'students__last_name', 'instructors__user__first_name', 'instructors__user__last_name')
     ordering = ('-date',)
     filter_horizontal = ('students', 'instructors')
+    inlines = [LessonInline]
 
 
 @admin.register(Lesson)

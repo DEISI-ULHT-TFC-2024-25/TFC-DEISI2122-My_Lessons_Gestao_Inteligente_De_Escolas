@@ -10,8 +10,7 @@ String getCurrencySymbol(String currencyCode) {
 
 class ServiceDetailsContent extends StatefulWidget {
   final Map<String, dynamic> service;
-  const ServiceDetailsContent({Key? key, required this.service})
-      : super(key: key);
+  const ServiceDetailsContent({super.key, required this.service});
 
   @override
   _ServiceDetailsContentState createState() => _ServiceDetailsContentState();
@@ -430,10 +429,12 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> images = (widget.service['images'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [widget.service['image'] ?? 'https://via.placeholder.com/300'];
+    // Extract the images robustly.
+    final List<String> images =
+        widget.service.containsKey('photos') && widget.service['photos'] is List
+            ? List<String>.from(widget.service['photos'])
+            : [widget.service['image'] ?? 'https://via.placeholder.com/300'];
+
     final List<String> benefits = (widget.service['benefits'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
@@ -457,7 +458,6 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
             ),
           ),
           const SizedBox(height: 16),
-          // Image carousel.
           SizedBox(
             height: 200,
             child: PageView.builder(
@@ -470,6 +470,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
               },
               itemBuilder: (context, index) {
                 return Padding(
+                  key: ValueKey(index), // <-- added key here
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -488,6 +489,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
               },
             ),
           ),
+
           const SizedBox(height: 16),
           // Service description.
           Text(

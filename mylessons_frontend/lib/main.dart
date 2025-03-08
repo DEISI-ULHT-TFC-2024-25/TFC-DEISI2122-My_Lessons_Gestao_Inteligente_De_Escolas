@@ -2,8 +2,22 @@ import 'package:flutter/material.dart';
 import 'pages/register_page.dart';
 import 'pages/login_page.dart' as login;
 import 'main_layout.dart'; // Import MainScreen
+import 'package:flutter/rendering.dart';
 
-void main() {
+// 1. Import the Firebase packages
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  // 2. Ensure bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 3. Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  debugPaintSizeEnabled = false;
   runApp(const MyApp());
 }
 
