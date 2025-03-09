@@ -154,14 +154,13 @@ def current_role(request):
 def available_schools(request):
     user = request.user
     current_role = user.current_role
-    current_school_id = user.current_school_id if user.current_school_id else 0
 
     available_schools = []
 
     # Check and retrieve schools based on the user's role
     if current_role == "Admin":
         available_schools = [
-            {"id": school.id, "name": school.name} for school in user.school_admins.all().exclude(id=current_school_id)
+            {"id": school.id, "name": school.name} for school in user.school_admins.all()
         ]
     elif current_role == "Parent":
         available_schools = [
