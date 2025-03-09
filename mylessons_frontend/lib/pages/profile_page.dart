@@ -97,9 +97,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   const SizedBox(height: 20),
 
-                  // School Switching Buttons (only for Admin).
-                  if (currentRole == "Admin" &&
-                      availableSchools.isNotEmpty) ...[
+                  // School Switching Buttons (only for Admin if there are schools available).
+                  if (currentRole == "Admin" && availableSchools.isNotEmpty) ...[
                     Text(
                       "Current School: ${currentSchoolName ?? 'Not Set'}",
                       style: const TextStyle(
@@ -108,27 +107,33 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 10),
                     for (var school in availableSchools)
                       ElevatedButton(
-                        onPressed: () => changeSchool(school['id'].toString()),
+                        onPressed: () =>
+                            changeSchool(school['id'].toString()),
                         child: Text("Switch to ${school['name']}"),
                       ),
                     const SizedBox(height: 20),
                   ],
+                  // Button text changes based on whether there is an associated school.
                   if (currentRole == "Admin")
                     ElevatedButton(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const SchoolSetupPage()),
+                            builder: (context) => SchoolSetupPage(
+                              isCreatingSchool: availableSchools.isEmpty,
+                            ),
+                          ),
                         );
                       },
-                      child: const Text("Manage School"),
+                      child: Text(
+                        availableSchools.isEmpty ? "Create School" : "Manage School",
+                      ),
                     ),
                   // Logout Button.
                   ElevatedButton(
                     onPressed: logout,
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                     child: const Text("Logout",
                         style: TextStyle(color: Colors.white)),
                   ),

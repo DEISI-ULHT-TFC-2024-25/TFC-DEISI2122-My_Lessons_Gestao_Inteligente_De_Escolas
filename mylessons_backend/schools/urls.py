@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import add_instructor, remove_instructor, number_of_bookings_in_timeframe, school_revenue_in_timeframe, number_of_students_in_timeframe, number_of_instructors_in_timeframe, update_pack_price_view, school_details_view, update_payment_type_view, all_schools, get_services, add_edit_service
+from .views import add_instructor, remove_instructor, number_of_bookings_in_timeframe, school_revenue_in_timeframe, number_of_students_in_timeframe, number_of_instructors_in_timeframe, update_pack_price_view, school_details_view, update_payment_type_view, all_schools, get_services, add_edit_service, create_school
 
 urlpatterns = [
     path('add_instructor/', add_instructor, name='add_instructor'),
@@ -14,5 +14,6 @@ urlpatterns = [
     path('all_schools/', all_schools, name='all_schools'),
     path('<int:school_id>/services/', get_services, name='get-services'),
     path('<int:school_id>/services/add_edit/', add_edit_service, name='add-edit-service'),
+    path('create/', create_school, name='create_school'),
 
 ]   
