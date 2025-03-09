@@ -93,6 +93,7 @@ def all_schools(request):
                 {'id': sport.id, 'name': sport.name}
                 for sport in school.sports.all()
             ],
+            'isFavorite': True if request.user.schools.exists() and school in request.user.schools.all() else False,
             'services': school.services,
             'currency': school.currency if school.currency else "EUR"
         })

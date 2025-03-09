@@ -19,60 +19,6 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
   final GlobalKey _contactsKey = GlobalKey();
   final GlobalKey _aboutKey = GlobalKey();
 
-  // Updated defaultServices with the new structure:
-  final List<Map<String, dynamic>> defaultServices = const [
-    {
-      'id': 'default1',
-      'name': 'Private Lessons',
-      'photos': ['https://via.placeholder.com/300'],
-      'benefits': ['One-on-one personalized tutoring sessions.'],
-      'description': 'Intensive private lessons for individualized learning.',
-      'sports': ['soccer', 'basketball'],
-      'locations': ['Room 101', 'Room 102'],
-      'type': {'pack': 'private'} // Must be either "pack" or "activity".
-    },
-    {
-      'id': 'default2',
-      'name': 'Group Lessons',
-      'photos': ['https://via.placeholder.com/300'],
-      'benefits': ['Collaborative learning in small groups.'],
-      'description': 'Learn together in a dynamic group environment.',
-      'sports': ['swimming'],
-      'locations': ['Pool Area'],
-      'type': {'pack': 'group'}
-    },
-    {
-      'id': 'default3',
-      'name': 'Camps',
-      'photos': ['https://via.placeholder.com/300'],
-      'benefits': ['Engaging summer camp activities.'],
-      'description': 'Summer camps designed for fun and learning.',
-      'sports': ['tennis'],
-      'locations': ['Camp Ground 1', 'Camp Ground 2'],
-      'type': {'activity': 'skate camp'} // Example using "activity"
-    },
-    {
-      'id': 'default4',
-      'name': 'Birthday Parties',
-      'photos': ['https://via.placeholder.com/300'],
-      'benefits': ['Fun and educational birthday celebrations.'],
-      'description': 'Celebrate birthdays with a mix of fun and learning.',
-      'sports': [],
-      'locations': ['Party Room'],
-      'type': {'activity': 'birthday party'}
-    },
-    {
-      'id': 'default5',
-      'name': 'Special Events',
-      'photos': ['https://via.placeholder.com/300'],
-      'benefits': ['Exclusive events tailored to your interests.'],
-      'description': 'Special events that bring unique experiences.',
-      'sports': [],
-      'locations': ['Main Hall'],
-      'type': {'activity': 'special event'}
-    },
-  ];
-
   void _scrollToSection(GlobalKey key) {
     final context = key.currentContext;
     if (context != null) {
@@ -83,20 +29,7 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
     }
   }
 
-  List<Map<String, String>> reviews = [
-    {
-      'author': 'john doe',
-      'review': 'great school, highly recommended!',
-      'rating': '5',
-      'date': '2025-02-25'
-    },
-    {
-      'author': 'jane smith',
-      'review': 'my child has had an excellent experience here.',
-      'rating': '4',
-      'date': '2025-02-20'
-    },
-  ];
+  List<Map<String, String>> reviews = [];
 
   void _showAddReviewDialog() {
     final authorController = TextEditingController();
@@ -156,7 +89,7 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
   @override
   Widget build(BuildContext context) {
     // Updated: Expect services to follow the new structure.
-    final services = widget.school['services'] as List<dynamic>? ?? defaultServices;
+    final services = widget.school['services'] as List<dynamic>? ?? [];
     final reviews = widget.school['reviews'] as List<dynamic>? ?? [];
     final lastPurchases = widget.school['lastPurchases'] as List<dynamic>? ?? [];
     return Stack(

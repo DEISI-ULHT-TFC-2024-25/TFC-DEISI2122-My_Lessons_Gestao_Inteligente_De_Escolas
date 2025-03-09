@@ -13,111 +13,6 @@ class SchoolsPage extends StatefulWidget {
 class _SchoolsPageState extends State<SchoolsPage> {
   final TextEditingController searchController = TextEditingController();
 
-  // Default sample schools (for details pages if needed).
-  final List<Map<String, dynamic>> defaultSchools = [
-    {
-      'name': 'sunshine academy',
-      'image': 'https://via.placeholder.com/150',
-      'description': 'a top school for diverse educational experiences.',
-      'rating': 4.5,
-      'sports': ['soccer', 'basketball', 'swimming'],
-      'locations': ['new york', 'los angeles'],
-      'isFavorite': true,
-      'lastPurchases': [
-        {'packName': 'math pack', 'date': '2025-02-22', 'price': '\$100'},
-        {'packName': 'science pack', 'date': '2025-02-20', 'price': '\$80'},
-      ],
-      'services': [
-        {
-          'name': 'private lessons',
-          'image': 'https://via.placeholder.com/300',
-          'images': [
-            'https://via.placeholder.com/300/ff0000',
-            'https://via.placeholder.com/300/00ff00',
-            'https://via.placeholder.com/300/0000ff',
-          ],
-          'description':
-              'one-on-one personalized tutoring sessions to help your child excel.',
-          'benefits': [
-            'personal attention',
-            'customized curriculum',
-            'flexible scheduling'
-          ],
-          'locations': ['room 101', 'room 102'],
-        },
-        {
-          'name': 'group lessons',
-          'image': 'https://via.placeholder.com/300',
-          'images': [
-            'https://via.placeholder.com/300/aaaaaa',
-            'https://via.placeholder.com/300/bbbbbb',
-          ],
-          'description': 'interactive sessions in small groups fostering teamwork.',
-          'benefits': [
-            'collaborative learning',
-            'social skills',
-            'competitive pricing'
-          ],
-          'locations': ['lab a', 'lab b'],
-        },
-      ],
-    },
-    {
-      'name': 'green valley school',
-      'image': 'https://via.placeholder.com/150',
-      'description': 'focused on holistic development and innovation.',
-      'rating': 4.2,
-      'sports': ['tennis', 'baseball'],
-      'locations': ['chicago'],
-      'isFavorite': false,
-      'lastPurchases': [
-        {'packName': 'art pack', 'date': '2025-02-18', 'price': '\$90'},
-      ],
-      'services': [
-        {
-          'name': 'camps',
-          'image': 'https://via.placeholder.com/300',
-          'images': [
-            'https://via.placeholder.com/300/123456',
-            'https://via.placeholder.com/300/654321',
-          ],
-          'description': 'engaging summer camps that combine fun and learning.',
-          'benefits': [
-            'outdoor activities',
-            'expert instructors',
-            'peer bonding'
-          ],
-          'locations': ['camp ground 1', 'camp ground 2'],
-        },
-      ],
-    },
-    {
-      'name': 'blue ocean institute',
-      'image': 'https://via.placeholder.com/150',
-      'description': 'providing world-class learning opportunities.',
-      'rating': 4.8,
-      'sports': ['soccer', 'tennis'],
-      'locations': ['san francisco', 'boston'],
-      'isFavorite': true,
-      'lastPurchases': [
-        {'packName': 'language pack', 'date': '2025-02-15', 'price': '\$120'},
-      ],
-      'services': [
-        {
-          'name': 'special events',
-          'image': 'https://via.placeholder.com/300',
-          'images': [
-            'https://via.placeholder.com/300/cccccc',
-            'https://via.placeholder.com/300/dddddd',
-          ],
-          'description': 'exclusive events tailored to your interests.',
-          'benefits': ['vip access', 'networking', 'expert talks'],
-          'locations': ['main hall', 'conference room'],
-        },
-      ],
-    },
-  ];
-
   // Variables holding API data.
   List<Map<String, dynamic>> apiSchools = [];
   List<Map<String, dynamic>> filteredSchools = [];
@@ -158,7 +53,8 @@ class _SchoolsPageState extends State<SchoolsPage> {
     setState(() {
       filteredSchools = schoolsData.where((school) {
         final schoolName = school['name'].toString();
-        final matchesQuery = query.isEmpty || schoolName.toLowerCase().contains(query.toLowerCase());
+        final matchesQuery = query.isEmpty ||
+            schoolName.toLowerCase().contains(query.toLowerCase());
 
         // Extract applied sports and locations from selectedFilters.
         final appliedSports = selectedFilters
@@ -174,9 +70,10 @@ class _SchoolsPageState extends State<SchoolsPage> {
         final matchesSport =
             appliedSports.isEmpty || sportList.any((s) => appliedSports.contains(s));
 
-        final locationList = (school['locations'] as List).map((l) => l.toString()).toList();
-        final matchesLocation = appliedLocations.isEmpty ||
-            locationList.any((l) => appliedLocations.contains(l));
+        final locationList =
+            (school['locations'] as List).map((l) => l.toString()).toList();
+        final matchesLocation =
+            appliedLocations.isEmpty || locationList.any((l) => appliedLocations.contains(l));
 
         return matchesQuery && matchesSport && matchesLocation;
       }).toList();
@@ -249,6 +146,7 @@ class _SchoolsPageState extends State<SchoolsPage> {
             bool isFilterSelected(String type, String value) {
               return tempFilters.any((f) => f['type'] == type && f['value'] == value);
             }
+
             return Padding(
               padding: MediaQuery.of(context).viewInsets,
               child: Container(
@@ -340,43 +238,109 @@ class _SchoolsPageState extends State<SchoolsPage> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 100,
+              height: 150, // Keep it compact
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: favorites.length,
                 itemBuilder: (context, index) {
                   final fav = favorites[index];
+                  final favServices = fav['services'] as List<dynamic>? ?? [];
+
+                  // Wrap the entire card in a GestureDetector
+                  // so tapping it (outside the service row) goes to the school page
                   return GestureDetector(
                     onTap: () => selectSchool(fav),
                     child: Container(
-                      width: 120,
+                      width: 200,
                       margin: const EdgeInsets.only(right: 12),
-                      child: Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              fav['image'],
-                              height: 60,
-                              width: 120,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  height: 60,
-                                  width: 120,
-                                  color: Colors.grey,
-                                  child: const Icon(Icons.error),
-                                );
-                              },
-                            ),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Top row: School image and name.
+                              Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      fav['image'] ?? "https://www.placeholder.com/150/",
+                                      height: 40,
+                                      width: 40,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          height: 40,
+                                          width: 40,
+                                          color: Colors.grey,
+                                          child: const Icon(Icons.error, size: 20),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      fav['name'],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Middle text: "Book Service"
+                              const Text(
+                                'Book Service',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 8),
+                              // Bottom row: Horizontally scrollable list of service names.
+                              SizedBox(
+                                height: 30,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: favServices.length,
+                                  itemBuilder: (context, svcIndex) {
+                                    final service =
+                                        favServices[svcIndex] as Map<String, dynamic>;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        final updatedService =
+                                            Map<String, dynamic>.from(service);
+                                        updatedService['school_name'] =
+                                            fav['name'] ?? 'N/A';
+                                        setState(() {
+                                          selectedSchool = fav;
+                                          selectedService = updatedService;
+                                        });
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            service['name'] ?? 'Service',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            fav['name'],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   );

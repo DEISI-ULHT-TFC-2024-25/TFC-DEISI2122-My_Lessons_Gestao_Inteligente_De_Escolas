@@ -48,19 +48,33 @@ class Pack(models.Model):
         # TODO notifications
 
     def get_number_of_unscheduled_lessons(self):
-
-        # TODO check for group classes problems 
-
         today = now().date()
 
-        return self.lessons.filter(
-            is_done=False
-        ).filter(
-            Q(date__lt=today) |
-            Q(date=None) |
-            Q(start_time=None)
-        ).count() 
-    
+        if self.type == "private":
+            return self.lessons.filter(
+                is_done=False
+            ).filter(
+                Q(date__lt=today) |
+                Q(date=None) |
+                Q(start_time=None)
+            ).count()
+        elif self.type == "group":
+            # If there are no lessons, return the total number of classes.
+            if not self.lessons.exists():
+                return self.number_of_classes
+            
+            # Count lessons that are considered scheduled (have both date and start_time).
+            scheduled_count = self.lessons.filter(
+                date__isnull=False,
+                start_time__isnull=False
+            ).count()
+            
+            # Calculate unscheduled lessons.
+            unscheduled = self.number_of_classes - scheduled_count
+            
+            # Ensure we never return a negative value.
+            return max(unscheduled, 0)
+
     def get_students_name(self):
         return get_users_name(self.students.all())
 
@@ -106,6 +120,8 @@ class Pack(models.Model):
 
         pack.students.set(students)
         pack.parents.set(parents)
+        for parent in parents:
+            pack.school.parents.add(parent) 
         pack.instructors.set(instructors)
 
         if type == "private":

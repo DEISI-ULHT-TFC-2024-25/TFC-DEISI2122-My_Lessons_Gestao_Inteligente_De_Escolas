@@ -1,18 +1,6 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-
-/// Returns the appropriate API base URL based on the current platform.
-String getApiBaseUrl() {
-  if (kIsWeb) {
-    return "http://127.0.0.1:8000"; // Web environment (localhost)
-  } else if (Platform.isAndroid) {
-    return "http://10.0.2.2:8000"; // Android emulator
-  } else {
-    return "http://127.0.0.1:8000"; // Default (iOS or others)
-  }
-}
+import 'package:mylessons_frontend/services/api_service.dart';
 
 /// Calls the registration endpoint with the provided user details.
 /// Returns the http.Response so that the calling code can handle success or errors.
@@ -24,8 +12,7 @@ Future<http.Response> registerUser({
   required String phone,
   String countryCode = "+351",
 }) async {
-  final String apiBaseUrl = getApiBaseUrl();
-  final Uri registerUrl = Uri.parse("$apiBaseUrl/api/users/register/");
+  final Uri registerUrl = Uri.parse("$baseUrl/api/users/register/");
 
   final response = await http.post(
     registerUrl,

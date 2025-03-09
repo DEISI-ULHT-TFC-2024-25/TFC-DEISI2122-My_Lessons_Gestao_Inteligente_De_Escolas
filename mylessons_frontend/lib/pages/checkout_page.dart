@@ -113,7 +113,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     final body = jsonEncode({"packs": bookings});
-    final url = Uri.parse('http://127.0.0.1:8000/api/users/book_pack/');
+    final url = Uri.parse('$baseUrl/api/users/book_pack/');
     final headers = await getAuthHeaders();
 
     try {
@@ -427,7 +427,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// This function should call your backend to create a Stripe Checkout session.
   Future<void> _initiateStripeCheckout() async {
     try {
-      // Example: Replace with your actual Stripe integration.
+      // TODO : Replace with your actual Stripe integration.
       final sessionUrl = 'https://checkout.stripe.com/pay/cs_test_1234567890';
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Redirecting to Stripe Checkout...")),

@@ -2,9 +2,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import 'auth_service.dart';
+import 'api_service.dart';
 
-const String _baseUrl = 'http://127.0.0.1:8000';
 
 class ProfileData {
   final List<String> availableRoles;
@@ -33,7 +32,7 @@ class ProfileService {
 
     // Fetch available roles.
     final roleResponse = await http.get(
-      Uri.parse('$_baseUrl/api/users/available_roles/'),
+      Uri.parse('$baseUrl/api/users/available_roles/'),
       headers: headers,
     );
     List<String> availableRoles = [];
@@ -47,7 +46,7 @@ class ProfileService {
     // Fetch current role.
     String currentRole = "";
     final currentRoleResponse = await http.get(
-      Uri.parse('$_baseUrl/api/users/current_role/'),
+      Uri.parse('$baseUrl/api/users/current_role/'),
       headers: headers,
     );
     if (currentRoleResponse.statusCode == 200) {
@@ -63,7 +62,7 @@ class ProfileService {
     if (currentRole == "Admin") {
       // Fetch available schools.
       final schoolsResponse = await http.get(
-        Uri.parse('$_baseUrl/api/users/available_schools/'),
+        Uri.parse('$baseUrl/api/users/available_schools/'),
         headers: headers,
       );
       if (schoolsResponse.statusCode == 200) {
@@ -75,7 +74,7 @@ class ProfileService {
 
       // Fetch current school.
       final currentSchoolResponse = await http.get(
-        Uri.parse('$_baseUrl/api/users/current_school_id/'),
+        Uri.parse('$baseUrl/api/users/current_school_id/'),
         headers: headers,
       );
       if (currentSchoolResponse.statusCode == 200) {
@@ -100,7 +99,7 @@ class ProfileService {
   static Future<String> changeRole(String newRole) async {
     final headers = await getAuthHeaders();
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/users/change_role/'),
+      Uri.parse('$baseUrl/api/users/change_role/'),
       headers: headers,
       body: jsonEncode({"new_role": newRole}),
     );
@@ -117,7 +116,7 @@ class ProfileService {
   static Future<String> changeSchool(String schoolId) async {
     final headers = await getAuthHeaders();
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/users/change_school_id/'),
+      Uri.parse('$baseUrl/api/users/change_school_id/'),
       headers: headers,
       body: jsonEncode({"new_school_id": schoolId}),
     );
