@@ -4,7 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-const String baseUrl = 'http://192.168.1.94:8000';
+const String baseUrl = 'https://mylessons.pythonanywhere.com';
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
