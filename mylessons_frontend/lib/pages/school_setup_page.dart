@@ -1169,8 +1169,10 @@ Future<void> addEditService(
   );
 }
 
+
 class SchoolSetupPage extends StatefulWidget {
-  const SchoolSetupPage({super.key});
+  final bool isCreatingSchool;
+  const SchoolSetupPage({super.key, this.isCreatingSchool = false});
 
   @override
   _SchoolSetupPageState createState() => _SchoolSetupPageState();
@@ -1180,11 +1182,19 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
   final TextEditingController _schoolNameController = TextEditingController();
   Map<String, dynamic>? schoolDetails;
   bool isLoading = true;
+  // This flag is used to switch from creation UI to the regular details UI after a successful creation.
+  bool _isCreated = false;
 
   @override
   void initState() {
     super.initState();
-    fetchAndDisplaySchoolDetails();
+    // If we are not in create mode, fetch the school details.
+    if (!widget.isCreatingSchool) {
+      fetchAndDisplaySchoolDetails();
+    } else {
+      // In creation mode, we don't fetch any details.
+      isLoading = false;
+    }
   }
 
   Future<void> fetchAndDisplaySchoolDetails() async {
@@ -1205,8 +1215,73 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
     }
   }
 
+  /// Creates a school by sending a POST request to /api/schools/create.
+  Future<void> createSchool() async {
+    final schoolName = _schoolNameController.text.trim();
+    if (schoolName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a school name")),
+      );
+      return;
+    }
+    try {
+      final url = Uri.parse('$baseUrl/api/schools/create/');
+      final headers = await getAuthHeaders();
+      final payload = jsonEncode({'school_name': schoolName});
+      final response = await http.post(url, headers: headers, body: payload);
+      if (response.statusCode == 201) {
+        // On success, fetch the new school details.
+        await fetchAndDisplaySchoolDetails();
+        setState(() {
+          _isCreated = true;
+        });
+      } else {
+        final data = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['error'] ?? 'Error creating school')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to create school: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // If in creation mode and the school has not been created yet, show the simple creation UI.
+    if (widget.isCreatingSchool && !_isCreated) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("School Setup")),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Create School",
+                  style: GoogleFonts.lato(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _schoolNameController,
+                decoration: const InputDecoration(
+                    labelText: "School Name", border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: ElevatedButton(
+                  onPressed: createSchool,
+                  child: const Text("Create School"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Otherwise, show the full school details UI (same as before).
     return Scaffold(
       appBar: AppBar(title: const Text("School Settings")),
       body: isLoading
@@ -1258,7 +1333,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
                             // Display Payment Types as Accordion.
                             Text("STAFF PAYMENTS",
                                 style: GoogleFonts.lato(
-                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold)),
                             const SizedBox(height: 8),
                             if (schoolDetails!['payment_types'] != null)
                               buildPaymentTypesWidget(
@@ -1301,20 +1377,21 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
                                                 context: context,
                                                 builder: (context) =>
                                                     AlertDialog(
-                                                  title: Text("Delete Service"),
-                                                  content: Text(
+                                                  title:
+                                                      const Text("Delete Service"),
+                                                  content: const Text(
                                                       "Are you sure you want to delete this service?"),
                                                   actions: [
                                                     TextButton(
                                                         onPressed: () =>
                                                             Navigator.pop(
                                                                 context, false),
-                                                        child: Text("Cancel")),
+                                                        child: const Text("Cancel")),
                                                     ElevatedButton(
                                                         onPressed: () =>
                                                             Navigator.pop(
                                                                 context, true),
-                                                        child: Text("Delete")),
+                                                        child: const Text("Delete")),
                                                   ],
                                                 ),
                                               );
@@ -1326,7 +1403,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
                                                           .toString(),
                                                       service["id"]);
                                                   ScaffoldMessenger.of(context)
-                                                      .showSnackBar(SnackBar(
+                                                      .showSnackBar(const SnackBar(
                                                           content: Text(
                                                               "Service deleted successfully")));
                                                   await fetchAndDisplaySchoolDetails();
@@ -1341,8 +1418,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
                                           ),
                                           title: Text(
                                               service['name'] ?? "No Name"),
-                                          subtitle: Text(
-                                              service['description'] ?? ""),
+                                          subtitle:
+                                              Text(service['description'] ?? ""),
                                           trailing: IconButton(
                                             icon: const Icon(Icons.edit),
                                             onPressed: () async {

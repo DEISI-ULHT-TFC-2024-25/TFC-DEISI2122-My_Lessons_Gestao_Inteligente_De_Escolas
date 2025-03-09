@@ -448,3 +448,48 @@ def remove_instructor(request):
         return Response({"error": "Impossivel remover o instrutor."}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_school(request):
+    # Use request.data for proper parsing
+    school_name = request.data.get('school_name', '').strip()
+    
+    # Validate the payload
+    if not school_name:
+        return Response(
+            {'success': False, 'error': 'School name is required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    user = request.user
+    if user.current_role != "Admin":
+        return Response(
+            {'success': False, 'error': 'Only admins can create a school.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Check if a school with the same name exists (case-insensitive)
+    if School.objects.filter(name__iexact=school_name).exists():
+        return Response(
+            {'success': False, 'error': 'School name already chosen.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Create the new school
+    school = School.objects.create(name=school_name)
+    school.admins.add(user)
+    
+    # Optionally update the user's current school
+    user.current_school_id = school.id
+    user.save()
+    
+    school_data = {
+        'id': school.id,
+        'name': school.name,
+    }
+    
+    return Response(
+        {'success': True, 'school': school_data},
+        status=status.HTTP_201_CREATED
+    )
+    
