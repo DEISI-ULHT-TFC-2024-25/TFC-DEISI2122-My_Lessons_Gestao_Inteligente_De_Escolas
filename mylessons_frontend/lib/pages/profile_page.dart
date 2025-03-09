@@ -96,9 +96,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Text("Switch to $role"),
                     ),
                   const SizedBox(height: 20),
-
-                  // School Switching Buttons (only for Admin if there are schools available).
-                  if (currentRole == "Admin" && availableSchools.isNotEmpty) ...[
+                  // School Switching Buttons (only for Admin if there is more than one school).
+                  if (currentRole == "Admin" && availableSchools.length > 1) ...[
                     Text(
                       "Current School: ${currentSchoolName ?? 'Not Set'}",
                       style: const TextStyle(
@@ -106,14 +105,15 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 10),
                     for (var school in availableSchools)
-                      ElevatedButton(
-                        onPressed: () =>
-                            changeSchool(school['id'].toString()),
-                        child: Text("Switch to ${school['name']}"),
-                      ),
+                      if (school['id'].toString() != currentSchoolId)
+                        ElevatedButton(
+                          onPressed: () =>
+                              changeSchool(school['id'].toString()),
+                          child: Text("Switch to ${school['name']}"),
+                        ),
                     const SizedBox(height: 20),
                   ],
-                  // Button text changes based on whether there is an associated school.
+                  // Manage School / Create School button.
                   if (currentRole == "Admin")
                     ElevatedButton(
                       onPressed: () {
