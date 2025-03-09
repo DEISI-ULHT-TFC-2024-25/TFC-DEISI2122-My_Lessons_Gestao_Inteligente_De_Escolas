@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:intl/intl.dart';
-
-import '../services/auth_service.dart';
 import '../services/cart_service.dart';
 import '../pages/checkout_page.dart';
 
@@ -94,7 +93,7 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
 
   /// Fetches the list of students from your backend.
   Future<Map<String, dynamic>> _fetchStudents() async {
-    final url = Uri.parse('http://127.0.0.1:8000/api/users/students/');
+    final url = Uri.parse('$baseUrl/api/users/students/');
     final headers = await getAuthHeaders();
     final response = await http.get(url, headers: headers);
     if (response.statusCode == 200) {
@@ -106,7 +105,7 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
   /// Creates a new student via POST request.
   Future<Map<String, dynamic>> _createStudent(
       String firstName, String lastName, String birthday) async {
-    final url = Uri.parse('http://127.0.0.1:8000/api/users/students/create/');
+    final url = Uri.parse('$baseUrl/api/users/students/create/');
     final headers = await getAuthHeaders();
     final body = jsonEncode({
       "first_name": firstName,

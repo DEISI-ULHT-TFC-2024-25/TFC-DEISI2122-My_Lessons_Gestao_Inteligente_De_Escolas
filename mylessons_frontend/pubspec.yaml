@@ -23,6 +23,7 @@ dependencies:
   table_calendar: ^3.2.0
   syncfusion_flutter_datepicker: ^28.2.7
   currency_picker: ^2.0.21
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:

@@ -136,7 +136,7 @@ class _ScheduleMultipleLessonsModalState
       final payload = buildMultiplePayload();
       final headers = await getAuthHeaders();
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:8000/api/lessons/schedule_multiple_lessons/'),
+        Uri.parse('$baseUrl/api/lessons/schedule_multiple_lessons/'),
         headers: {
           "Content-Type": "application/json",
           ...headers,
@@ -236,7 +236,7 @@ class _ScheduleMultipleLessonsModalState
       final payload = buildSinglePayload();
       final headers = await getAuthHeaders();
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:8000/api/lessons/schedule_private_lesson/'),
+        Uri.parse('$baseUrl/api/lessons/schedule_private_lesson/'),
         headers: {
           "Content-Type": "application/json",
           ...headers,

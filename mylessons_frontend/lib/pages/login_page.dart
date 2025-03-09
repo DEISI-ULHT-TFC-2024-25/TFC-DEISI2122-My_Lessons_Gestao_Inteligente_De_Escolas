@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
-import '../../services/auth_service.dart';
-import '../widgets/google_sign_in_widget.dart';
+import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -78,7 +75,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _sendCredentialsToBackend(String? idToken, String? accessToken) async {
     if (idToken == null || accessToken == null) return;
 
-    final url = Uri.parse('http://127.0.0.1:8000/api/users/store_google_credentials/');
+    final url = Uri.parse('$baseUrl/api/users/store_google_credentials/');
     final payload = jsonEncode({
       'idToken': idToken,
       'accessToken': accessToken,
@@ -130,18 +127,6 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         _isLoading = false;
       });
-    }
-  }
-
-
-  // Dynamic API base URL (if needed in UI; otherwise, it's handled in auth_service.dart)
-  String get _apiBaseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000'; // Web environment
-    } else if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000'; // Android Emulator
-    } else {
-      return 'http://127.0.0.1:8000'; // Default (iOS)
     }
   }
 
@@ -254,8 +239,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: const Text(
                       'Não tens conta? Regista-te no MyLessons',
                       style: TextStyle(
-                        decoration: TextDecoration.underline,
-                        color: Colors.blue,
+                        color: Colors.orange,
                       ),
                       textAlign: TextAlign.center,
                     ),

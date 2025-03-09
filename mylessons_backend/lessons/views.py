@@ -154,11 +154,11 @@ def pack_details(request, id):
         "debt": str(pack.debt),
         "students_name": pack.get_students_name(),
         "students_ids": pack.get_students_ids(),
-        "instructors_name": pack.get_instructors_name() if pack.instructors.exists() else "Unknown",
-        "instructors_ids": pack.get_instructors_ids() if pack.instructors.exists() else "Unknown",
+        "instructors_name": pack.get_instructors_name() if pack.instructors.exists() else "",
+        "instructors_ids": pack.get_instructors_ids() if pack.instructors.exists() else "",
         "finished_date": pack.finished_date,
-        "school_name": str(pack.school) if pack.school else "Unknown",
-        "school_id": pack.school.id if pack.school else "Unknown",
+        "school_name": str(pack.school) if pack.school else "",
+        "school_id": pack.school.id if pack.school else "",
         "sport": pack.sport.name if pack.sport else None,
     }
     return Response(data)
@@ -182,9 +182,9 @@ def lesson_details(request, id):
 
     data = {
             "lesson_id": lesson.id,
-            "date": lesson.date.strftime("%d %b") if lesson.date else "None",
-            "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
-            "end_time": lesson.end_time.strftime("%I:%M %p") if lesson.end_time else "None",
+            "date": lesson.date.strftime("%d %b %Y") if lesson.date else "None",
+            "start_time": lesson.start_time.strftime("%H:%M") if lesson.start_time else "None",
+            "end_time": lesson.end_time.strftime("%H:%M") if lesson.end_time else "None",
             "duration_in_minutes": lesson.duration_in_minutes,
             "lesson_number": lesson.class_number,
             "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None",

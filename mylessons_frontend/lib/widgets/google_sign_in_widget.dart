@@ -63,7 +63,7 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
     if (idToken == null || accessToken == null) return;
 
     // Use your Django endpoint here.
-    final url = Uri.parse('http://127.0.0.1:8000/api/users/store_google_credentials/');
+    final url = Uri.parse('http://192.168.1.66:8000/api/users/store_google_credentials/');
     final payload = {
       'idToken': idToken,
       'accessToken': accessToken,

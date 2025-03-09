@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import '../services/auth_service.dart'; // Assuming getAuthHeaders() is defined here.
+import '../services/api_service.dart'; // Assuming getAuthHeaders() is defined here.
 
-const String baseUrl = 'http://127.0.0.1:8000';
 // Initialize secure storage.
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 

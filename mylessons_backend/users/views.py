@@ -329,6 +329,8 @@ def create_student(request):
 
     print("Incoming data:", request.data)
 
+    user = request.user
+    current_role = user.current_role
 
     # Expecting only first_name, last_name, and birthday in the request data.
     first_name = request.data.get('first_name')
@@ -353,8 +355,9 @@ def create_student(request):
             birthday=birthday_date,
             level=1
         )
-        # Add the current user as a parent.
-        student.parents.add(request.user)
+        if current_role == "Parent":
+            # Add the current user as a parent.
+            student.parents.add(request.user)
         # Prepare a response with the created student's details.
         response_data = {
             "id": student.id,

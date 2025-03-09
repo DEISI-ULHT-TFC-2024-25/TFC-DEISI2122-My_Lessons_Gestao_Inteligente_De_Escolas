@@ -5,7 +5,8 @@ class CollapsibleSection extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const CollapsibleSection({super.key, required this.title, required this.child});
+  const CollapsibleSection(
+      {super.key, required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -14,19 +15,22 @@ class CollapsibleSection extends StatelessWidget {
         title,
         style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
       ),
-      // Start expanded by default.
       initiallyExpanded: true,
-      // Remove borders/lines.
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
         side: BorderSide.none,
       ),
-      collapsedShape: RoundedRectangleBorder(
+      collapsedShape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
         side: BorderSide.none,
       ),
       childrenPadding: EdgeInsets.zero,
       tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
+
+      // Make the arrow orange.
+      iconColor: Colors.orange,
+      collapsedIconColor: Colors.orange,
+
       children: [child],
     );
   }
