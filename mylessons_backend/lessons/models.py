@@ -385,7 +385,7 @@ class Lesson(models.Model):
             fixed_price = self.get_fixed_price(instructor=instructor) or 0
 
             try:
-                commission = instructor.user.payment_types[self.school.name]["instructor"][f"{self.type} lesson"]["commission"]
+                commission = instructor.user.payment_types[self.school.name]["instructor"][f"{self.type}"]["commission"]
             except (KeyError, TypeError):
                 commission = 0
 
@@ -410,7 +410,7 @@ class Lesson(models.Model):
 
             fixed_price = self.get_fixed_price(instructor=instructor) or 0
             try:
-                commission = instructor.user.payment_types[self.school.name]["instructor"][f"{self.type} lesson"]["commission"]
+                commission = instructor.user.payment_types[self.school.name]["instructor"][f"{self.type}"]["commission"]
             except (KeyError, TypeError):
                 commission = 0
 

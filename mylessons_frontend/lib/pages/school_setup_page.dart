@@ -1418,8 +1418,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage> {
                                           ),
                                           title: Text(
                                               service['name'] ?? "No Name"),
-                                          subtitle:
-                                              Text(service['description'] ?? ""),
                                           trailing: IconButton(
                                             icon: const Icon(Icons.edit),
                                             onPressed: () async {
