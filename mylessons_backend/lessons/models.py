@@ -116,12 +116,13 @@ class Pack(models.Model):
             expiration_date=expiration_date
         )
 
-        # TODO expiration date
-
         pack.students.set(students)
         pack.parents.set(parents)
-        for parent in parents:
-            pack.school.parents.add(parent) 
+        if school:
+            for parent in parents:
+                school.parents.add(parent)
+            for student in students:
+                school.students.add(student)
         pack.instructors.set(instructors)
 
         if type == "private":
