@@ -92,10 +92,10 @@ def google_oauth_start(request):
     
 @csrf_exempt
 @api_view(['POST'])
-@permission_classes([AllowAny])  # Permite acesso sem autenticação
+@permission_classes([AllowAny])
 def register_user(request):
     """
-    Regista um novo utilizador na base de dados.
+    Registers a new user and returns an authentication token.
     """
     data = request.data
 
@@ -103,7 +103,10 @@ def register_user(request):
     missing_fields = [field for field in required_fields if field not in data]
 
     if missing_fields:
-        return Response({'error': f'Missing fields: {", ".join(missing_fields)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': f'Missing fields: {", ".join(missing_fields)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     try:
         user = UserAccount.objects.create(
@@ -116,7 +119,13 @@ def register_user(request):
             password=make_password(data['password']),
         )
 
-        return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+        # Create token for the new user.
+        token, created = Token.objects.get_or_create(user=user)
+
+        return Response(
+            {'message': 'User registered successfully', 'token': token.key},
+            status=status.HTTP_201_CREATED
+        )
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

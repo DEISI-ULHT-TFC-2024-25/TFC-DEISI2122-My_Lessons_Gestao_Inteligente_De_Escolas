@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/register_service.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -55,7 +56,9 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _register() async {
     if (!_agreeTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You must accept the terms and conditions to proceed.")),
+        const SnackBar(
+            content:
+                Text("You must accept the terms and conditions to proceed.")),
       );
       return;
     }
@@ -71,12 +74,18 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        // Store the token securely.
+        final storage = const FlutterSecureStorage();
+        await storage.write(key: 'auth_token', value: data['token']);
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Registration successful!")),
         );
-        Navigator.pushReplacementNamed(context, "/login_success_page");
+        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
       } else {
-        final errorMessage = jsonDecode(response.body)['error'] ?? "An error occurred.";
+        final errorMessage =
+            jsonDecode(response.body)['error'] ?? "An error occurred.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error: $errorMessage")),
         );
@@ -234,7 +243,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     Icon(Icons.check_box_outline_blank, size: 16),
                     SizedBox(width: 8),
                     Expanded(
-                      child: Text("1 number or special character (example: # ? ! &)"),
+                      child: Text(
+                          "1 number or special character (example: # ? ! &)"),
                     )
                   ],
                 ),
@@ -373,7 +383,8 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           const SizedBox(height: 24),
           CheckboxListTile(
-            title: const Text("I don't want to receive marketing from MyLessons"),
+            title:
+                const Text("I don't want to receive marketing from MyLessons"),
             value: _dontReceiveMarketing,
             onChanged: (bool? value) {
               setState(() {
@@ -382,7 +393,8 @@ class _RegisterPageState extends State<RegisterPage> {
             },
           ),
           CheckboxListTile(
-            title: const Text("I agree with the terms and conditions of MyLessons"),
+            title: const Text(
+                "I agree with the terms and conditions of MyLessons"),
             value: _agreeTerms,
             onChanged: (bool? value) {
               setState(() {
