@@ -31,14 +31,36 @@ def get_lessons_data(user, date_lookup, is_done_flag):
     :return: Combined list of private and group lessons data.
     """
     today = now().date()
-    student_ids = user.students.values_list('id', flat=True)
     
-    # Adjust the private class filters with the given parameters.
-    lessons = Lesson.objects.filter(
-        students__id__in=student_ids,
-        is_done=is_done_flag,
-        **date_lookup  # expects key like date__gte or date__lte with value today
-    ).order_by('date', 'start_time').distinct()
+    if user.current_role == "Parent":
+        student_ids = user.students.values_list('id', flat=True)
+        
+        # Adjust the private class filters with the given parameters.
+        lessons = Lesson.objects.filter(
+            students__id__in=student_ids,
+            is_done=is_done_flag,
+            **date_lookup  # expects key like date__gte or date__lte with value today
+        ).order_by('date', 'start_time').distinct()
+        
+    elif user.current_role == "Instructor":
+        
+        # Adjust the private class filters with the given parameters.
+        lessons = Lesson.objects.filter(
+            instructors__id__in=[user.instructor_profile.id],
+            is_done=is_done_flag,
+            **date_lookup  # expects key like date__gte or date__lte with value today
+        ).order_by('date', 'start_time').distinct()
+        
+    elif user.current_role == "Admin":
+        if not user.current_school_id:
+            lessons = []
+        else:
+            # Adjust the private class filters with the given parameters.
+            lessons = Lesson.objects.filter(
+                school_id=user.current_school_id,
+                is_done=is_done_flag,
+                **date_lookup  # expects key like date__gte or date__lte with value today
+            ).order_by('date', 'start_time').distinct()
 
     # Process private lessons data.
     lessons_data = [
@@ -56,6 +78,59 @@ def get_lessons_data(user, date_lookup, is_done_flag):
         for lesson in lessons
     ]
     return lessons_data
+
+def get_packs_data(user, is_done_flag):
+    """
+    Helper function to get packs data.
+    
+    :param user: The current authenticated user.
+    :param date_lookup: A dict with the lookup to apply on dates 
+                        (e.g. {'date__gte': today} for active lessons)
+    :param is_done_flag: Boolean indicating if lessons are completed.
+                          Used in the filter for Pack.
+    :return: Combined list of private and group packs data.
+    """
+    
+    today = now().date()
+    user = user  # Get authenticated user
+    current_role = user.current_role
+
+    if current_role == "Parent":
+        # Fetch active packs
+        student_ids = user.students.values_list('id', flat=True)
+        packs = Pack.objects.filter(students__id__in=student_ids,
+                                    is_done=is_done_flag,
+                                    ).order_by("-date_time").distinct()
+    elif current_role == "Instructor":
+        packs = Pack.objects.filter(lessons__instructors__in=[user.instructor_profile],
+                                    is_done=is_done_flag,
+                                    ).order_by("-date_time").distinct() # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
+    elif current_role == "Admin":
+        packs = Pack.objects.filter(school__in=user.school_admins.all(),
+                                    is_done=is_done_flag,
+                                    ).order_by("-date_time").distinct()
+    else:
+        packs = []
+
+    packs_data = [
+        {
+            "pack_id": pack.id,
+            "lessons": [
+                            {
+                                "lesson_id" : str(lesson.id),
+                                "lesson_str": str(lesson)
+                            }
+                            for lesson in pack.lessons.all()
+                        ],
+            "lessons_remaining": pack.number_of_classes_left,
+            "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
+            "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
+            "students_name": pack.get_students_name(),
+            "type": pack.type
+        }
+        for pack in packs
+    ]
+    return packs_data
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -89,39 +164,21 @@ def last_lessons(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def active_packs(request):
-    today = now().date()
-    user = request.user  # Get authenticated user
-    current_role = user.current_role
+    # For upcoming lessons, filter for date >= today and is_done False.
+    packs_data = get_packs_data(
+        user=request.user,
+        is_done_flag=False
+    )
+    return Response(packs_data)
 
-    if current_role == "Parent":
-        # Fetch active packs
-        student_ids = user.students.values_list('id', flat=True)
-        packs = Pack.objects.filter(students__id__in=student_ids, is_done=False).order_by("-date_time").distinct()
-    elif current_role == "Instructor":
-        packs = Pack.objects.filter(lessons__instructors__in=[user.instructor_profile], is_done=False).order_by("-date_time").distinct() # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
-    elif current_role == "Admin":
-        packs = Pack.objects.filter(school__in=user.school_admins.all(), is_done=False).order_by("-date_time").distinct()
-    else:
-        packs = []
-
-    packs_data = [
-        {
-            "pack_id": pack.id,
-            "lessons": [
-                            {
-                                "lesson_id" : str(lesson.id),
-                                "lesson_str": str(lesson)
-                            }
-                            for lesson in pack.lessons.all()
-                        ],
-            "lessons_remaining": pack.number_of_classes_left,
-            "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
-            "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
-            "students_name": pack.get_students_name(),
-            "type": pack.type
-        }
-        for pack in packs
-    ]
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def last_packs(request):
+    # For upcoming lessons, filter for date >= today and is_done False.
+    packs_data = get_packs_data(
+        user=request.user,
+        is_done_flag=True
+    )
     return Response(packs_data)
 
 @api_view(['GET'])
@@ -208,7 +265,7 @@ def lesson_details(request, id):
             "school_name": str(lesson.school) if lesson.school else "Unknown",
             "school_id": lesson.school.id if lesson.school else "Unknown",
             "pack_id": lesson.pack.id if lesson.pack else "Unknown",
-            "sport_name": lesson.sport.name if lesson.sport else "Unknown",
+            "subject": lesson.sport.name if lesson.sport else "Unknown",
         }
     return Response(data)
 
@@ -646,7 +703,6 @@ def update_lesson_extras(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_lesson_completion(request):
-    # TODO dev flutter and test
     """
     Toggle the completion status of a lesson.
     Calls lesson.was_done() or lesson.was_undone() based on current status.
@@ -822,19 +878,15 @@ def edit_lesson_location(request):
     action = request.data.get('action')
     
     if action == 'add':
-        new_location = request.data.get('new_location')
-        if new_location:
-            location_name = request.get("location_name")
-            location_address = request.get("location_address")
-            if not location_name:
-                return Response({"error": "É necessário fornecer location_name"}, status=400)
-            if not location_address:
-                return Response({"error": "É necessário fornecer location_address"}, status=400)
-            location = Location.objects.create(name=location_name, address=location_address)
-            lesson.school.locations.add(location)
-        else:
-            location_id = request.data.get('location_id')
-            location = get_object_or_404(Location, id=location_id)
+        
+        location_name = request.data.get("location_name")
+        location_address = request.data.get("location_address")
+        if not location_name:
+            return Response({"error": "É necessário fornecer location_name"}, status=400)
+        if not location_address:
+            return Response({"error": "É necessário fornecer location_address"}, status=400)
+        location = Location.objects.create(name=location_name, address=location_address)
+        lesson.school.locations.add(location)
         lesson.location = location
         status_msg = "location set"
         

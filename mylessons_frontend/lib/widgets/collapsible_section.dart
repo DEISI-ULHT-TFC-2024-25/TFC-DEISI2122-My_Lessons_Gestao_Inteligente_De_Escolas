@@ -13,9 +13,9 @@ class CollapsibleSection extends StatelessWidget {
     return ExpansionTile(
       title: Text(
         title,
-        style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
+        style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange),
       ),
-      initiallyExpanded: true,
+      initiallyExpanded: false,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
         side: BorderSide.none,

@@ -6,7 +6,7 @@ import '../services/api_service.dart';
 
 /// The main widget to display the Add Staff modal as a bottom sheet.
 class AddStaffModal extends StatefulWidget {
-  const AddStaffModal({Key? key}) : super(key: key);
+  const AddStaffModal({super.key});
 
   @override
   _AddStaffModalState createState() => _AddStaffModalState();

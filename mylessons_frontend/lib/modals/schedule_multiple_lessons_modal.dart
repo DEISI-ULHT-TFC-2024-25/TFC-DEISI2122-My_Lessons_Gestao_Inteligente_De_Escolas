@@ -13,10 +13,10 @@ class ScheduleMultipleLessonsModal extends StatefulWidget {
   final VoidCallback onScheduleConfirmed;
 
   const ScheduleMultipleLessonsModal({
-    Key? key,
+    super.key,
     required this.lessons,
     required this.onScheduleConfirmed,
-  }) : super(key: key);
+  });
 
   @override
   _ScheduleMultipleLessonsModalState createState() =>
@@ -273,7 +273,7 @@ class _ScheduleMultipleLessonsModalState
         Text('Select a Date',
             style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Container(
+        SizedBox(
           height: 300,
           child: SfDateRangePicker(
             view: DateRangePickerView.month,

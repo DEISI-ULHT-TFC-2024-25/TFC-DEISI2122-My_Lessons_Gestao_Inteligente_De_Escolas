@@ -1,5 +1,7 @@
 import json
 from django.shortcuts import render, get_object_or_404
+from locations.models import Location
+from sports.models import Sport
 from payments.models import Payment
 from users.models import Instructor, Monitor, UserAccount
 from .models import School
@@ -732,3 +734,20 @@ def add_staff_view(request):
         "detail": f"User {email} added to roles: {roles} in school {school.name}"
     }, status=200)
     
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_subjects(request):
+    """
+    Returns a list of all Sport objects (subjects) as dictionaries.
+    """
+    subjects = Sport.objects.all().values()
+    return Response(list(subjects), status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_locations(request):
+    """
+    Returns a list of all Location objects as dictionaries.
+    """
+    locations = Location.objects.all().values()
+    return Response(list(locations), status=status.HTTP_200_OK)
