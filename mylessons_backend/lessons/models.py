@@ -361,7 +361,7 @@ class Lesson(models.Model):
         """
         total_students = self.students.count() # TODO (might be a problem if they dont show up) + (self.number_of_extra_students or 0)
         try:
-            pricing_list = instructor.user.payment_types[self.school.name]["instructor"][f"{self.type} lesson"]["fixed"]
+            pricing_list = instructor.user.payment_types[self.school.name]["instructor"][f"{self.type}"]["fixed"]
         except (KeyError, TypeError):
             return None
         for pricing in pricing_list:

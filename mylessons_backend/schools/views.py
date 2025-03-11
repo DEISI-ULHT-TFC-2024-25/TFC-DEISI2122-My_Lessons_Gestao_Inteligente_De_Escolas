@@ -1,7 +1,7 @@
 import json
 from django.shortcuts import render, get_object_or_404
 from payments.models import Payment
-from users.models import Instructor
+from users.models import Instructor, Monitor, UserAccount
 from .models import School
 from datetime import datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
@@ -102,27 +102,99 @@ def all_schools(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def school_details_view(request):
-    
-    # TODO TEST
     user = request.user
-    school = School.objects.get(pk = user.current_school_id)
-    if not school:
+    try:
+        school = School.objects.get(pk=user.current_school_id)
+    except School.DoesNotExist:
         return Response({
             'success': True,
             'school_id': None,
             'school_name': "",
             'services': {},
             'payment_types': {},
-            'currency': ""
+            'staff': [],
+            'currency': "",
+            'locations': [],
+            'subjects': [],
+            'equipments': [],
         })
+
+    # Use a dict to merge staff by user id
+    staff_dict = {}
+
+    # Process Admins
+    for admin in school.admins.all():
+        # assuming admin is a UserAccount instance
+        u = admin
+        if u.id not in staff_dict:
+            staff_dict[u.id] = {
+                'user_id': u.id,
+                'user_name': f"{u.first_name} {u.last_name}",
+                'roles': [],
+                'payment_types': u.payment_types[school.name] if school.name in u.payment_types else {},  # full payment_types dict
+            }
+        staff_dict[u.id]['roles'].append("Admin")
+
+    # Process Instructors (access user via instructor.user)
+    for instructor in school.instructors.all():
+        u = instructor.user
+        if u.id not in staff_dict:
+            staff_dict[u.id] = {
+                'user_id': u.id,
+                'user_name': f"{u.first_name} {u.last_name}",
+                'roles': [],
+                'payment_types': u.payment_types[school.name],
+            }
+        staff_dict[u.id]['roles'].append("Instructor")
+
+    # Process Monitors (access user via monitor.user)
+    for monitor in school.monitors.all():
+        u = monitor.user
+        if u.id not in staff_dict:
+            staff_dict[u.id] = {
+                'user_id': u.id,
+                'user_name': f"{u.first_name} {u.last_name}",
+                'roles': [],
+                'payment_types': u.payment_types[school.name],
+            }
+        staff_dict[u.id]['roles'].append("Monitor")
+
+    staff_list = list(staff_dict.values())
+
     return Response({
         'success': True,
         'school_id': school.id,
         'school_name': school.name,
         'services': school.services,
         'payment_types': school.payment_types,
+        'staff': staff_list,
         'currency': school.currency,
+        'locations': [
+            {
+                'location_id': location.id,
+                'location_name': location.name,
+                'address': location.address or "",
+            }
+            for location in school.locations.all()
+        ],
+        'subjects': [
+            {
+                'subject_id': subject.id,
+                'subject_name': subject.name,
+            }
+            for subject in school.sports.all()
+        ],
+        'equipment': [
+            {
+                'equipment_id': equipment.id,
+                'equipment_name': equipment.name,
+                'location': equipment.location or "",
+            }
+            for equipment in school.equipments.all()
+        ]
     })
+
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -144,6 +216,7 @@ def update_payment_type_view(request):
     
     school_id = data.get('school_id')
     school_name = data.get('school_name')
+    user_id = data.get('user_id')
     user = request.user
     logger.debug("User: %s", user)
     
@@ -172,20 +245,42 @@ def update_payment_type_view(request):
         logger.error("Missing key_path or new_value. key_path=%s, new_value=%s", key_path, new_value)
         return JsonResponse({'success': False, 'error': 'key_path and new_value must be provided'}, status=400)
     
+    user_obj = None
+    if user_id:
+        try:
+            user_obj = UserAccount.objects.get(id=user_id)  # or your user model
+        except UserAccount.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'User not found'}, status=404)
+        
     try:
-        result = school.update_payment_type_value(key_path, new_value, user_obj=None)
+        result = school.update_payment_type_value(key_path, new_value, user_obj=user_obj)
         logger.debug("update_payment_type_value result: %s", result)
     except Exception as e:
         logger.exception("Error during update_payment_type_value:")
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
     
-    logger.debug("Updated payment_types: %s", school.payment_types)
-    return JsonResponse({
-        'success': True,
-        'school_id': school.id,
-        'school_name': school.name,
-        'payment_types': school.payment_types
-    })
+    logger.debug("Updated payment_types:\nschool: %s", school.payment_types)
+    
+    # Return updated data
+    if user_obj:
+        logger.debug("Updated payment_types:\nschool: %s", user_obj.payment_types)
+        # If we updated a user’s payment_types
+        return JsonResponse({
+            'success': True,
+            'school_id': school.id,
+            'school_name': school.name,
+            'user_id': user_obj.id,
+            # user’s payment_types for this school
+            'payment_types': user_obj.payment_types.get(school.name, {})
+        })
+    else:
+        # If we updated the school’s default payment_types
+        return JsonResponse({
+            'success': True,
+            'school_id': school.id,
+            'school_name': school.name,
+            'payment_types': school.payment_types
+        })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -246,6 +341,56 @@ def update_pack_price_view(request):
         'school_id': school.id,
         'school_name': school.name,
         'pack_prices': school.pack_prices
+    })
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def delete_payment_type_entry_view(request):
+    try:
+        data = json.loads(request.body)
+        logger.debug("Received delete payload: %s", data)
+    except json.JSONDecodeError as e:
+        logger.error("JSON decode error: %s", str(e))
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    school_id = data.get('school_id')
+    school_name = data.get('school_name')
+    key_path = data.get('key_path')
+    entry_to_delete = data.get('entry')
+    user_id = data.get('user_id')
+    
+    if not school_id or not key_path or not entry_to_delete:
+        return JsonResponse({'success': False, 'error': 'Missing required parameters'}, status=400)
+    
+    # Fetch school by id.
+    try:
+        school = School.objects.get(id=school_id)
+    except School.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'School not found'}, status=404)
+    
+    # If user_id is provided, fetch the user.
+    user_obj = None
+    if user_id:
+        try:
+            user_obj = UserAccount.objects.get(id=user_id)
+        except UserAccount.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'User not found'}, status=404)
+    
+    try:
+        result = school.delete_payment_type_value(key_path, entry_to_delete, user_obj=user_obj)
+        logger.debug("delete_payment_type_value result: %s", result)
+    except Exception as e:
+        logger.exception("Error during delete_payment_type_value:")
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    # Return updated payment types.
+    if user_obj:
+        updated = user_obj.payment_types.get(school.name, {})
+    else:
+        updated = school.payment_types
+    return JsonResponse({
+        'success': True,
+        'payment_types': updated
     })
 
 
@@ -492,4 +637,98 @@ def create_school(request):
         {'success': True, 'school': school_data},
         status=status.HTTP_201_CREATED
     )
+    
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def check_user_view(request):
+    """
+    POST data: { "email": "somebody@example.com" }
+
+    Returns the user's email, first_name, last_name if found.
+    """
+    email = request.data.get("email", "").strip()
+    if not email:
+        return Response({
+            "success": False,
+            "detail": "Email is required."
+        }, status=400)
+
+    try:
+        user = UserAccount.objects.get(email=email)
+        return Response({
+            "success": True,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name
+        }, status=200)
+    except UserAccount.DoesNotExist:
+        return Response({
+            "success": False,
+            "detail": "User not found."
+        }, status=404)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def add_staff_view(request):
+    """
+    POST data:
+    {
+      "email": "somebody@example.com",
+      "roles": ["Admin", "Instructor", "Monitor"]
+    }
+
+    Adds the user to the given roles in the current school.
+    """
+    email = request.data.get("email", "").strip()
+    roles = request.data.get("roles", [])
+
+    if not email:
+        return Response({
+            "success": False,
+            "detail": "Email is required."
+        }, status=400)
+
+    # Attempt to fetch the user by email
+    try:
+        user = UserAccount.objects.get(email=email)
+    except UserAccount.DoesNotExist:
+        return Response({
+            "success": False,
+            "detail": "User not found."
+        }, status=404)
+
+    # Get the school associated with the current user
+    try:
+        school = School.objects.get(pk=request.user.current_school_id)
+    except School.DoesNotExist:
+        return Response({
+            "success": False,
+            "detail": "Current school not found for this user."
+        }, status=404)
+
+    # For each role, add the user to the appropriate relationship
+    for role in roles:
+        lower_role = role.lower()
+        if lower_role == "admin":
+            # School has a ManyToManyField or similar for admins
+            school.admins.add(user)
+
+        elif lower_role == "instructor":
+            # Usually we have an Instructor model that references UserAccount
+            instructor, _ = Instructor.objects.get_or_create(user=user)
+            school.instructors.add(instructor)
+
+        elif lower_role == "monitor":
+            monitor, _ = Monitor.objects.get_or_create(user=user)
+            school.monitors.add(monitor)
+        # else ignore any unknown roles, or handle them as you see fit
+        
+        school.add_payment_types_to_user(user)
+
+    return Response({
+        "success": True,
+        "detail": f"User {email} added to roles: {roles} in school {school.name}"
+    }, status=200)
     
