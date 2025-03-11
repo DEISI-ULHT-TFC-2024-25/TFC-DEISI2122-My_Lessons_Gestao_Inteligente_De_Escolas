@@ -8,10 +8,10 @@ class PackDetailsModal extends StatelessWidget {
   final String currentRole;
 
   const PackDetailsModal({
-    Key? key,
+    super.key,
     required this.pack,
     required this.currentRole,
-  }) : super(key: key);
+  });
 
   // Fetch pack details from API.
   Future<Map<String, dynamic>?> _fetchPackDetails(int packId) =>
@@ -227,7 +227,7 @@ class PackDetailsModal extends StatelessWidget {
                     Widget buildCard(Map<String, dynamic> item, {bool withAction = false}) {
                       final String label = item['label'];
                       final String value = item['value'].toString();
-                      return Container(
+                      return SizedBox(
                         width: itemWidth,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

@@ -12,8 +12,7 @@ import '../modals/service_modal.dart';
 
 class SchoolSetupPage extends StatefulWidget {
   final bool isCreatingSchool;
-  const SchoolSetupPage({Key? key, this.isCreatingSchool = false})
-      : super(key: key);
+  const SchoolSetupPage({super.key, this.isCreatingSchool = false});
 
   @override
   _SchoolSetupPageState createState() => _SchoolSetupPageState();

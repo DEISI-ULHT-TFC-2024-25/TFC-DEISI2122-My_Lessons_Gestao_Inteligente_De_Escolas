@@ -4,8 +4,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-//const String baseUrl = 'https://mylessons.pythonanywhere.com';
-const String baseUrl = 'http://127.0.0.1:8000';
+const String baseUrl = 'https://mylessons.pythonanywhere.com';
+//const String baseUrl = 'http://127.0.0.1:8000';
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
@@ -84,7 +84,7 @@ Future<List<Map<String, dynamic>>> fetchSchools() async {
   final headers = await getAuthHeaders();
   final response = await http.get(url, headers: headers);
   if (response.statusCode == 200) {
-    final List<dynamic> data = json.decode(response.body);
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data.map<Map<String, dynamic>>((jsonSchool) {
       return {
         'name': (jsonSchool['school_name'] ?? '').toString(),

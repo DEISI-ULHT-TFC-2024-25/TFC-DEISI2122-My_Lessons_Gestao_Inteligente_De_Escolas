@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import add_pack_payment, edit_lesson_instructors, edit_lesson_location, edit_lesson_students, edit_lesson_subject, edit_pack_instructors, edit_pack_students, edit_pack_subject, pay_pack_debt, toggle_lesson_completion, upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, available_lesson_times, can_still_reschedule, schedule_multiple_lessons, update_lesson_extras
+from .views import add_pack_payment, edit_lesson_instructors, edit_lesson_location, edit_lesson_students, edit_lesson_subject, edit_pack_instructors, edit_pack_students, edit_pack_subject, last_packs, pay_pack_debt, toggle_lesson_completion, upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, available_lesson_times, can_still_reschedule, schedule_multiple_lessons, update_lesson_extras
 
 urlpatterns = [
     path('upcoming_lessons/', upcoming_lessons, name='upcoming_lessons'),
@@ -7,6 +7,7 @@ urlpatterns = [
     path('schedule_private_lesson/', schedule_private_lesson, name='schedule_private_lesson'),
     path('schedule_multiple_lessons/', schedule_multiple_lessons, name='schedule_multiple_lessons'),
     path('active_packs/', active_packs, name='active_packs'),
+    path('last_packs/', last_packs, name='last_packs'),
     path('pack_details/<int:id>/', pack_details, name='pack_details'),
     path('lesson_details/<int:id>/', lesson_details, name='lesson_details'),
     path('todays_lessons/', todays_lessons, name='todays_lessons'),

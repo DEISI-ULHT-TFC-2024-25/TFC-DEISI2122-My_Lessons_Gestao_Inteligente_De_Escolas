@@ -3,18 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
+import 'subject_modal.dart'; // Make sure this file exports SubjectModal
+import 'location_modal.dart'; // Make sure this file exports LocationModal
 
 class LessonDetailsModal extends StatefulWidget {
   final dynamic lesson;
   final String currentRole;
-  final Future<void> Function() fetchData; // Callback to refresh the whole home page
+  final Future<void> Function()
+      fetchData; // Callback to refresh the whole home page
 
   const LessonDetailsModal({
-    Key? key,
+    super.key,
     required this.lesson,
     required this.currentRole,
     required this.fetchData,
-  }) : super(key: key);
+  });
 
   @override
   _LessonDetailsModalState createState() => _LessonDetailsModalState();
@@ -117,9 +120,9 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
         final type = details['type'] ?? '';
         final instructors = details['instructors_name'] ?? '';
         final school = details['school_name'] ?? '';
-        final location = details['location'] ?? '';
-        final activity = details['sport'] ?? '';
-        final isDone = details['is_done'] ?? null;
+        final location = details['location_name'] ?? '';
+        final activity = details['subject'] ?? '';
+        final isDone = details['is_done'];
 
         List<Map<String, dynamic>> gridItems = [];
         Map<String, IconData> leftIconMapping = {};
@@ -256,19 +259,19 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     double spacing = 8.0;
+                    // Two cards per row.
                     double itemWidth = (constraints.maxWidth - spacing) / 2;
                     Widget buildCard(Map<String, dynamic> item,
                         {bool withAction = false}) {
                       final String label = item['label'];
                       final String value = item['value'].toString();
-                      return Container(
+                      return SizedBox(
                         width: itemWidth,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ConstrainedBox(
-                              constraints:
-                                  const BoxConstraints(minHeight: 80),
+                              constraints: const BoxConstraints(minHeight: 80),
                               child: Card(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -316,30 +319,90 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                           ),
                                           onPressed: () async {
                                             if (label == "Is Done") {
-                                              final result = await toggleLessonCompletion(
-                                                  lessonId);
+                                              final result =
+                                                  await toggleLessonCompletion(
+                                                      lessonId);
                                               if (result != null &&
-                                                  result.containsKey("status")) {
+                                                  result
+                                                      .containsKey("status")) {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   SnackBar(
-                                                      content: Text(result[
-                                                          "status"])),
+                                                      content: Text(
+                                                          result["status"])),
                                                 );
                                                 // Refresh the entire home page...
                                                 await widget.fetchData();
                                                 // ...and refresh the modal's data.
                                                 _refreshLessonDetails();
                                               } else {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (context) {
+                                                    return AlertDialog(
+                                                      content: const Text(
+                                                          "To complete a lesson make sure the schedule has passed"),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                  context),
+                                                          child:
+                                                              const Text("OK"),
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                );
+                                              }
+                                            } else if (label == "Subject") {
+                                              bool? updated =
+                                                  await showModalBottomSheet<
+                                                      bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape:
+                                                    const RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.vertical(
+                                                          top: Radius.circular(
+                                                              16)),
+                                                ),
+                                                builder: (context) =>
+                                                    SubjectModal(
+                                                        lessonId: lessonId),
+                                              );
+                                              if (updated == true) {
+                                                await widget.fetchData();
+                                                _refreshLessonDetails();
+                                              } else {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   const SnackBar(
-                                                      content: Text(
-                                                          "Error toggling completion")),
+                                                      content: Text("Error")),
                                                 );
                                               }
-                                            } else {
-                                              debugPrint("Action pressed for $label");
+                                            } else if (label == "Location") {
+                                              bool? updated =
+                                                  await showModalBottomSheet<
+                                                      bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape:
+                                                    const RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.vertical(
+                                                          top: Radius.circular(
+                                                              16)),
+                                                ),
+                                                builder: (context) =>
+                                                    LocationModal(
+                                                        lessonId: lessonId),
+                                              );
+                                              if (updated == true) {
+                                                await widget.fetchData();
+                                                _refreshLessonDetails();
+                                              }
                                             }
                                           },
                                         ),

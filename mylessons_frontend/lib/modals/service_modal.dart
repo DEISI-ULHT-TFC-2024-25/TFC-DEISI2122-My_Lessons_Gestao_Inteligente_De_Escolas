@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:currency_picker/currency_picker.dart' as CurrencyPicker;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 import '../services/service_service.dart';
