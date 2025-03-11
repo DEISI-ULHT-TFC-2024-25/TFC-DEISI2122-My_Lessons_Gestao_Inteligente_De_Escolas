@@ -309,34 +309,22 @@ class School(models.Model):
     def update_payment_type_value(self, key_path, new_value, user_obj=None):
         """
         Updates a single nested field in the payment_types structure.
-
-        For simple dictionary fields (e.g., "commission" or "fixed monthly rate"), the key_path is used as before.
-        However, if the target field is the "fixed" pricing list, then new_value is expected to be a dictionary 
-        with keys: "duration", "min_students", "max_students", and "price". The method will search the list for 
-        a pricing rule matching the provided criteria. If found, it updates the rule’s "price" with new_value["price"].
-        If no matching rule exists, it appends new_value to the list.
-
-        Args:
-            key_path (str): A string representing the nested path.
-                For example: "instructor[private lesson][fixed]" for the fixed pricing list.
-            new_value: The new value to assign. For the "fixed" field, this must be a dict with the required keys.
-            user_obj (optional): If provided, update that user's payment_types for this school.
-                            Otherwise, update the school's default payment_types.
+        If user_obj is provided, update that user's payment_types for this school.
+        Otherwise, update the school's default payment_types.
         """
         logger.debug("update_payment_type_value called with key_path: %s and new_value: %s", key_path, new_value)
-        # Parse the key_path into parts. For example, "instructor[private lesson][fixed]" -> 
-        # ["instructor", "private lesson", "fixed"]
         keys = re.findall(r'\w[\w\s-]*', key_path)
         logger.debug("Parsed keys: %s", keys)
-        
-        # Determine the target: either user-specific (keyed by school name) or the school's own payment_types.
+
         if user_obj:
+            # Ensure user_obj.payment_types is a dict.
             if not user_obj.payment_types or not isinstance(user_obj.payment_types, dict):
                 logger.debug("Initializing user_obj.payment_types as an empty dict")
                 user_obj.payment_types = {}
-            if self.name not in user_obj.payment_types or not user_obj.payment_types[self.name]:
-                logger.debug("Copying default payment_types for school %s into user_obj.payment_types", self.name)
-                user_obj.payment_types[self.name] = copy.deepcopy(self.payment_types) if self.payment_types else {}
+            # Only initialize if it doesn't exist yet.
+            if self.name not in user_obj.payment_types:
+                logger.debug("Initializing user_obj.payment_types[%s] as an empty dict", self.name)
+                user_obj.payment_types[self.name] = {}
             target = user_obj.payment_types[self.name]
             logger.debug("User-specific target structure before update: %s", target)
         else:
@@ -345,7 +333,7 @@ class School(models.Model):
                 self.payment_types = {}
             target = self.payment_types
             logger.debug("School default target structure before update: %s", target)
-        
+
         # Traverse the nested structure for all keys except the last.
         current = target
         for key in keys[:-1]:
@@ -355,43 +343,50 @@ class School(models.Model):
                 current[key] = {}
             current = current[key]
         logger.debug("Structure at final level before update: %s", current)
-        
+
         last_key = keys[-1]
-        
-        # If the current node for last_key is a list, we assume it is the "fixed" pricing list.
+
+        # Handle fixed pricing updates if the target node is a list.
         if isinstance(current.get(last_key), list):
-            logger.debug("Target for key '%s' is a list; expecting fixed pricing update.", last_key)
-            # In this case, new_value must be a dict with required keys.
-            if not isinstance(new_value, dict):
-                error_msg = "For updating a list field (fixed pricing), new_value must be a dictionary."
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+            logger.debug("Target for key '%s' is a list; processing fixed pricing update.", last_key)
             required_keys = {"duration", "min_students", "max_students", "price"}
-            if not required_keys.issubset(new_value.keys()):
-                error_msg = f"new_value must contain keys: {required_keys}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-            updated = False
-            for rule in current[last_key]:
-                logger.debug("Checking rule: %s", rule)
-                if (rule.get("duration") == new_value["duration"] and
-                    rule.get("min_students") == new_value["min_students"] and
-                    rule.get("max_students") == new_value["max_students"]):
-                    logger.debug("Matching rule found. Updating price from %s to %s", rule.get("price"), new_value["price"])
-                    rule["price"] = new_value["price"]
-                    updated = True
-                    break
-            if not updated:
-                logger.debug("No matching rule found. Appending new_value: %s", new_value)
-                current[last_key].append(new_value)
+            if isinstance(new_value, list):
+                for pricing in new_value:
+                    if not isinstance(pricing, dict):
+                        raise ValueError("Each fixed pricing entry must be a dictionary.")
+                    if not required_keys.issubset(pricing.keys()):
+                        raise ValueError(f"Each fixed pricing entry must contain keys: {required_keys}")
+                    updated = False
+                    for rule in current[last_key]:
+                        if (rule.get("duration") == pricing["duration"] and 
+                            rule.get("min_students") == pricing["min_students"] and 
+                            rule.get("max_students") == pricing["max_students"]):
+                            rule["price"] = pricing["price"]
+                            updated = True
+                            break
+                    if not updated:
+                        current[last_key].append(pricing)
+            elif isinstance(new_value, dict):
+                if not required_keys.issubset(new_value.keys()):
+                    raise ValueError(f"new_value must contain keys: {required_keys}")
+                updated = False
+                for rule in current[last_key]:
+                    if (rule.get("duration") == new_value["duration"] and 
+                        rule.get("min_students") == new_value["min_students"] and 
+                        rule.get("max_students") == new_value["max_students"]):
+                        rule["price"] = new_value["price"]
+                        updated = True
+                        break
+                if not updated:
+                    current[last_key].append(new_value)
+            else:
+                raise ValueError("For updating a list field (fixed pricing), new_value must be a dict or list of dicts.")
         else:
-            # Otherwise, simply update the field.
             logger.debug("Updating key '%s' from %s to %s", last_key, current.get(last_key), new_value)
             current[last_key] = new_value
 
         logger.debug("Final updated target structure: %s", target)
-        
-        # Save the changes.
+
         if user_obj:
             logger.debug("Saving user_obj.payment_types")
             user_obj.save(update_fields=["payment_types"])
@@ -400,6 +395,60 @@ class School(models.Model):
             self.save(update_fields=["payment_types"])
         logger.debug("Update successful.")
         return True
+
+    def delete_payment_type_value(self, key_path, entry_to_delete, user_obj=None):
+        """
+        Deletes a fixed pricing entry from the payment_types structure.
+        The payload should specify a key_path (e.g., "instructor[private][fixed]") and
+        an entry (a dict with keys like 'duration', 'min_students', 'max_students', 'price').
+        """
+        logger.debug("delete_payment_type_value called with key_path: %s and entry: %s", key_path, entry_to_delete)
+        keys = re.findall(r'\w[\w\s-]*', key_path)
+        logger.debug("Parsed keys: %s", keys)
+        
+        if user_obj:
+            if not user_obj.payment_types or not isinstance(user_obj.payment_types, dict):
+                user_obj.payment_types = {}
+            if self.name not in user_obj.payment_types:
+                user_obj.payment_types[self.name] = {}
+            target = user_obj.payment_types[self.name]
+        else:
+            if not self.payment_types or not isinstance(self.payment_types, dict):
+                self.payment_types = {}
+            target = self.payment_types
+        
+        current = target
+        for key in keys[:-1]:
+            if key not in current or not isinstance(current[key], (dict, list)):
+                current[key] = {}
+            current = current[key]
+        
+        last_key = keys[-1]
+        if isinstance(current.get(last_key), list):
+            required_keys = {"duration", "min_students", "max_students", "price"}
+            # Verify the entry contains the required keys.
+            if not required_keys.issubset(entry_to_delete.keys()):
+                raise ValueError(f"Entry must contain keys: {required_keys}")
+            # Remove matching entry.
+            original_length = len(current[last_key])
+            current[last_key] = [
+                rule for rule in current[last_key]
+                if not (rule.get("duration") == entry_to_delete["duration"] and
+                        rule.get("min_students") == entry_to_delete["min_students"] and
+                        rule.get("max_students") == entry_to_delete["max_students"] and
+                        rule.get("price") == entry_to_delete["price"])
+            ]
+            if len(current[last_key]) == original_length:
+                raise ValueError("No matching fixed pricing entry found to delete.")
+        else:
+            raise ValueError("Target field is not a list. Cannot delete entry.")
+        
+        if user_obj:
+            user_obj.save(update_fields=["payment_types"])
+        else:
+            self.save(update_fields=["payment_types"])
+        return True
+
     
     def get_unpaid_camp_orders(self):
         return list(self.camp_orders.filter(is_fully_paid=False))
@@ -578,21 +627,27 @@ class School(models.Model):
         }
         return templates.get(key, default_templates.get(key))
     
+    def add_payment_types_to_user(self, user):
+        # Ensure the instructor has a dictionary for payment_types.
+        if not user.payment_types or not isinstance(user.payment_types, dict):
+            user.payment_types = {}
+        
+        user.payment_types[self.name] = copy.deepcopy(self.payment_types)
+        user.save(update_fields=['payment_types'])
+            
+    def remove_payment_types_from_user(self, user):
+        # Remove the payment types entry for this school if it exists
+        if user.payment_types and isinstance(user.payment_types, dict):
+            if self.name in user.payment_types:
+                del user.payment_types[self.name]
+                user.save(update_fields=['payment_types'])
+    
     # Example: when adding an instructor, update the instructor's payment_types for this school.
     def add_instructor(self, instructor):
         if instructor and instructor not in self.instructors.all():
             self.instructors.add(instructor)
             user = instructor.user
-            
-            # Ensure the instructor has a dictionary for payment_types.
-            if not user.payment_types or not isinstance(user.payment_types, dict):
-                user.payment_types = {}
-            
-            # If there's no payment types entry for this school, initialize it
-            if self.name not in user.payment_types or not user.payment_types[self.name]:
-                user.payment_types[self.name] = copy.deepcopy(self.payment_types)
-                user.save(update_fields=['payment_types'])
-            
+            self.add_payment_types_to_user(user)
             return True
         return False
     
@@ -600,12 +655,7 @@ class School(models.Model):
         if instructor and instructor in self.instructors.all():
             self.instructors.remove(instructor)
             user = instructor.user
-            
-            # Remove the payment types entry for this school if it exists
-            if user.payment_types and isinstance(user.payment_types, dict):
-                if self.name in user.payment_types:
-                    del user.payment_types[self.name]
-                    user.save(update_fields=['payment_types'])
+            self.remove_payment_types_from_user(user)
                     
             return True
         return False

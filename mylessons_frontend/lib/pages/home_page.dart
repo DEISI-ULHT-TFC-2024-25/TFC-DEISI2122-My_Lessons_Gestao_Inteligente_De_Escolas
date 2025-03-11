@@ -242,7 +242,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _markNotificationsAsRead(List<int> notificationIds) =>
       markNotificationsAsRead(notificationIds);
 
-  void _showLessonDetailsModal(dynamic lesson) {
+  _showLessonDetailsModal(lesson) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -252,6 +252,7 @@ class _HomePageState extends State<HomePage> {
       builder: (context) => LessonDetailsModal(
         lesson: lesson,
         currentRole: currentRole,
+        fetchData: fetchData, // Pass the function reference, not fetchData()
       ),
     );
   }

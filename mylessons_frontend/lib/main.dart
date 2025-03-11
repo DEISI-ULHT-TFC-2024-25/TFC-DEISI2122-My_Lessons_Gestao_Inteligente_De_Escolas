@@ -19,7 +19,7 @@ Future<void> main() async {
 
   debugPaintSizeEnabled = false;
   runApp(
-      MyApp(),
+    MyApp(),
   );
 }
 
@@ -32,7 +32,15 @@ class MyApp extends StatelessWidget {
       title: 'MyLessons App',
       theme: ThemeData(
         primarySwatch: Colors.orange,
-
+        // Make checkboxes orange when checked:
+        checkboxTheme: CheckboxThemeData(
+          fillColor: WidgetStateProperty.all(Colors.orange),
+        ),
+        tabBarTheme: const TabBarTheme(
+          labelColor: Colors.orange,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.orange,
+        ),
         // ElevatedButtons
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(

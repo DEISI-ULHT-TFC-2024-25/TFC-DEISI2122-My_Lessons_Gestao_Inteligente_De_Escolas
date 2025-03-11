@@ -1,20 +1,60 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 
-class LessonDetailsModal extends StatelessWidget {
+class LessonDetailsModal extends StatefulWidget {
   final dynamic lesson;
   final String currentRole;
+  final Future<void> Function() fetchData; // Callback to refresh the whole home page
 
   const LessonDetailsModal({
     Key? key,
     required this.lesson,
     required this.currentRole,
+    required this.fetchData,
   }) : super(key: key);
 
-  // These API functions are now moved to services/api_service.dart.
-  Future<Map<String, dynamic>?> _fetchLessonDetails(int lessonId) =>
-      fetchLessonDetails(lessonId);
+  @override
+  _LessonDetailsModalState createState() => _LessonDetailsModalState();
+}
+
+class _LessonDetailsModalState extends State<LessonDetailsModal> {
+  late Future<Map<String, dynamic>?> _lessonDetailsFuture;
+  late final int lessonId;
+
+  @override
+  void initState() {
+    super.initState();
+    lessonId = widget.lesson['id'] ?? widget.lesson['lesson_id'];
+    _refreshLessonDetails();
+  }
+
+  /// Refresh the modal's lesson details.
+  void _refreshLessonDetails() {
+    setState(() {
+      _lessonDetailsFuture = fetchLessonDetails(lessonId);
+    });
+  }
+
+  Future<Map<String, dynamic>?> toggleLessonCompletion(int lessonId) async {
+    final url = Uri.parse("$baseUrl/api/lessons/toggle_lesson_completion/");
+    final response = await http.post(
+      url,
+      headers: await getAuthHeaders(),
+      body: jsonEncode({'lesson_id': lessonId}),
+    );
+    final decodedResponse = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode == 200) {
+      return decodedResponse;
+    } else {
+      return {
+        "error": "Failed to toggle completion",
+        "details": decodedResponse
+      };
+    }
+  }
 
   // Helper method to format keys.
   String _formatKey(String key) {
@@ -23,9 +63,8 @@ class LessonDetailsModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int lessonId = lesson['id'] ?? lesson['lesson_id'];
     return FutureBuilder<Map<String, dynamic>?>(
-      future: _fetchLessonDetails(lessonId),
+      future: _lessonDetailsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -52,8 +91,7 @@ class LessonDetailsModal extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child:
-                        const Text("Close", selectionColor: Colors.orange),
+                    child: const Text("Close", selectionColor: Colors.orange),
                   ),
                 ),
               ],
@@ -89,8 +127,7 @@ class LessonDetailsModal extends StatelessWidget {
         Map<String, IconData> actionIconMapping = {};
         Map<String, String> actionNoteMapping = {};
 
-        if (currentRole == "Parent") {
-          // Define grid items with simplified labels.
+        if (widget.currentRole == "Parent") {
           gridItems = [
             {'label': 'Date', 'value': date},
             {'label': 'Time', 'value': time},
@@ -117,7 +154,6 @@ class LessonDetailsModal extends StatelessWidget {
             'Location': Icons.location_on,
           };
 
-          // Only these labels get an action button and note.
           labelsWithAction = ['Extras', 'Instructors', 'School', 'Location'];
           actionIconMapping = {
             'Extras': Icons.edit,
@@ -131,8 +167,8 @@ class LessonDetailsModal extends StatelessWidget {
             'School': 'Contact school',
             'Location': 'Get directions',
           };
-        } else if (currentRole == "Instructor" || currentRole == "Admin") {
-          // Define grid items with simplified labels.
+        } else if (widget.currentRole == "Instructor" ||
+            widget.currentRole == "Admin") {
           gridItems = [
             {'label': 'Date', 'value': date},
             {'label': 'Time', 'value': time},
@@ -151,7 +187,7 @@ class LessonDetailsModal extends StatelessWidget {
             'Date': Icons.calendar_today,
             'Time': Icons.access_time,
             'Lesson': Icons.confirmation_number,
-            'is Done': Icons.check_box,
+            'Is Done': Icons.check_box,
             'Students': Icons.people,
             'Type': Icons.groups,
             'Subject': Icons.menu_book,
@@ -161,7 +197,6 @@ class LessonDetailsModal extends StatelessWidget {
             'Location': Icons.location_on,
           };
 
-          // Only these labels get an action button and note.
           labelsWithAction = [
             'Date',
             'Time',
@@ -198,12 +233,12 @@ class LessonDetailsModal extends StatelessWidget {
           };
         }
 
-        // Separate non-action and action cards.
-        final nonActionItems =
-            gridItems.where((item) => !labelsWithAction.contains(item['label'])).toList();
-        final actionItems =
-            gridItems.where((item) => labelsWithAction.contains(item['label'])).toList();
-        // Combine both groups with non-action items first.
+        final nonActionItems = gridItems
+            .where((item) => !labelsWithAction.contains(item['label']))
+            .toList();
+        final actionItems = gridItems
+            .where((item) => labelsWithAction.contains(item['label']))
+            .toList();
         final combinedItems = [...nonActionItems, ...actionItems];
 
         return Container(
@@ -214,17 +249,16 @@ class LessonDetailsModal extends StatelessWidget {
               children: [
                 Text(
                   "Lesson Details",
-                  style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.lato(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     double spacing = 8.0;
-                    // Two cards per row.
                     double itemWidth = (constraints.maxWidth - spacing) / 2;
-
-                    // Function to build a card.
-                    Widget buildCard(Map<String, dynamic> item, {bool withAction = false}) {
+                    Widget buildCard(Map<String, dynamic> item,
+                        {bool withAction = false}) {
                       final String label = item['label'];
                       final String value = item['value'].toString();
                       return Container(
@@ -233,7 +267,8 @@ class LessonDetailsModal extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 80),
+                              constraints:
+                                  const BoxConstraints(minHeight: 80),
                               child: Card(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -241,17 +276,21 @@ class LessonDetailsModal extends StatelessWidget {
                                 child: Padding(
                                   padding: const EdgeInsets.all(8.0),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        leftIconMapping[label] ?? Icons.info_outline,
+                                        leftIconMapping[label] ??
+                                            Icons.info_outline,
                                         color: Colors.grey,
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Text(
                                               label,
@@ -261,7 +300,8 @@ class LessonDetailsModal extends StatelessWidget {
                                             ),
                                             Text(
                                               value,
-                                              style: GoogleFonts.lato(fontSize: 12),
+                                              style: GoogleFonts.lato(
+                                                  fontSize: 12),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ],
@@ -270,12 +310,37 @@ class LessonDetailsModal extends StatelessWidget {
                                       if (withAction)
                                         IconButton(
                                           icon: Icon(
-                                            actionIconMapping[label] ?? Icons.arrow_forward,
+                                            actionIconMapping[label] ??
+                                                Icons.arrow_forward,
                                             color: Colors.orange,
                                           ),
-                                          onPressed: () {
-                                            // TODO: Add your action for "$label" here.
-                                            debugPrint("Action pressed for $label");
+                                          onPressed: () async {
+                                            if (label == "Is Done") {
+                                              final result = await toggleLessonCompletion(
+                                                  lessonId);
+                                              if (result != null &&
+                                                  result.containsKey("status")) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(result[
+                                                          "status"])),
+                                                );
+                                                // Refresh the entire home page...
+                                                await widget.fetchData();
+                                                // ...and refresh the modal's data.
+                                                _refreshLessonDetails();
+                                              } else {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                      content: Text(
+                                                          "Error toggling completion")),
+                                                );
+                                              }
+                                            } else {
+                                              debugPrint("Action pressed for $label");
+                                            }
                                           },
                                         ),
                                     ],
@@ -288,7 +353,8 @@ class LessonDetailsModal extends StatelessWidget {
                                 alignment: Alignment.bottomRight,
                                 child: Text(
                                   actionNoteMapping[label] ?? "",
-                                  style: GoogleFonts.lato(fontSize: 12, color: Colors.orange),
+                                  style: GoogleFonts.lato(
+                                      fontSize: 12, color: Colors.orange),
                                 ),
                               ),
                           ],
@@ -300,7 +366,8 @@ class LessonDetailsModal extends StatelessWidget {
                       spacing: spacing,
                       runSpacing: spacing,
                       children: combinedItems.map((item) {
-                        final bool withAction = labelsWithAction.contains(item['label']);
+                        final bool withAction =
+                            labelsWithAction.contains(item['label']);
                         return buildCard(item, withAction: withAction);
                       }).toList(),
                     );
