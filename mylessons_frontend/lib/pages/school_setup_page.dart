@@ -100,13 +100,12 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       padding: const EdgeInsets.only(bottom: 100),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(24), // increased padding
+          padding: const EdgeInsets.all(24),
           child: services.isNotEmpty
               ? Column(
                   children: services.map<Widget>((service) {
                     return Card(
-                      margin: const EdgeInsets.only(
-                          bottom: 24), // extra spacing between cards
+                      margin: const EdgeInsets.only(bottom: 24),
                       child: ListTile(
                         title: Text(
                           service['name'] ?? "No Name",
@@ -160,7 +159,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     );
   }
 
-  // Updated _buildStaffPaymentsTab() to pass extra parameters so the edit icon works.
   Widget _buildStaffPaymentsTab() {
     if (schoolDetails == null) {
       return const Center(child: CircularProgressIndicator());
@@ -408,15 +406,45 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         ),
         body: isLoading
             ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                controller: _tabController,
+            : Column(
                 children: [
-                  _buildServicesTab(),
-                  _buildStaffTab(),
-                  _buildStaffPaymentsTab(),
-                  _buildSubjectsTab(),
-                  _buildEquipmentsTab(),
-                  _buildLocationsTab(),
+                  // Display the critical message banner if present.
+                  if (schoolDetails != null &&
+                      schoolDetails!['critical_message'] != null &&
+                      schoolDetails!['critical_message']
+                          .toString()
+                          .trim()
+                          .isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      color: Colors.redAccent,
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              schoolDetails!['critical_message'],
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildServicesTab(),
+                        _buildStaffTab(),
+                        _buildStaffPaymentsTab(),
+                        _buildSubjectsTab(),
+                        _buildEquipmentsTab(),
+                        _buildLocationsTab(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
         bottomNavigationBar: _buildBottomButton(),
