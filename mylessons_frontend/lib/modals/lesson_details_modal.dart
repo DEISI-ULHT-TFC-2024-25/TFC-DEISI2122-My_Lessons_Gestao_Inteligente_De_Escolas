@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
+import 'students_modal.dart';
 import 'subject_modal.dart'; // Make sure this file exports SubjectModal
 import 'location_modal.dart'; // Make sure this file exports LocationModal
 
@@ -219,7 +220,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'Subject': Icons.edit,
             'Extras': Icons.edit,
             'Instructors': Icons.edit,
-            'School': Icons.contact_mail,
+            'School': Icons.phone,
             'Location': Icons.edit,
           };
 
@@ -355,7 +356,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                   },
                                                 );
                                               }
-                                            } else if (label == "Subject") {
+                                            } else if (label == "Subject" && widget.currentRole != "Parent") {
                                               bool? updated =
                                                   await showModalBottomSheet<
                                                       bool>(
@@ -382,7 +383,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                       content: Text("Error")),
                                                 );
                                               }
-                                            } else if (label == "Location") {
+                                            } else if (label == "Location" && widget.currentRole != "Parent") {
                                               bool? updated =
                                                   await showModalBottomSheet<
                                                       bool>(
@@ -397,6 +398,27 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 ),
                                                 builder: (context) =>
                                                     LocationModal(
+                                                        lessonId: lessonId),
+                                              );
+                                              if (updated == true) {
+                                                await widget.fetchData();
+                                                _refreshLessonDetails();
+                                              }
+                                            } else if (label == "Students" && widget.currentRole != "Parent") {
+                                              bool? updated =
+                                                  await showModalBottomSheet<
+                                                      bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape:
+                                                    const RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.vertical(
+                                                          top: Radius.circular(
+                                                              16)),
+                                                ),
+                                                builder: (context) =>
+                                                    StudentsModal(
                                                         lessonId: lessonId),
                                               );
                                               if (updated == true) {

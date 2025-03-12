@@ -83,7 +83,7 @@ class _LocationModalState extends State<LocationModal>
           body: jsonEncode({
             "lesson_id": widget.lessonId,
             "location_id": location["id"],
-            "action": "add",
+            "action": "change",
           }),
         );
         if (response.statusCode == 200) {
