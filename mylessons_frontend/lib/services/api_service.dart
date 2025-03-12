@@ -4,8 +4,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-const String baseUrl = 'https://mylessons.pythonanywhere.com';
-//const String baseUrl = 'http://127.0.0.1:8000';
+//const String baseUrl = 'https://mylessons.pythonanywhere.com';
+const String baseUrl = 'http://127.0.0.1:8000';
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
@@ -18,6 +18,19 @@ Future<Map<String, String>> getAuthHeaders() async {
     'Authorization': 'Token $token',
     'Content-Type': 'application/json',
   };
+}
+
+Future<String> fetchCurrentRole() async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/users/current_role/';
+  final response = await http.get(Uri.parse(url), headers: headers);
+  
+  if (response.statusCode == 200) {
+    final data = json.decode(utf8.decode(response.bodyBytes));
+    return data['current_role'] as String;
+  } else {
+    throw Exception('Failed to fetch current role: ${response.statusCode}');
+  }
 }
 
 

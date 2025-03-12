@@ -32,6 +32,65 @@ class MyApp extends StatelessWidget {
       title: 'MyLessons App',
       theme: ThemeData(
         primarySwatch: Colors.orange,
+        timePickerTheme: TimePickerThemeData(
+         
+          
+        ),
+        datePickerTheme: DatePickerThemeData(
+          // Header
+          headerBackgroundColor: Colors.orange,
+          headerForegroundColor: Colors.white,
+
+          // Highlight "today" with an orange border
+          todayBorder: const BorderSide(color: Colors.orange, width: 1.5),
+
+          // Day text color for different states
+          dayForegroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              // Selected day text = white
+              return Colors.white;
+            }
+            // Fallback to default text color
+            return null;
+          }),
+
+          // Day background color for different states
+          dayBackgroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              // Selected day background = orange
+              return Colors.orange;
+            }
+            // No background for unselected days
+            return null;
+          }),
+
+          // “Today” text color for different states
+          todayForegroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
+            // If "today" is also selected, use white text
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white;
+            }
+            // Otherwise, orange text
+            return Colors.orange;
+          }),
+
+          // “Today” background color (only if you want a fill for today)
+          todayBackgroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
+            // If today is selected, fill it with orange
+            if (states.contains(MaterialState.selected)) {
+              return Colors.orange;
+            }
+            // Otherwise transparent
+            return null;
+          }),
+
+          // Remove or customize the Material3 hover/ripple overlay (often purple-ish)
+          dayOverlayColor: MaterialStateProperty.all(Colors.transparent),
+        ),
         // Make checkboxes orange when checked:
         checkboxTheme: CheckboxThemeData(
           fillColor: WidgetStateProperty.all(Colors.orange),

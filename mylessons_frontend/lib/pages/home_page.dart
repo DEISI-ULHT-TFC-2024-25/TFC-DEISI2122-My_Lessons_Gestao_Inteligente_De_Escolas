@@ -8,7 +8,8 @@ import 'package:mylessons_frontend/modals/schedule_multiple_lessons_modal.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../services/api_service.dart'; // Import our API services
+import '../services/api_service.dart';
+import 'lesson_report_page.dart'; // Import our API services
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -1024,93 +1025,118 @@ class _HomePageState extends State<HomePage> {
   // ------------------- Card Builders -------------------
 
   Widget _buildLessonCard(dynamic lesson, {bool isLastLesson = false}) {
-    final isGroup = lesson['type']?.toString().toLowerCase() == 'group';
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: IconButton(
-                icon: Icon(
-                  isLastLesson ? Icons.article : Icons.calendar_today,
-                  size: 28,
-                  color: Colors.orange,
-                ),
-                onPressed: () {
-                  if (isLastLesson) {
-                    // Optionally implement lesson report view.
-                  } else {
-                    if (isGroup) {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return AlertDialog(
-                            title: const Text("Scheduling Unavailable"),
-                            content: const Text(
-                              "To change the schedule of a group lesson, please contact the school.",
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text("OK"),
-                              )
-                            ],
-                          );
-                        },
-                      );
-                    } else {
-                      _showScheduleLessonModal(lesson);
-                    }
+  final isGroup = lesson['type']?.toString().toLowerCase() == 'group';
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: IconButton(
+              icon: Icon(
+                isLastLesson ? Icons.article : Icons.calendar_today,
+                size: 28,
+                color: Colors.orange,
+              ),
+              onPressed: () {
+                if (isLastLesson) {
+                  // New behavior for report icon on last lessons.
+                  if (currentRole == "Parent") {
+                    // For parents, open the report view page.
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LessonReportPage(
+                          lesson: lesson,
+                          mode: 'view',
+                        ),
+                      ),
+                    );
+                  } else if (currentRole == "Instructor" || currentRole == "Admin") {
+                    // For instructors/admins, open the report edit/build page.
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LessonReportPage(
+                          lesson: lesson,
+                          mode: 'edit',
+                        ),
+                      ),
+                    );
                   }
-                },
-              ),
+                } else {
+                  // Existing behavior for non-last lessons.
+                  if (isGroup) {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text("Scheduling Unavailable"),
+                          content: const Text(
+                            "To change the schedule of a group lesson, please contact the school.",
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text("OK"),
+                            )
+                          ],
+                        );
+                      },
+                    );
+                  } else {
+                    _showScheduleLessonModal(lesson);
+                  }
+                }
+              },
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lesson['students_name'],
-                    style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${lesson['date']} at ${lesson['start_time']}',
-                    style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isGroup ? Icons.groups : Icons.person,
-                  size: 20,
-                  color: Colors.grey,
+                Text(
+                  lesson['students_name'],
+                  style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.more_vert, size: 28, color: Colors.orange),
-                  onPressed: () {
-                    _showLessonDetailsModal(lesson);
-                  },
+                const SizedBox(height: 4),
+                Text(
+                  '${lesson['date']} at ${lesson['start_time']}',
+                  style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
                 ),
               ],
             ),
-            const SizedBox(width: 8),
-          ],
-        ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isGroup ? Icons.groups : Icons.person,
+                size: 20,
+                color: Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.more_vert, size: 28, color: Colors.orange),
+                onPressed: () {
+                  _showLessonDetailsModal(lesson);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Widget _buildPackCard(dynamic pack) {
     final isGroup = pack['type'].toString().toLowerCase() == 'group';

@@ -8,17 +8,19 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import GoogleCredential, Student, UserAccount, Instructor
+from .models import GoogleCredential, Student, Unavailability, UserAccount, Instructor
 from .serializers import UserAccountSerializer, StudentSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
 from schools.models import School
 from django.db.models import Q
 from django.utils.timezone import now
+from django.utils.dateparse import parse_date, parse_time
 import firebase_admin
 from firebase_admin import auth as firebase_auth, initialize_app, credentials as firebase_credentials
 import os
@@ -393,6 +395,34 @@ def students(request):
 
     return Response(data)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_selected_students(request):
+    lesson_id = request.data.get("lesson_id")
+    pack_id = request.data.get("pack_id")
+
+    if lesson_id:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        associated_students = lesson.students.all()
+        all_students = lesson.school.students.all()
+    elif pack_id:
+        pack = get_object_or_404(Pack, id=pack_id)
+        associated_students = pack.students.all()
+        all_students = pack.school.students.all()
+    else:
+        associated_students = Student.objects.none()
+        all_students = Student.objects.all()
+
+    
+
+    data = {
+        "associated_students": StudentSerializer(associated_students, many=True).data,
+        "all_students": StudentSerializer(all_students, many=True).data,
+    }
+    return Response(data)
+
+
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -574,3 +604,170 @@ def store_google_credentials(request):
         },
         status=status.HTTP_200_OK
     )
+    
+    
+    
+# Helper to map weekday names to Python's date.weekday() indices
+DAY_NAME_TO_INDEX = {
+    "Monday": 0,
+    "Tuesday": 1,
+    "Wednesday": 2,
+    "Thursday": 3,
+    "Friday": 4,
+    "Saturday": 5,
+    "Sunday": 6,
+}
+
+
+
+@api_view(['POST'])
+def update_availability(request):
+    """
+    Handles both "save as available" (remove unavailability)
+    and "save as unavailability" (add unavailability),
+    according to the frontend payload structure.
+    """
+    logger.info("update_availability called with payload: %s", request.data)
+    
+    mode = request.data.get("mode")
+    action = request.data.get("action")
+    current_role = request.data.get("role")
+    logger.info("Mode: %s, Action: %s, Role: %s", mode, action, current_role)
+    
+    instructor = None
+    if current_role == "Instructor":
+        instructor = request.user.instructor_profile
+        
+    student_id = request.data.get("student_id")
+    school_id = request.data.get("school_id")
+    student = None
+    if student_id:
+        student = Student.objects.get(pk=student_id)
+    school = None
+    if school_id:
+        school = School.objects.get(pk=school_id)
+
+    is_add_unavailability = (action == "add_unavailability")
+    logger.info("is_add_unavailability: %s", is_add_unavailability)
+    
+    try:
+        if mode == "single_day_list":
+            items = request.data.get("items", [])
+            logger.info("Processing single_day_list with %d items", len(items))
+            for day_item in items:
+                date_str = day_item["date"]
+                date_obj = parse_date(date_str)
+                logger.debug("Processing date: %s", date_str)
+                for t in day_item["times"]:
+                    start_str = t["start_time"]
+                    end_str = t["end_time"]
+                    start_time = parse_time(start_str)
+                    end_time = parse_time(end_str)
+                    logger.debug("Time range: %s - %s", start_str, end_str)
+                    if is_add_unavailability:
+                        logger.info("Creating unavailability for %s", date_str)
+                        Unavailability.define_unavailability(
+                            instructor=instructor,
+                            student=student,
+                            date=date_obj,
+                            start_time=start_time,
+                            end_time=end_time,
+                            school=school
+                        )
+                    else:
+                        logger.info("Removing unavailability for %s", date_str)
+                        Unavailability.define_availability(
+                            instructor=instructor,
+                            student=student,
+                            date=date_obj,
+                            start_time=start_time,
+                            end_time=end_time,
+                            school=school
+                        )
+
+        elif mode == "date_interval_day_times":
+            from_str = request.data["from_date"]
+            to_str   = request.data["to_date"]
+            days_map = request.data.get("days", {})
+            from_date = parse_date(from_str)
+            to_date   = parse_date(to_str)
+            logger.info("Processing date_interval_day_times from %s to %s", from_str, to_str)
+            current = from_date
+            while current <= to_date:
+                weekday_idx = current.weekday()  # Monday=0, Sunday=6
+                for day_name, time_list in days_map.items():
+                    if DAY_NAME_TO_INDEX.get(day_name) == weekday_idx:
+                        logger.debug("Processing %s on %s", day_name, current)
+                        for t in time_list:
+                            start_str = t["start_time"]
+                            end_str   = t["end_time"]
+                            start_time = parse_time(start_str)
+                            end_time   = parse_time(end_str)
+                            if is_add_unavailability:
+                                logger.info("Creating unavailability for %s", current)
+                                Unavailability.define_unavailability(
+                                    instructor=instructor,
+                                    student=student,
+                                    date=current,
+                                    start_time=start_time,
+                                    end_time=end_time,
+                                    school=school
+                                )
+                            else:
+                                logger.info("Removing unavailability for %s", current)
+                                Unavailability.define_availability(
+                                    instructor=instructor,
+                                    student=student,
+                                    date=current,
+                                    start_time=start_time,
+                                    end_time=end_time,
+                                    school=school
+                                )
+                current += timedelta(days=1)
+
+        elif mode == "date_interval_time_ranges":
+            from_str = request.data["from_date"]
+            to_str   = request.data["to_date"]
+            ranges   = request.data.get("ranges", [])
+            from_date = parse_date(from_str)
+            to_date   = parse_date(to_str)
+            logger.info("Processing date_interval_time_ranges from %s to %s", from_str, to_str)
+            current = from_date
+            while current <= to_date:
+                weekday_idx = current.weekday()
+                for rng in ranges:
+                    for day_name in rng["days"]:
+                        if DAY_NAME_TO_INDEX.get(day_name) == weekday_idx:
+                            start_time = parse_time(rng["start_time"])
+                            end_time   = parse_time(rng["end_time"])
+                            if is_add_unavailability:
+                                logger.info("Creating unavailability for %s", current)
+                                Unavailability.define_unavailability(
+                                    instructor=instructor,
+                                    student=student,
+                                    date=current,
+                                    start_time=start_time,
+                                    end_time=end_time,
+                                    school=school
+                                )
+                            else:
+                                logger.info("Removing unavailability for %s", current)
+                                Unavailability.define_availability(
+                                    instructor=instructor,
+                                    student=student,
+                                    date=current,
+                                    start_time=start_time,
+                                    end_time=end_time,
+                                    school=school
+                                )
+                current += timedelta(days=1)
+        else:
+            logger.error("Unknown mode: %s", mode)
+            return Response({"detail": f"Unknown mode: {mode}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.exception("Exception during update_availability:")
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    logger.info("update_availability completed successfully")
+    return Response({"status": "success"}, status=status.HTTP_200_OK)

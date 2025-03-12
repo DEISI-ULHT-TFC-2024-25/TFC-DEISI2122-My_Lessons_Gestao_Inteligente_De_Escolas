@@ -762,7 +762,6 @@ def edit_lesson_subject(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def edit_lesson_students(request):
-    # TODO test and dev flutter
     """
     Edit the students for a lesson.
     For adding: send action 'add' with either student_id or new_student data.
@@ -865,7 +864,6 @@ def edit_lesson_instructors(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def edit_lesson_location(request):
-    # TODO test and dev flutter
     """
     Edit the location for a lesson.
     For setting: send action 'add' with either location_id or new_location data.
@@ -891,6 +889,10 @@ def edit_lesson_location(request):
         status_msg = "location set"
         
     elif action == 'change':
+        location_id = request.data.get("location_id")
+        if not location_id:
+            return Response({"error": "É necessário fornecer location_id"}, status=400)
+        location = get_object_or_404(Location, id=location_id)
         lesson.location = location
         status_msg = "location changed"
     else:
