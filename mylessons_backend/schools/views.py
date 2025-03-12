@@ -119,6 +119,7 @@ def school_details_view(request):
             'locations': [],
             'subjects': [],
             'equipments': [],
+            'critical_message': ""  # no conflicts
         })
 
     # Use a dict to merge staff by user id
@@ -163,6 +164,9 @@ def school_details_view(request):
 
     staff_list = list(staff_dict.values())
 
+    # Call the conflict verification method.
+    conflict_message = school.check_payment_types_conflicts()
+
     return Response({
         'success': True,
         'school_id': school.id,
@@ -193,7 +197,8 @@ def school_details_view(request):
                 'location': equipment.location or "",
             }
             for equipment in school.equipments.all()
-        ]
+        ],
+        'critical_message': conflict_message
     })
 
 

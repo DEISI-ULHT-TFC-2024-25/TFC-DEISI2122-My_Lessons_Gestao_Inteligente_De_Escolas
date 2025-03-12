@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import json
 from django.contrib.auth import authenticate, get_user_model
+from events.models import Activity
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -620,17 +621,42 @@ DAY_NAME_TO_INDEX = {
 
 
 
+def unify_intervals(time_ranges):
+    """
+    Given a list of (start_time, end_time) tuples (Python time objects),
+    returns a list of merged, non-overlapping intervals.
+    """
+    if not time_ranges:
+        return []
+    # Sort intervals by start time (converted to minutes since midnight)
+    sorted_ranges = sorted(time_ranges, key=lambda r: (r[0].hour * 60 + r[0].minute))
+    merged = []
+    current_start, current_end = sorted_ranges[0]
+    for s, e in sorted_ranges[1:]:
+        if (s.hour * 60 + s.minute) <= (current_end.hour * 60 + current_end.minute):
+            if (e.hour * 60 + e.minute) > (current_end.hour * 60 + current_end.minute):
+                current_end = e
+        else:
+            merged.append((current_start, current_end))
+            current_start, current_end = s, e
+    merged.append((current_start, current_end))
+    return merged
+
 @api_view(['POST'])
 def update_availability(request):
     """
     Handles both "save as available" (remove unavailability)
     and "save as unavailability" (add unavailability),
     according to the frontend payload structure.
+    
+    For each interval processed, a summary message is recorded.
+    If end_time is smaller than start_time, it is set to 23:59.
+    The final response includes a "summary" of the changes.
     """
     logger.info("update_availability called with payload: %s", request.data)
     
-    mode = request.data.get("mode")
-    action = request.data.get("action")
+    mode = request.data.get("mode")  # e.g. "single_day_list"
+    action = request.data.get("action")  # "add_unavailability" or "remove_unavailability"
     current_role = request.data.get("role")
     logger.info("Mode: %s, Action: %s, Role: %s", mode, action, current_role)
     
@@ -640,15 +666,18 @@ def update_availability(request):
         
     student_id = request.data.get("student_id")
     school_id = request.data.get("school_id")
+    
     student = None
     if student_id:
         student = Student.objects.get(pk=student_id)
     school = None
     if school_id:
         school = School.objects.get(pk=school_id)
-
+        
     is_add_unavailability = (action == "add_unavailability")
     logger.info("is_add_unavailability: %s", is_add_unavailability)
+    
+    summary_list = []  # Collect summary messages
     
     try:
         if mode == "single_day_list":
@@ -663,6 +692,8 @@ def update_availability(request):
                     end_str = t["end_time"]
                     start_time = parse_time(start_str)
                     end_time = parse_time(end_str)
+                    if end_time < start_time:
+                        end_time = time(23, 59)
                     logger.debug("Time range: %s - %s", start_str, end_str)
                     if is_add_unavailability:
                         logger.info("Creating unavailability for %s", date_str)
@@ -674,6 +705,7 @@ def update_availability(request):
                             end_time=end_time,
                             school=school
                         )
+                        summary_list.append(f"Created unavailability on {date_str} from {start_str} to {end_str}.")
                     else:
                         logger.info("Removing unavailability for %s", date_str)
                         Unavailability.define_availability(
@@ -684,7 +716,8 @@ def update_availability(request):
                             end_time=end_time,
                             school=school
                         )
-
+                        summary_list.append(f"Made available on {date_str} from {start_str} to {end_str}.")
+                        
         elif mode == "date_interval_day_times":
             from_str = request.data["from_date"]
             to_str   = request.data["to_date"]
@@ -703,6 +736,8 @@ def update_availability(request):
                             end_str   = t["end_time"]
                             start_time = parse_time(start_str)
                             end_time   = parse_time(end_str)
+                            if end_time < start_time:
+                                end_time = time(23, 59)
                             if is_add_unavailability:
                                 logger.info("Creating unavailability for %s", current)
                                 Unavailability.define_unavailability(
@@ -713,6 +748,7 @@ def update_availability(request):
                                     end_time=end_time,
                                     school=school
                                 )
+                                summary_list.append(f"Created unavailability on {current} from {start_str} to {end_str}.")
                             else:
                                 logger.info("Removing unavailability for %s", current)
                                 Unavailability.define_availability(
@@ -723,8 +759,9 @@ def update_availability(request):
                                     end_time=end_time,
                                     school=school
                                 )
+                                summary_list.append(f"Made available on {current} from {start_str} to {end_str}.")
                 current += timedelta(days=1)
-
+                
         elif mode == "date_interval_time_ranges":
             from_str = request.data["from_date"]
             to_str   = request.data["to_date"]
@@ -734,12 +771,14 @@ def update_availability(request):
             logger.info("Processing date_interval_time_ranges from %s to %s", from_str, to_str)
             current = from_date
             while current <= to_date:
-                weekday_idx = current.weekday()
+                weekday_idx = current.weekday()  # Monday=0, Tuesday=1, etc.
                 for rng in ranges:
                     for day_name in rng["days"]:
                         if DAY_NAME_TO_INDEX.get(day_name) == weekday_idx:
                             start_time = parse_time(rng["start_time"])
                             end_time   = parse_time(rng["end_time"])
+                            if end_time < start_time:
+                                end_time = time(23, 59)
                             if is_add_unavailability:
                                 logger.info("Creating unavailability for %s", current)
                                 Unavailability.define_unavailability(
@@ -750,6 +789,7 @@ def update_availability(request):
                                     end_time=end_time,
                                     school=school
                                 )
+                                summary_list.append(f"Created unavailability on {current} from {rng['start_time']} to {rng['end_time']}.")
                             else:
                                 logger.info("Removing unavailability for %s", current)
                                 Unavailability.define_availability(
@@ -760,14 +800,182 @@ def update_availability(request):
                                     end_time=end_time,
                                     school=school
                                 )
+                                summary_list.append(f"Made available on {current} from {rng['start_time']} to {rng['end_time']}.")
                 current += timedelta(days=1)
         else:
             logger.error("Unknown mode: %s", mode)
             return Response({"detail": f"Unknown mode: {mode}"}, status=status.HTTP_400_BAD_REQUEST)
-
     except Exception as e:
         logger.exception("Exception during update_availability:")
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     logger.info("update_availability completed successfully")
-    return Response({"status": "success"}, status=status.HTTP_200_OK)
+    summary_text = "\n".join(summary_list)
+    return Response({"status": "success", "summary": summary_text}, status=status.HTTP_200_OK)
+
+def split_overlaps(intervals):
+    """
+    Given a list of intervals as (start, end, type, title) sorted by start time,
+    returns a new list where overlapping intervals of different types are split so
+    that both appear in the final timeline.
+    
+    For example, if we have:
+      - Unavailability: 09:00–12:00
+      - Lesson: 10:00–11:00
+    This function will produce:
+      - 09:00–10:00 (unavailability)
+      - 10:00–11:00 (lesson)
+      - 11:00–12:00 (unavailability)
+    """
+    final_intervals = []
+    for (start, end, block_type, title) in intervals:
+        if not final_intervals:
+            final_intervals.append((start, end, block_type, title))
+            continue
+
+        last_start, last_end, last_type, last_title = final_intervals[-1]
+
+        # If there is no overlap or they are the same type, simply append.
+        if start >= last_end or block_type == last_type:
+            final_intervals.append((start, end, block_type, title))
+        else:
+            # There is an overlap and the types differ.
+            # First, if there is a gap at the beginning of the last interval, adjust it.
+            if last_start < start:
+                # Modify the last interval to end at the new block's start.
+                final_intervals[-1] = (last_start, start, last_type, last_title)
+            else:
+                # If last_start is not less than start, remove it.
+                final_intervals.pop()
+            # Insert the new block fully.
+            final_intervals.append((start, end, block_type, title))
+            # If the last interval extended past the new block, add the remaining part.
+            if last_end > end:
+                final_intervals.append((end, last_end, last_type, last_title))
+    # Re-sort the intervals by start time.
+    final_intervals.sort(key=lambda x: (x[0].hour * 60 + x[0].minute))
+    return final_intervals
+
+@api_view(['GET'])
+def daily_timeline(request):
+    """
+    Returns a merged timeline for a single day combining unavailabilities, lessons, and activities.
+    Query parameter: ?date=YYYY-MM-DD
+
+    The timeline is returned as a list of blocks, each with:
+      - type: "unavailability", "lesson", "activity", or "available"
+      - title: for lessons/activities (or null)
+      - start_time: "HH:MM" (string)
+      - end_time: "HH:MM" (string)
+    """
+    date_str = request.GET.get("date")
+    if not date_str:
+        return Response({"error": "Missing 'date' parameter (YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST)
+    date_obj = parse_date(date_str)
+    if not date_obj:
+        return Response({"error": "Invalid date format."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Use the logged-in instructor's profile
+    try:
+        instructor = request.user.instructor_profile
+    except Exception as e:
+        logger.exception("Unable to get instructor profile.")
+        return Response({"error": "Instructor profile not found."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 1. Fetch unavailabilities for the day and merge overlapping intervals.
+    unavails = Unavailability.objects.filter(instructor=instructor, date=date_obj).order_by("start_time")
+    unavail_intervals = []
+    for u in unavails:
+        start_t = u.start_time
+        if u.end_time:
+            end_t = u.end_time
+        else:
+            end_dt = datetime.combine(date_obj, start_t) + timedelta(minutes=u.duration_in_minutes)
+            end_t = end_dt.time()
+        unavail_intervals.append((start_t, end_t))
+    merged_unavails = unify_intervals(unavail_intervals)
+
+    # 2. Fetch lessons for the day where instructor is assigned.
+    lessons = Lesson.objects.filter(date=date_obj, instructors=instructor).order_by("start_time")
+    lesson_intervals = []
+    for lesson in lessons:
+        s = lesson.start_time
+        if lesson.end_time:
+            e = lesson.end_time
+        else:
+            e = (datetime.combine(date_obj, s) + timedelta(minutes=lesson.duration_in_minutes)).time()
+        lesson_intervals.append((s, e, "lesson", "Lesson"))
+    
+    # 3. Fetch activities for the day where instructor is assigned.
+    activities = Activity.objects.filter(date=date_obj, instructors=instructor).order_by("start_time")
+    activity_intervals = []
+    for act in activities:
+        s = act.start_time
+        if act.end_time:
+            e = act.end_time
+        else:
+            e = (datetime.combine(date_obj, s) + timedelta(minutes=act.duration_in_minutes)).time()
+        activity_intervals.append((s, e, "activity", act.name))
+
+    # 4. Build a list of all intervals.
+    intervals = []
+    for (s, e) in merged_unavails:
+        intervals.append((s, e, "unavailability", None))
+    intervals.extend(lesson_intervals)
+    intervals.extend(activity_intervals)
+    intervals.sort(key=lambda x: (x[0].hour * 60 + x[0].minute))
+
+    # 5. Split overlaps so that lessons/activities remain visible even when overlapping unavailability.
+    intervals = split_overlaps(intervals)
+
+    # 6. Build the final timeline from 00:00 to 24:00.
+    day_start = time(0, 0)
+    day_end = time(23, 59)  # Treat 23:59 as end of day.
+    final_timeline = []
+    current_time = day_start
+
+    def time_to_minutes(t):
+        return t.hour * 60 + t.minute
+
+    def minutes_to_time(m):
+        h, m = divmod(m, 60)
+        return time(h, m)
+
+    def fmt_time(t):
+        return t.strftime("%H:%M")
+
+    for (s, e, typ, title) in intervals:
+        s_min = max(time_to_minutes(s), time_to_minutes(day_start))
+        e_min = min(time_to_minutes(e), 24 * 60)
+        if time_to_minutes(current_time) < s_min:
+            # There is a gap – mark as available.
+            final_timeline.append({
+                "type": "available",
+                "title": None,
+                "start_time": fmt_time(current_time),
+                "end_time": fmt_time(minutes_to_time(s_min)),
+            })
+            current_time = minutes_to_time(s_min)
+        if time_to_minutes(current_time) < e_min:
+            final_timeline.append({
+                "type": typ,
+                "title": title,
+                "start_time": fmt_time(current_time),
+                "end_time": fmt_time(minutes_to_time(e_min)),
+            })
+            current_time = minutes_to_time(e_min)
+        if time_to_minutes(current_time) >= 24 * 60:
+            break
+
+    if time_to_minutes(current_time) < 24 * 60:
+        difference = 24 * 60 - time_to_minutes(current_time)
+        # Only add an available block if the gap is more than 1 minute.
+        if difference > 1:
+            final_timeline.append({
+                "type": "available",
+                "title": None,
+                "start_time": fmt_time(current_time),
+                "end_time": "24:00",
+            })
+
+    return Response(final_timeline, status=status.HTTP_200_OK)

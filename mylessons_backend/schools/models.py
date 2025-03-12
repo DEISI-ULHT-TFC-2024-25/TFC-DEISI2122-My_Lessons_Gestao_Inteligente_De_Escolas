@@ -258,6 +258,160 @@ class School(models.Model):
     def __str__(self):
         return self.name
     
+    def check_payment_types_conflicts(self):
+        """
+        1) Overlapping min/max checks ALWAYS for both school and instructors.
+        2) Coverage checks for a service's pricing options ONLY if commission == 0
+        (for that service at the school or instructor level).
+        3) If the payment type entry for a given service is missing altogether,
+        we also flag a conflict, because coverage is impossible.
+
+        Returns:
+        A string with "CRITICAL: ..." if conflicts exist, else "".
+        """
+        conflicts = []
+
+        # ------------------------------------------------------------------
+        # Helper: Overlap Check
+        # ------------------------------------------------------------------
+        def check_overlaps(fixed_list, context_label):
+            """
+            If the next entry's min_students <= current entry's max_students,
+            we consider it overlapping.
+            """
+            sorted_list = sorted(fixed_list, key=lambda x: x.get("min_students", 0))
+            for i in range(len(sorted_list) - 1):
+                current = sorted_list[i]
+                nxt = sorted_list[i + 1]
+                if nxt["min_students"] <= current["max_students"]:
+                    conflicts.append(
+                        f"Overlapping min/max in {context_label}: "
+                        f"{current['min_students']}-{current['max_students']} "
+                        f"and {nxt['min_students']}-{nxt['max_students']}."
+                    )
+                    # If you want to catch ALL overlaps, remove this break
+                    break
+
+        # ------------------------------------------------------------------
+        # Helper: Coverage Check
+        # ------------------------------------------------------------------
+        def check_service_coverage(service_label, pricing_options, fixed_list, context_label):
+            """
+            For each pricing_option with (duration, people),
+            we need at least one 'fixed' entry that:
+            - has the same 'duration'
+            - min_students <= people <= max_students
+            If not found, we add a conflict.
+            """
+            for option in pricing_options:
+                needed_duration = option.get("duration")
+                needed_people = option.get("people")
+                if needed_duration is None or needed_people is None:
+                    continue  # skip incomplete data
+
+                matched = False
+                for fx in fixed_list:
+                    if (fx.get("duration") == needed_duration and
+                        fx.get("min_students") <= needed_people <= fx.get("max_students")):
+                        matched = True
+                        break
+
+                if not matched:
+                    conflicts.append(
+                        f"{context_label} is missing a payment 'fixed' entry to cover "
+                        f"{service_label} (duration={needed_duration}, people={needed_people})."
+                    )
+
+        # ------------------------------------------------------------------
+        # 1) SCHOOL-LEVEL VALIDATIONS
+        # ------------------------------------------------------------------
+        school_payment_types = self.payment_types or {}
+
+        # (A) Overlap checks (ALWAYS)
+        for role, role_data in school_payment_types.items():
+            for service_key, details in role_data.items():
+                fixed_list = details.get("fixed", [])
+                check_overlaps(fixed_list, f"school {role}/{service_key}")
+
+        # (B) Coverage checks (ONLY if commission == 0), plus missing-entry checks
+        for service in self.services or []:
+            service_type = service.get("type", {})
+            if "pack" in service_type:
+                pack_type = service_type["pack"]  # e.g. 'private', 'group'
+                service_label = f"{service.get('name', 'Unnamed Service')} ({pack_type})"
+                pricing_options = service.get("details", {}).get("pricing_options", [])
+
+                # Suppose we only care about "instructor" role coverage. Adjust if needed.
+                instructor_data = school_payment_types.get("instructor", {})
+
+                # If there's no entry at all for that pack_type, that's automatically a conflict
+                # (since you can't cover the service if there's no payment type).
+                if pack_type not in instructor_data:
+                    conflicts.append(
+                        f"School is missing payment type '{pack_type}' under 'instructor' "
+                        f"for service: {service_label}."
+                    )
+                else:
+                    # We have some data; only do coverage checks if commission == 0
+                    pack_data = instructor_data[pack_type]
+                    commission_val = pack_data.get("commission", None)
+                    if commission_val == 0:
+                        fixed_list = pack_data.get("fixed", [])
+                        check_service_coverage(
+                            service_label, pricing_options, fixed_list,
+                            f"School instructor/{pack_type}"
+                        )
+
+        # ------------------------------------------------------------------
+        # 2) INSTRUCTOR-LEVEL VALIDATIONS
+        # ------------------------------------------------------------------
+        for instructor in self.instructors.all():
+            user = instructor.user
+            user_school_payment_types = user.payment_types.get(self.name, {})
+
+            # (A) Overlap checks (ALWAYS)
+            for role, role_data in user_school_payment_types.items():
+                for service_key, details in role_data.items():
+                    fixed_list = details.get("fixed", [])
+                    check_overlaps(fixed_list, f"user {user.id} {role}/{service_key}")
+
+            # (B) Coverage checks (ONLY if commission == 0), plus missing-entry checks
+            for service in self.services or []:
+                service_type = service.get("type", {})
+                if "pack" in service_type:
+                    pack_type = service_type["pack"]
+                    service_label = f"{service.get('name', 'Unnamed Service')} ({pack_type})"
+                    pricing_options = service.get("details", {}).get("pricing_options", [])
+
+                    # We assume 'instructor' role. Adjust if needed.
+                    user_instructor_data = user_school_payment_types.get("instructor", {})
+
+                    # If there's no entry at all for that pack_type, conflict
+                    if pack_type not in user_instructor_data:
+                        conflicts.append(
+                            f"Instructor {user.id} is missing payment type '{pack_type}' "
+                            f"for service: {service_label}."
+                        )
+                    else:
+                        # We have the data; check if commission == 0 for coverage checks
+                        pack_data = user_instructor_data[pack_type]
+                        commission_val = pack_data.get("commission", None)
+                        if commission_val == 0:
+                            fixed_list = pack_data.get("fixed", [])
+                            check_service_coverage(
+                                service_label, pricing_options, fixed_list,
+                                f"Instructor {user.id} {pack_type}"
+                            )
+
+        # ------------------------------------------------------------------
+        # Return final result
+        # ------------------------------------------------------------------
+        if conflicts:
+            return "CRITICAL: " + " ".join(conflicts)
+        return ""
+
+
+    
     def add_or_edit_service(self, service_data: dict) -> list:
         """
         Add or edit a service in this school's services list based on the 'id' field.

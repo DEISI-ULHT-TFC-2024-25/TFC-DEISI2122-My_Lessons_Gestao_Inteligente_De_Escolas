@@ -3,17 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-
 import '../services/api_service.dart';
-// import 'package:http/http.dart' as http;
-// import '../services/api_service.dart'; // Provides baseUrl & getAuthHeaders()
-
-class AvailabilityPage extends StatefulWidget {
-  const AvailabilityPage({Key? key}) : super(key: key);
-
-  @override
-  _AvailabilityPageState createState() => _AvailabilityPageState();
-}
+import 'availability_calendar_page.dart';
 
 /// Model for single-day availability: a date with a list of time ranges.
 class SingleDayAvailability {
@@ -25,7 +16,7 @@ class SingleDayAvailability {
 
 /// Model for Approach A (Day→Times): each day has multiple time ranges.
 class DayWithTimes {
-  String day; // e.g., "monday"
+  String day; // e.g., "Monday"
   List<_TimeRange> ranges;
   DayWithTimes({required this.day, List<_TimeRange>? ranges})
       : ranges = ranges ?? [_TimeRange()];
@@ -44,6 +35,13 @@ class TimeRangeWithDays {
 class _TimeRange {
   TimeOfDay? start;
   TimeOfDay? end;
+}
+
+class AvailabilityPage extends StatefulWidget {
+  const AvailabilityPage({Key? key}) : super(key: key);
+
+  @override
+  _AvailabilityPageState createState() => _AvailabilityPageState();
 }
 
 class _AvailabilityPageState extends State<AvailabilityPage>
@@ -86,40 +84,74 @@ class _AvailabilityPageState extends State<AvailabilityPage>
   }
 
   // --------------------- TIME & DATE PICKERS ---------------------
+
+  /// Modified _pickTime: Preselects 00:00 for start and 23:59 for end if not already set.
   Future<void> _pickTime(
-      BuildContext context, bool isStart, _TimeRange range) async {
+      BuildContext context, bool isStart, _TimeRange range,
+      {TimeOfDay? minTime}) async {
     final TimeOfDay initial = isStart
-        ? (range.start ?? const TimeOfDay(hour: 9, minute: 0))
-        : (range.end ?? const TimeOfDay(hour: 18, minute: 0));
+        ? (range.start ?? const TimeOfDay(hour: 0, minute: 0))
+        : (range.end ?? const TimeOfDay(hour: 23, minute: 59));
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: initial,
     );
     if (picked != null) {
+      if (!isStart && minTime != null) {
+        // Ensure the picked time is not before minTime.
+        if (picked.hour < minTime.hour ||
+            (picked.hour == minTime.hour && picked.minute < minTime.minute)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                "Please select a time after ${minTime.format(context)}",
+              ),
+            ),
+          );
+          return;
+        }
+      }
       setState(() {
-        if (isStart)
+        if (isStart) {
           range.start = picked;
-        else
+        } else {
           range.end = picked;
+        }
       });
     }
   }
 
+  /// Modified _pickTimeWithDays: Preselects 00:00 for start and 23:59 for end if not already set.
   Future<void> _pickTimeWithDays(
-      BuildContext context, bool isStart, TimeRangeWithDays tr) async {
+      BuildContext context, bool isStart, TimeRangeWithDays tr,
+      {TimeOfDay? minTime}) async {
     final TimeOfDay initial = isStart
-        ? (tr.start ?? const TimeOfDay(hour: 9, minute: 0))
-        : (tr.end ?? const TimeOfDay(hour: 18, minute: 0));
+        ? (tr.start ?? const TimeOfDay(hour: 0, minute: 0))
+        : (tr.end ?? const TimeOfDay(hour: 23, minute: 59));
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: initial,
     );
     if (picked != null) {
+      if (!isStart && minTime != null) {
+        if (picked.hour < minTime.hour ||
+            (picked.hour == minTime.hour && picked.minute < minTime.minute)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                "Please select a time after ${minTime.format(context)}",
+              ),
+            ),
+          );
+          return;
+        }
+      }
       setState(() {
-        if (isStart)
+        if (isStart) {
           tr.start = picked;
-        else
+        } else {
           tr.end = picked;
+        }
       });
     }
   }
@@ -276,19 +308,16 @@ class _AvailabilityPageState extends State<AvailabilityPage>
         }).toList();
         return {"date": dateStr, "times": times};
       }).toList();
-      // Note: when saving as unavailability, we want to add records.
       payload = {
         "mode": "single_day_list",
         "items": items,
-        "action":
-            isUnavailability ? "add_unavailability" : "remove_unavailability",
+        "action": isUnavailability ? "add_unavailability" : "remove_unavailability",
       };
     } else {
       // Date Interval payload
       final fromStr = DateFormat('yyyy-MM-dd').format(_fromDate);
       final toStr = DateFormat('yyyy-MM-dd').format(_toDate);
       if (_useDayTimesApproach) {
-        // Approach A: Day→Times
         final dayMap = <String, dynamic>{};
         for (final dwt in _daysList) {
           final times = dwt.ranges.map((r) {
@@ -304,11 +333,9 @@ class _AvailabilityPageState extends State<AvailabilityPage>
           "from_date": fromStr,
           "to_date": toStr,
           "days": dayMap,
-          "action":
-              isUnavailability ? "add_unavailability" : "remove_unavailability",
+          "action": isUnavailability ? "add_unavailability" : "remove_unavailability",
         };
       } else {
-        // Approach B: TimeRange→Days
         final ranges = _rangeList.map((tr) {
           return {
             "start_time": _formatTime(tr.start),
@@ -321,37 +348,53 @@ class _AvailabilityPageState extends State<AvailabilityPage>
           "from_date": fromStr,
           "to_date": toStr,
           "ranges": ranges,
-          "action":
-              isUnavailability ? "add_unavailability" : "remove_unavailability",
+          "action": isUnavailability ? "add_unavailability" : "remove_unavailability",
         };
       }
     }
 
-    // Integrate current role info (fetched via your API service) into the payload.
-    payload["role"] =
-        await fetchCurrentRole(); // e.g., "Instructor", "Parent", "Admin"
-    // Optionally, you can also add school_id if needed:
-    // payload["school_id"] = schoolId;
+    payload["role"] = await fetchCurrentRole();
 
-    // Log the payload before sending
     debugPrint("Submitting payload: ${jsonEncode(payload)}");
 
-    // Retrieve auth headers and send the POST request.
     final headers = await getAuthHeaders();
     final url = '$baseUrl/api/users/update_availability/';
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(payload),
-      );
+      final response = await http.post(Uri.parse(url),
+          headers: headers, body: jsonEncode(payload));
       if (response.statusCode == 200) {
-        debugPrint("Availability update successful: ${response.body}");
-        // Optionally display a success message or update UI accordingly.
+        final result = json.decode(response.body);
+        final summary = result["summary"] ?? "Update successful";
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text("Update Summary"),
+            content: Text(summary),
+            actions: [
+              TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("OK")),
+            ],
+          ),
+        );
       } else {
-        debugPrint(
-            "Error updating availability: ${response.statusCode} ${response.body}");
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text("Update Summary"),
+            content: Text(response.body),
+            actions: [
+              TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("OK")),
+            ],
+          ),
+        );
       }
     } catch (e) {
       debugPrint("Exception during availability update: $e");
@@ -363,10 +406,27 @@ class _AvailabilityPageState extends State<AvailabilityPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // No background color for the page.
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text("Availability", style: GoogleFonts.lato()),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(40),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AvailabilityCalendarPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.calendar_today, color: Colors.orange),
+              label: Text("View Availability",
+                  style: GoogleFonts.lato(color: Colors.orange)),
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -413,7 +473,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                     padding: const EdgeInsets.all(8.0),
                     child: Column(
                       children: [
-                        // Date row in "from ○" style.
                         Row(
                           children: [
                             GestureDetector(
@@ -440,18 +499,16 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                           ],
                         ),
                         const Divider(),
-                        // Time range rows.
                         ...List.generate(item.ranges.length, (rIndex) {
                           final range = item.ranges[rIndex];
                           return _TimeRangeRow(
                             range: range,
-                            onRemove: () =>
-                                _removeTimeRangeSingleDay(item, rIndex),
+                            onRemove: () => _removeTimeRangeSingleDay(item, rIndex),
                             onPickStart: () => _pickTime(context, true, range),
-                            onPickEnd: () => _pickTime(context, false, range),
+                            onPickEnd: () =>
+                                _pickTime(context, false, range, minTime: range.start),
                           );
                         }),
-                        // "add new times" button.
                         Align(
                           alignment: Alignment.centerLeft,
                           child: TextButton.icon(
@@ -468,7 +525,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
               },
             ),
           ),
-          // "add new date" button.
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -489,7 +545,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Column(
         children: [
-          // "from ○ to ○" row for dates.
           Row(
             children: [
               GestureDetector(
@@ -530,18 +585,16 @@ class _AvailabilityPageState extends State<AvailabilityPage>
             ],
           ),
           const SizedBox(height: 8),
-          // Internal toggle: Approach A (Day→Times) vs. Approach B (Time→Days)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ChoiceChip(
-                label: Text(
-                  "By Weekday",
-                  style: GoogleFonts.lato(
-                    fontSize: 14,
-                    color: _useDayTimesApproach ? Colors.white : Colors.black,
-                  ),
-                ),
+                label: Text("By Weekday",
+                    style: GoogleFonts.lato(
+                        fontSize: 14,
+                        color: _useDayTimesApproach
+                            ? Colors.white
+                            : Colors.black)),
                 selected: _useDayTimesApproach,
                 onSelected: (selected) =>
                     setState(() => _useDayTimesApproach = true),
@@ -549,13 +602,12 @@ class _AvailabilityPageState extends State<AvailabilityPage>
               ),
               const SizedBox(width: 16),
               ChoiceChip(
-                label: Text(
-                  "By Timeframe",
-                  style: GoogleFonts.lato(
-                    fontSize: 14,
-                    color: !_useDayTimesApproach ? Colors.white : Colors.black,
-                  ),
-                ),
+                label: Text("By Timeframe",
+                    style: GoogleFonts.lato(
+                        fontSize: 14,
+                        color: !_useDayTimesApproach
+                            ? Colors.white
+                            : Colors.black)),
                 selected: !_useDayTimesApproach,
                 onSelected: (selected) =>
                     setState(() => _useDayTimesApproach = false),
@@ -578,7 +630,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
   Widget _buildDayTimesApproach() {
     return Column(
       children: [
-        // Horizontal row of day chips.
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -587,13 +638,10 @@ class _AvailabilityPageState extends State<AvailabilityPage>
               return Padding(
                 padding: const EdgeInsets.only(right: 8.0),
                 child: ChoiceChip(
-                  label: Text(
-                    day,
-                    style: GoogleFonts.lato(
-                      fontSize: 14,
-                      color: isSelected ? Colors.white : Colors.black,
-                    ),
-                  ),
+                  label: Text(day,
+                      style: GoogleFonts.lato(
+                          fontSize: 14,
+                          color: isSelected ? Colors.white : Colors.black)),
                   selected: isSelected,
                   onSelected: (_) => _toggleDayInList(day),
                   selectedColor: Colors.orange,
@@ -603,7 +651,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
           ),
         ),
         const SizedBox(height: 8),
-        // For each selected day, show a card with time ranges.
         Expanded(
           child: ListView.builder(
             itemCount: _daysList.length,
@@ -617,7 +664,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                   padding: const EdgeInsets.all(8.0),
                   child: Column(
                     children: [
-                      // Day label and delete button.
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -632,7 +678,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                         ],
                       ),
                       const Divider(),
-                      // Time range rows.
                       ...List.generate(dayItem.ranges.length, (rIndex) {
                         final r = dayItem.ranges[rIndex];
                         return _TimeRangeRow(
@@ -640,10 +685,10 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                           onRemove: () =>
                               _removeTimeRangeFromDay(dayItem, rIndex),
                           onPickStart: () => _pickTime(context, true, r),
-                          onPickEnd: () => _pickTime(context, false, r),
+                          onPickEnd: () =>
+                              _pickTime(context, false, r, minTime: r.start),
                         );
                       }),
-                      // "add new times" button.
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
@@ -681,7 +726,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                   padding: const EdgeInsets.all(8.0),
                   child: Column(
                     children: [
-                      // Time range row (from → to)
                       Row(
                         children: [
                           GestureDetector(
@@ -703,8 +747,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                           ),
                           const SizedBox(width: 12),
                           GestureDetector(
-                            onTap: () =>
-                                _pickTimeWithDays(context, false, item),
+                            onTap: () => _pickTimeWithDays(context, false, item, minTime: item.start),
                             child: Row(
                               children: [
                                 Text(
@@ -729,7 +772,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // Day chips for this time range.
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -738,15 +780,12 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                             return Padding(
                               padding: const EdgeInsets.only(right: 6.0),
                               child: ChoiceChip(
-                                label: Text(
-                                  day,
-                                  style: GoogleFonts.lato(
-                                    fontSize: 14,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.black,
-                                  ),
-                                ),
+                                label: Text(day,
+                                    style: GoogleFonts.lato(
+                                        fontSize: 14,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black)),
                                 selected: isSelected,
                                 selectedColor: Colors.orange,
                                 onSelected: (_) =>
@@ -764,7 +803,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
             },
           ),
         ),
-        // "add new time range" button.
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -788,7 +826,6 @@ class _AvailabilityPageState extends State<AvailabilityPage>
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      // No background color on the bottom button section.
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
