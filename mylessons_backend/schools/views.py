@@ -743,16 +743,258 @@ def add_staff_view(request):
 @permission_classes([IsAuthenticated])
 def get_all_subjects(request):
     """
-    Returns a list of all Sport objects (subjects) as dictionaries.
+    Returns a list of all subjects (Sports) as dictionaries.
+    If a school_id is provided, returns subjects linked to that school (school.sports.all()).
+    If a lesson_id or pack_id is provided, also returns the selected subject (lesson.sport or pack.sport).
     """
-    subjects = Sport.objects.all().values()
-    return Response(list(subjects), status=status.HTTP_200_OK)
+    lesson_id = request.GET.get('lesson_id')
+    pack_id = request.GET.get('pack_id')
+    school_id = request.GET.get('school_id')
+
+    selected_subject = None
+    selected_subjects = None
+    subjects_qs = Sport.objects.all().values()
+
+    # If school_id provided, get subjects from that school; otherwise, get all subjects.
+        
+
+    if school_id:
+        try:
+            school = School.objects.get(pk=school_id)
+            selected_subjects = [
+                {
+                    "id": subject.id,
+                    "name": subject.name,
+                }
+                for subject in school.sports.all()
+            ]
+            
+        except School.DoesNotExist:
+            print("Error on school_id")
+    # Check for lesson_id or pack_id to set the selected subject.
+    elif lesson_id:
+        try:
+            lesson = Lesson.objects.get(pk=lesson_id)
+            selected_subject_obj = lesson.sport  # assuming lesson.sport is a Sport instance
+            
+            selected_subject = {"id": selected_subject_obj.id, "name": selected_subject_obj.name} if selected_subject_obj else None
+        except Lesson.DoesNotExist:
+            selected_subject = None
+    elif pack_id:
+        try:
+            pack = Pack.objects.get(pk=pack_id)
+            selected_subject_obj = pack.sport  # assuming pack.sport is a Sport instance
+            selected_subject = {"id": selected_subject_obj.id, "name": selected_subject_obj.name} if selected_subject_obj else None
+        except Pack.DoesNotExist:
+            selected_subject = None
+
+    response_data = {
+        "subjects": list(subjects_qs),
+    }
+    if selected_subject:
+        response_data["selected_subject"] = selected_subject
+    if selected_subjects:
+        response_data["selected_subjects"] = selected_subjects
+
+    return Response(response_data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_all_locations(request):
     """
-    Returns a list of all Location objects as dictionaries.
+    Returns a list of all locations as dictionaries.
+    If a school_id is provided, returns locations linked to that school (school.locations.all()).
+    If a lesson_id or pack_id is provided, also returns the selected location (lesson.location or pack.location).
     """
-    locations = Location.objects.all().values()
-    return Response(list(locations), status=status.HTTP_200_OK)
+    lesson_id = request.GET.get('lesson_id')
+    pack_id = request.GET.get('pack_id')
+    school_id = request.GET.get('school_id')
+
+    selected_location = None
+    selected_locations = None
+    locations_qs = Location.objects.all().values()
+
+    # If school_id provided, get locations from that school; otherwise, get all locations.
+    if school_id:
+        try:
+            school = School.objects.get(pk=school_id)
+            selected_locations = [
+                {
+                    "id": location.id,
+                    "name": location.name,
+                }
+                for location in school.locations.all()
+            ]
+        except School.DoesNotExist:
+            print("Error on school_id")
+
+    # Check for lesson_id or pack_id to set the selected location.
+    elif lesson_id:
+        try:
+            lesson = Lesson.objects.get(pk=lesson_id)
+            selected_location_obj = lesson.location  # assuming lesson.location is a Location instance
+            selected_location = {"id": selected_location_obj.id, "name": selected_location_obj.name} if selected_location_obj else None
+        except Lesson.DoesNotExist:
+            selected_location = None
+    elif pack_id:
+        try:
+            pack = Pack.objects.get(pk=pack_id)
+            selected_location_obj = pack.location  # assuming pack.location is a Location instance
+            selected_location = {"id": selected_location_obj.id, "name": selected_location_obj.name} if selected_location_obj else None
+        except Pack.DoesNotExist:
+            selected_location = None
+
+    response_data = {
+        "locations": list(locations_qs),
+    }
+    if selected_location:
+        response_data["selected_location"] = selected_location
+    if selected_locations:
+        response_data["selected_locations"] = selected_locations
+
+    return Response(response_data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_school_subjects(request):
+    """
+    Updates the subjects associated with a school.
+    Expects a JSON payload:
+      {
+         "school_id": <school id>,
+         "subject_ids": [list of subject ids]
+      }
+    The school's subjects will be replaced with the provided subjects.
+    """
+    try:
+        data = request.data
+        school_id = data.get("school_id")
+        subject_ids = data.get("subject_ids")
+        if not school_id or subject_ids is None:
+            return Response({"success": False, "error": "Missing school_id or subject_ids"}, status=400)
+        school = School.objects.get(pk=school_id)
+        subjects = Sport.objects.filter(id__in=subject_ids)
+        school.sports.set(subjects)
+        school.save()
+        return Response({"success": True, "school_id": school.id}, status=200)
+    except School.DoesNotExist:
+        return Response({"success": False, "error": "School not found"}, status=404)
+    except Exception as e:
+        return Response({"success": False, "error": str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_school_locations(request):
+    """
+    Updates the subjects associated with a school.
+    Expects a JSON payload:
+      {
+         "school_id": <school id>,
+         "subject_ids": [list of subject ids]
+      }
+    The school's subjects will be replaced with the provided subjects.
+    """
+    try:
+        data = request.data
+        school_id = data.get("school_id")
+        location_ids = data.get("location_ids")
+        if not school_id or location_ids is None:
+            return Response({"success": False, "error": "Missing school_id or location_ids"}, status=400)
+        school = School.objects.get(pk=school_id)
+        locations = Location.objects.filter(id__in=location_ids)
+        school.locations.set(locations)
+        school.save()
+        return Response({"success": True, "school_id": school.id}, status=200)
+    except School.DoesNotExist:
+        return Response({"success": False, "error": "School not found"}, status=404)
+    except Exception as e:
+        return Response({"success": False, "error": str(e)}, status=500)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_location(request):
+    """
+    Add the Location for a lesson, pack or school.
+    """
+    lesson_id = request.data.get("lesson_id")
+    pack_id = request.data.get("pack_id")
+    school_id = request.data.get("school_id")
+    location_name = request.data.get("location_name")
+    location_address = request.data.get("location_address")
+    
+    if not location_name:
+        return Response({"error": "É necessário fornecer location_name"}, status=400)
+    if not location_address:
+        return Response({"error": "É necessário fornecer location_address"}, status=400)
+    if not lesson_id and not pack_id and not school_id:
+        return Response({"error": "É necessário fornecer lesson_id ou pack_id ou school_id"}, status=400)
+        
+    lesson = None
+    pack = None
+    school = None
+    
+    location = Location.objects.create(name=location_name, address=location_address)
+    
+    if lesson_id:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        lesson.school.locations.add(location)
+        lesson.location = location
+        lesson.save()
+    elif pack_id:
+        pack = get_object_or_404(Pack, id=pack_id)
+        pack.school.locations.add(location)
+        pack.location = location
+        pack.save()
+    elif school_id:
+        school = get_object_or_404(School, id=school_id)
+        school.locations.add(location)
+        
+    status_msg = "location set"
+    
+    return Response({"status": status_msg}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_subject(request):
+    """
+    Add the Subject for a lesson, pack or school.
+    """
+    print(f"Incoming payload:\n{request.data}")
+    lesson_id = request.data.get("lesson_id")
+    pack_id = request.data.get("pack_id")
+    school_id = request.data.get("school_id")
+    subject_name = request.data.get("subject_name")
+    
+    if not subject_name:
+        return Response({"error": "É necessário fornecer subject_name"}, status=400)
+    if not lesson_id and not pack_id and not school_id:
+        return Response({"error": "É necessário fornecer lesson_id ou pack_id ou school_id"}, status=400)
+        
+    lesson = None
+    pack = None
+    school = None
+    
+    subject = Sport.objects.create(name=subject_name)
+    if not subject:
+        return Response({"error": "Subject was not created"}, status=400)
+    else:
+        print(f"Subject created: {subject}")
+    
+    if lesson_id:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        lesson.school.sports.add(subject)
+        lesson.sport = subject
+        lesson.save()
+    elif pack_id:
+        pack = get_object_or_404(Pack, id=pack_id)
+        pack.school.sports.add(subject)
+        pack.sport = subject
+        pack.save()
+    elif school_id:
+        school = get_object_or_404(School, id=school_id)
+        school.sports.add(subject)
+        
+    status_msg = "Subject set"
+    
+    return Response({"status": status_msg}, status=status.HTTP_200_OK)

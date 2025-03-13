@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart'; // Exports getAuthHeaders() and baseUrl
 
 class SubjectModal extends StatefulWidget {
-  final int lessonId;
-  const SubjectModal({super.key, required this.lessonId});
+  final int? lessonId;
+  final int? packId;
+  final int? schoolId;
+  const SubjectModal({Key? key, this.lessonId, this.packId, this.schoolId})
+      : super(key: key);
 
   @override
   _SubjectModalState createState() => _SubjectModalState();
@@ -18,7 +20,13 @@ class _SubjectModalState extends State<SubjectModal>
   List<dynamic> subjects = [];
   bool isLoading = false;
   String searchQuery = "";
+  dynamic selectedSubject; // singular selected subject from lesson/pack
+  List<int> _selectedIds = []; // for multi-select mode
+
   final TextEditingController _newSubjectController = TextEditingController();
+
+  // Multi-select mode is active if a school_id is provided.
+  bool get isMultiSelect => widget.schoolId != null;
 
   @override
   void initState() {
@@ -32,19 +40,55 @@ class _SubjectModalState extends State<SubjectModal>
       isLoading = true;
     });
     try {
-      final response = await http.get(
-        Uri.parse("$baseUrl/api/schools/subjects/"),
-        headers: await getAuthHeaders(),
-      );
+      // Build query parameters using lessonId, packId, and schoolId if available.
+      Map<String, String> queryParams = {};
+      if (widget.lessonId != null) {
+        queryParams['lesson_id'] = widget.lessonId.toString();
+      }
+      if (widget.packId != null) {
+        queryParams['pack_id'] = widget.packId.toString();
+      }
+      if (widget.schoolId != null) {
+        queryParams['school_id'] = widget.schoolId.toString();
+      }
+      Uri uri = Uri.parse("$baseUrl/api/schools/subjects/")
+          .replace(queryParameters: queryParams);
+
+      // Decode the response as UTF8.
+      final response = await http.get(uri, headers: await getAuthHeaders());
       if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
-        // Sort alphabetically by subject name.
-        data.sort((a, b) => a["name"]
-            .toString()
-            .toLowerCase()
-            .compareTo(b["name"].toString().toLowerCase()));
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         setState(() {
-          subjects = data;
+          subjects = (data["subjects"] as List?) ?? [];
+          selectedSubject = data["selected_subject"];
+          if (isMultiSelect) {
+            // In multi-select mode, get the list of subject ids currently associated with the school.
+            _selectedIds = (data["selected_subjects"] as List?)
+                    ?.map((s) => s["id"] as int)
+                    .toList() ??
+                [];
+          }
+          // Sort subjects so that items selected (by _selectedIds in multi-select,
+          // or by singular selectedSubject otherwise) come first, then alphabetically.
+          subjects.sort((a, b) {
+            bool aSelected;
+            bool bSelected;
+            if (isMultiSelect) {
+              aSelected = _selectedIds.contains(a["id"]);
+              bSelected = _selectedIds.contains(b["id"]);
+            } else {
+              aSelected =
+                  selectedSubject != null && a["id"] == selectedSubject["id"];
+              bSelected =
+                  selectedSubject != null && b["id"] == selectedSubject["id"];
+            }
+            if (aSelected && !bSelected) return -1;
+            if (bSelected && !aSelected) return 1;
+            return a["name"]
+                .toString()
+                .toLowerCase()
+                .compareTo(b["name"].toString().toLowerCase());
+          });
         });
       }
     } catch (e) {
@@ -55,23 +99,33 @@ class _SubjectModalState extends State<SubjectModal>
     });
   }
 
+  // For multi-select mode: toggle the selection of a subject.
+  void _toggleSelection(int subjectId) {
+    setState(() {
+      if (_selectedIds.contains(subjectId)) {
+        _selectedIds.remove(subjectId);
+      } else {
+        _selectedIds.add(subjectId);
+      }
+    });
+  }
+
+  // For single-select mode: handle selection immediately.
   void _selectSubject(dynamic subject) async {
     bool? confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Confirm Selection"),
-          content: Text("Do you want to select subject: ${subject["name"]}?"),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel")),
-            TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text("Confirm")),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Selection"),
+        content: Text("Do you want to select subject: ${subject["name"]}?"),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Confirm")),
+        ],
+      ),
     );
     if (confirmed == true) {
       final url = "$baseUrl/api/lessons/edit_lesson_subject/";
@@ -90,8 +144,8 @@ class _SubjectModalState extends State<SubjectModal>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Error updating subject: ${utf8.decode(response.bodyBytes)}"),
-            ),
+                content: Text(
+                    "Error updating subject: ${utf8.decode(response.bodyBytes)}")),
           );
         }
       } catch (e) {
@@ -101,48 +155,79 @@ class _SubjectModalState extends State<SubjectModal>
     }
   }
 
+  // Update subjects for multi-select mode.
+  Future<void> _updateSubjects() async {
+    final url = "$baseUrl/api/schools/update_subjects/";
+    try {
+      final response = await http.post(Uri.parse(url),
+          headers: await getAuthHeaders(),
+          body: jsonEncode({
+            "school_id": widget.schoolId,
+            "subject_ids": _selectedIds,
+          }));
+      if (response.statusCode == 200) {
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  "Error updating subjects: ${utf8.decode(response.bodyBytes)}")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
+  }
+
+  // Updated subject creation: pass only lesson_id if lessonId isn't null,
+  // else pass pack_id if packId isn't null, else pass school_id if schoolId isn't null.
   void _createSubject() async {
     if (_newSubjectController.text.trim().isEmpty) return;
-    // Show confirmation dialog before creating.
     bool? confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Confirm Creation"),
-          content: Text("Do you want to create subject: ${_newSubjectController.text.trim()}?"),
-          actions: [
-            TextButton(
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Creation"),
+        content: Text(
+            "Do you want to create subject: ${_newSubjectController.text.trim()}?"),
+        actions: [
+          TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel"),
-            ),
-            TextButton(
+              child: const Text("Cancel")),
+          TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("Confirm"),
-            ),
-          ],
-        );
-      },
+              child: const Text("Confirm")),
+        ],
+      ),
     );
     if (confirmed != true) return;
 
-    final url = "$baseUrl/api/lessons/edit_lesson_subject/";
+    final url = "$baseUrl/api/schools/create_subject/";
+    // Build the payload based on which ID is available.
+    Map<String, dynamic> payload = {
+      "subject_name": _newSubjectController.text.trim(),
+    };
+    if (widget.lessonId != null) {
+      payload["lesson_id"] = widget.lessonId;
+    } else if (widget.packId != null) {
+      payload["pack_id"] = widget.packId;
+    } else if (widget.schoolId != null) {
+      payload["school_id"] = widget.schoolId;
+    }
+
     try {
       final response = await http.post(
         Uri.parse(url),
         headers: await getAuthHeaders(),
-        body: jsonEncode({
-          "lesson_id": widget.lessonId,
-          // For creating, we pass the new subject name as subject_id.
-          "subject_id": _newSubjectController.text.trim(),
-          "action": "add",
-        }),
+        body: jsonEncode(payload),
       );
       if (response.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text("Error creating subject: ${utf8.decode(response.bodyBytes)}")),
+              content: Text(
+                  "Error creating subject: ${utf8.decode(response.bodyBytes)}")),
         );
       }
     } catch (e) {
@@ -153,6 +238,12 @@ class _SubjectModalState extends State<SubjectModal>
 
   @override
   Widget build(BuildContext context) {
+    // Filter subjects based on the search query.
+    List<dynamic> filteredSubjects = subjects
+        .where((subject) =>
+            subject["name"].toString().toLowerCase().contains(searchQuery))
+        .toList();
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16.0,
@@ -161,7 +252,7 @@ class _SubjectModalState extends State<SubjectModal>
         bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min, // Wrap content height
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Modal Header
@@ -173,9 +264,8 @@ class _SubjectModalState extends State<SubjectModal>
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context)),
             ],
           ),
           const SizedBox(height: 8),
@@ -196,43 +286,75 @@ class _SubjectModalState extends State<SubjectModal>
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Tab 1: Select Existing
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          labelText: "Search Subject",
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            searchQuery = value.toLowerCase();
-                          });
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : ListView(
-                              children: subjects.where((subject) {
-                                return subject["name"]
-                                    .toString()
-                                    .toLowerCase()
-                                    .contains(searchQuery);
-                              }).map((subject) {
-                                return ListTile(
-                                  title: Text(subject["name"]),
-                                  trailing: const Icon(Icons.arrow_forward, color: Colors.orange),
-                                  onTap: () => _selectSubject(subject),
-                                );
-                              }).toList(),
+                // Tab 1: Select Existing with Search Input
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    decoration: const InputDecoration(
+                                      labelText: "Search Subject",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        searchQuery = value.toLowerCase();
+                                      });
+                                    },
+                                  ),
+                                ),
+                                if (isMultiSelect) ...[
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: _updateSubjects,
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange),
+                                    child: const Text("Save"),
+                                  ),
+                                ],
+                              ],
                             ),
-                    ),
-                  ],
-                ),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: isMultiSelect
+                                  ? ListView(
+                                      children: filteredSubjects.map((subject) {
+                                        bool isChecked =
+                                            _selectedIds.contains(subject["id"]);
+                                        return CheckboxListTile(
+                                          title: Text(subject["name"]),
+                                          value: isChecked,
+                                          activeColor: Colors.orange,
+                                          onChanged: (val) =>
+                                              _toggleSelection(subject["id"] as int),
+                                        );
+                                      }).toList(),
+                                    )
+                                  : ListView(
+                                      children: filteredSubjects.map((subject) {
+                                        bool isSelected = selectedSubject != null &&
+                                            subject["id"] ==
+                                                selectedSubject["id"];
+                                        return ListTile(
+                                          title: Text(subject["name"]),
+                                          trailing: isSelected
+                                              ? const Icon(Icons.check_circle,
+                                                  color: Colors.orange)
+                                              : const Icon(Icons.arrow_forward,
+                                                  color: Colors.orange),
+                                          onTap: () => _selectSubject(subject),
+                                        );
+                                      }).toList(),
+                                    ),
+                            ),
+                          ],
+                        ),
+                      ),
                 // Tab 2: Create New
                 Padding(
                   padding: const EdgeInsets.all(16.0),

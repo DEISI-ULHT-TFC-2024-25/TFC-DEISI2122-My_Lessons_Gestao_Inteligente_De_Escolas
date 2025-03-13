@@ -276,21 +276,29 @@ class School(models.Model):
         # ------------------------------------------------------------------
         def check_overlaps(fixed_list, context_label):
             """
-            If the next entry's min_students <= current entry's max_students,
-            we consider it overlapping.
+            Checks for overlapping min/max in a 'fixed' list, but only
+            if the two entries share the same 'duration'.
             """
-            sorted_list = sorted(fixed_list, key=lambda x: x.get("min_students", 0))
+            # Sort primarily by duration, then by min_students
+            sorted_list = sorted(
+                fixed_list,
+                key=lambda x: (x.get("duration", 0), x.get("min_students", 0))
+            )
             for i in range(len(sorted_list) - 1):
                 current = sorted_list[i]
                 nxt = sorted_list[i + 1]
-                if nxt["min_students"] <= current["max_students"]:
-                    conflicts.append(
-                        f"Overlapping min/max in {context_label}: "
-                        f"{current['min_students']}-{current['max_students']} "
-                        f"and {nxt['min_students']}-{nxt['max_students']}."
-                    )
-                    # If you want to catch ALL overlaps, remove this break
-                    break
+                # Only compare if durations match
+                if current.get("duration") == nxt.get("duration"):
+                    if nxt["min_students"] <= current["max_students"]:
+                        # They overlap
+                        conflicts.append(
+                            f"Overlapping min/max in {context_label}: "
+                            f"{current['min_students']}-{current['max_students']} "
+                            f"and {nxt['min_students']}-{nxt['max_students']} "
+                            f"for duration={current['duration']}."
+                        )
+                        # If you only want to report the first overlap, break here.
+                        # break
 
         # ------------------------------------------------------------------
         # Helper: Coverage Check

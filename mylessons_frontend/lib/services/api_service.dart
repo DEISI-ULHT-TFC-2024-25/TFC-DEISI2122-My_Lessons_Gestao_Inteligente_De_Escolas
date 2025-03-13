@@ -24,7 +24,7 @@ Future<String> fetchCurrentRole() async {
   final headers = await getAuthHeaders();
   final url = '$baseUrl/api/users/current_role/';
   final response = await http.get(Uri.parse(url), headers: headers);
-  
+
   if (response.statusCode == 200) {
     final data = json.decode(utf8.decode(response.bodyBytes));
     return data['current_role'] as String;
@@ -33,14 +33,14 @@ Future<String> fetchCurrentRole() async {
   }
 }
 
-
 /// Performs email/password login. Returns the decoded JSON response.
 Future<Map<String, dynamic>> login(String email, String password) async {
- 
   final Uri loginUrl = Uri.parse('$baseUrl/api/users/login/');
   final response = await http.post(
     loginUrl,
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+    },
     body: jsonEncode({
       'username': email,
       'password': password,
@@ -90,7 +90,6 @@ Future<Map<String, dynamic>> googleSignInAuth() async {
     throw Exception(data['error'] ?? 'Error during Google sign-in.');
   }
 }
-
 
 Future<List<Map<String, dynamic>>> fetchSchools() async {
   final url = Uri.parse('$baseUrl/api/schools/all_schools/');
@@ -148,7 +147,8 @@ Future<Map<String, dynamic>?> fetchPackDetails(int packId) async {
   }
 }
 
-Future<List<String>> fetchAvailableTimes(int lessonId, DateTime date, int increment) async {
+Future<List<String>> fetchAvailableTimes(
+    int lessonId, DateTime date, int increment) async {
   final headers = await getAuthHeaders();
   final response = await http.post(
     Uri.parse('$baseUrl/api/lessons/available_lesson_times/'),
@@ -181,7 +181,8 @@ Future<bool> canStillReschedule(int lessonId) async {
   }
 }
 
-Future<String?> schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) async {
+Future<String?> schedulePrivateLesson(
+    int lessonId, DateTime newDate, String newTime) async {
   final headers = await getAuthHeaders();
   final newDateStr = DateFormat('yyyy-MM-dd').format(newDate);
   final payload = {
@@ -214,4 +215,3 @@ Future<void> markNotificationsAsRead(List<int> notificationIds) async {
     print("Error marking notifications as read: ${response.body}");
   }
 }
-

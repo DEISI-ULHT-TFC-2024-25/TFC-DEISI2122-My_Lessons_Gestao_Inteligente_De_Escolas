@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../modals/add_staff_modal.dart';
+import '../modals/payment_modal.dart';
+import '../modals/service_modal.dart';
+import '../modals/subject_modal.dart';
+import '../modals/location_modal.dart';
 import '../services/school_service.dart';
 import '../services/api_service.dart';
 import '../widgets/payment_widgets.dart';
 import '../widgets/staff_widgets.dart';
-import '../modals/payment_modal.dart';
-import '../modals/service_modal.dart';
 
 class SchoolSetupPage extends StatefulWidget {
   final bool isCreatingSchool;
@@ -50,6 +52,9 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
   }
 
+  /// This function calls fetchSchoolDetails() from school_service.dart.
+  /// Ensure that fetchSchoolDetails() decodes HTTP responses using:
+  ///    jsonDecode(utf8.decode(response.bodyBytes))
   Future<void> fetchAndDisplaySchoolDetails() async {
     try {
       final details = await fetchSchoolDetails();
@@ -68,6 +73,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
   }
 
+  /// This function calls createSchool() from school_service.dart.
+  /// Ensure that createSchool() decodes HTTP responses using UTF8 as well.
   Future<void> createSchoolAction() async {
     final schoolName = _schoolNameController.text.trim();
     if (schoolName.isEmpty) {
@@ -274,7 +281,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       case 0:
         // Services tab
         if (schoolDetails != null) {
-          showAddEditServiceModal(context, schoolDetails!);
+          await showAddEditServiceModal(context, schoolDetails!);
+          await fetchAndDisplaySchoolDetails();
         }
         break;
       case 1:
@@ -287,7 +295,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       case 2:
         // Staff Payments tab
         if (schoolDetails != null) {
-          showPaymentTypeModal(
+          await showPaymentTypeModal(
             context,
             schoolDetails!,
             _schoolNameController,
@@ -298,10 +306,17 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         }
         break;
       case 3:
-        // Subjects tab - placeholder
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Add Subject clicked")),
-        );
+        // Subjects tab: show the Subject modal.
+        if (schoolDetails != null) {
+          await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => SubjectModal(
+              schoolId: schoolDetails!['school_id'],
+            ),
+          );
+          await fetchAndDisplaySchoolDetails();
+        }
         break;
       case 4:
         // Equipments tab - placeholder
@@ -310,10 +325,17 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         );
         break;
       case 5:
-        // Locations tab - placeholder
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Add Location clicked")),
-        );
+        // Locations tab: show the Location modal.
+        if (schoolDetails != null && schoolDetails!['school_id'] != null ) {
+          await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => LocationModal(
+              schoolId: schoolDetails!['school_id'],
+            ),
+          );
+          await fetchAndDisplaySchoolDetails();
+        }
         break;
       default:
         break;
