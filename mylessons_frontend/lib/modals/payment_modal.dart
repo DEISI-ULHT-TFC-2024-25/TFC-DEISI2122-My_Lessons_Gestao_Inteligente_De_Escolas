@@ -6,14 +6,14 @@ import '../services/payment_service.dart';
 import '../services/api_service.dart';
 
 /// Added an optional parameter [preselectedOptions] to pre-populate fields.
-void showPaymentTypeModal(
+Future showPaymentTypeModal(
   BuildContext context,
   Map<String, dynamic> schoolDetails,
   TextEditingController schoolNameController,
   Future<void> Function() refreshSchoolDetails, {
   Map<String, dynamic>? preselectedOptions,
   String? userId,
-}) {
+}) async {
   // Selected values.
   String? selectedRole;
   String? selectedPaymentMode;

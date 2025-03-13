@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import add_instructor, add_staff_view, check_user_view, get_all_locations, get_all_subjects, remove_instructor,delete_payment_type_entry_view ,number_of_bookings_in_timeframe, school_revenue_in_timeframe, number_of_students_in_timeframe, number_of_instructors_in_timeframe, update_pack_price_view, school_details_view, update_payment_type_view, all_schools, get_services, add_edit_service, create_school
+from .views import add_instructor, add_staff_view, check_user_view, create_location, create_subject, get_all_locations, get_all_subjects, remove_instructor,delete_payment_type_entry_view ,number_of_bookings_in_timeframe, school_revenue_in_timeframe, number_of_students_in_timeframe, number_of_instructors_in_timeframe, update_pack_price_view, school_details_view, update_payment_type_view, all_schools, get_services, add_edit_service, create_school, update_school_locations, update_school_subjects
 
 urlpatterns = [
     path('add_instructor/', add_instructor, name='add_instructor'),
@@ -20,4 +20,9 @@ urlpatterns = [
     path('check_user/', check_user_view, name='check_user'),
     path('subjects/', get_all_subjects, name='get_all_subjects'),
     path('locations/', get_all_locations, name='get_all_sports'),
+    path('update_subjects/', update_school_subjects, name='update_school_subjects'),
+    path('update_locations/', update_school_locations, name='update_school_locations'),
+    path('create_subject/', create_subject, name='create_subject'),
+    path('create_location/', create_location, name='create_location'),
+    
 ]   
