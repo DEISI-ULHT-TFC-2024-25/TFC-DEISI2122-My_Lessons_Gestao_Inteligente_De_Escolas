@@ -28,3 +28,14 @@ Future<http.Response> registerUser({
   );
   return response;
 }
+
+Future<List<String>> fetchAllUsernames() async {
+  final url = Uri.parse('$baseUrl/api/users/usernames/');
+  final response = await http.get(url, headers: {"Content-Type": "application/json"},);
+  if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((u) => u.toString()).toList();
+  } else {
+    throw Exception("Failed to load usernames");
+  }
+}

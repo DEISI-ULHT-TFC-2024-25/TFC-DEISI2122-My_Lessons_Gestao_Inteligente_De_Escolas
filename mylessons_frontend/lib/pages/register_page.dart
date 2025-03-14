@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:country_picker/country_picker.dart';
 import '../services/register_service.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -22,13 +23,95 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final String _selectedCountryCode = "+351"; // Default for Portugal
 
-  // State for checkboxes.
+  // Default country (Portugal) using a Country object.
+  Country _selectedCountry = Country(
+    countryCode: 'PT',
+    phoneCode: '351',
+    e164Sc: 0,
+    geographic: true,
+    level: 1,
+    name: 'Portugal',
+    displayName: 'Portugal',
+    displayNameNoCountryCode: 'Portugal',
+    e164Key: '351-PT-0',
+    example: '912345678',
+  );
+
+  // Checkbox states.
   bool _dontReceiveMarketing = false;
   bool _agreeTerms = false;
 
-  void _nextPage() {
+  // Password validation booleans.
+  bool _hasLetter = false;
+  bool _hasNumberOrSpecial = false;
+  bool _hasMinLength = false;
+
+  // Username availability data.
+  List<String> _allUsernames = [];
+  bool _isUsernamesLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_validatePassword);
+    _fetchAllUsernames();
+  }
+
+  // Fetch all usernames from backend when the register page loads.
+  Future<void> _fetchAllUsernames() async {
+    try {
+      final usernames = await fetchAllUsernames();
+      setState(() {
+        // Store all usernames in lowercase for easier comparison.
+        _allUsernames = usernames.map((u) => u.toLowerCase()).toList();
+        _isUsernamesLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isUsernamesLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error fetching usernames: $e")),
+      );
+    }
+  }
+
+  void _validatePassword() {
+    final password = _passwordController.text;
+    bool hasLetter = RegExp(r'[A-Za-z]').hasMatch(password);
+    bool hasNumberOrSpecial = RegExp(r'[\d#?!&]').hasMatch(password);
+    bool hasMinLength = password.length >= 10;
+    setState(() {
+      _hasLetter = hasLetter;
+      _hasNumberOrSpecial = hasNumberOrSpecial;
+      _hasMinLength = hasMinLength;
+    });
+  }
+
+  Future<void> _nextPage() async {
+    // Step 1: Verify username availability on the email page.
+    if (_currentPage == 0) {
+      final email = _emailController.text;
+      if (email.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please enter an email.")),
+        );
+        return;
+      }
+      // Convert email to lowercase.
+      final username = email.toLowerCase();
+      _emailController.text = username;
+      // Check if the username exists in the pre-fetched list.
+      if (_allUsernames.contains(username)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Username is already taken.")),
+        );
+        return;
+      }
+    }
+
+    // Ensure the current step's required field(s) are filled before proceeding.
     if ((_currentPage == 0 && _emailController.text.isNotEmpty) ||
         (_currentPage == 1 && _passwordController.text.isNotEmpty) ||
         (_currentPage == 2 &&
@@ -57,8 +140,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_agreeTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text("You must accept the terms and conditions to proceed.")),
+            content: Text("You must accept the terms and conditions to proceed.")),
       );
       return;
     }
@@ -70,7 +152,7 @@ class _RegisterPageState extends State<RegisterPage> {
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         phone: _phoneController.text,
-        countryCode: _selectedCountryCode,
+        countryCode: _selectedCountry.phoneCode,
       );
 
       if (response.statusCode == 201) {
@@ -143,10 +225,10 @@ class _RegisterPageState extends State<RegisterPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 65),
           const Text(
-            "Register on MyLessons",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            "Register an email",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
           TextField(
@@ -158,35 +240,34 @@ class _RegisterPageState extends State<RegisterPage> {
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _nextPage,
-            child: const Text("Next"),
-          ),
+          // Show a loading animation until usernames are fetched.
+          _isUsernamesLoading
+              ? const CircularProgressIndicator()
+              : ElevatedButton(
+                  onPressed: _nextPage,
+                  child: const Text("Next"),
+                ),
           const SizedBox(height: 24),
           Row(
-            children: const <Widget>[
-              Expanded(child: Divider()),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                child: Text("or"),
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                "Already have an account? ",
+                style: TextStyle(color: Colors.black),
               ),
-              Expanded(child: Divider()),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pushReplacementNamed(context, '/login');
+                },
+                child: const Text(
+                  'Login here!',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              // TODO: Implement Google sign-up.
-            },
-            icon: const Icon(Icons.account_circle),
-            label: const Text("Register with Google"),
-          ),
-          const SizedBox(height: 24),
-          TextButton(
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/');
-            },
-            child: const Text("Already have an account? Login here"),
           ),
         ],
       ),
@@ -205,7 +286,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 icon: const Icon(Icons.arrow_back),
               ),
               const Spacer(),
-              const Text("Step 1 of 4"),
+              const Text("Step 2 of 5"),
             ],
           ),
           const SizedBox(height: 16),
@@ -227,33 +308,51 @@ class _RegisterPageState extends State<RegisterPage> {
             alignment: Alignment.centerLeft,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text("Your password needs at least:"),
-                SizedBox(height: 8),
+              children: [
+                const Text("Your password needs at least:"),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.check_box_outline_blank, size: 16),
-                    SizedBox(width: 8),
-                    Text("1 letter"),
+                    Icon(
+                      _hasLetter
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 16,
+                      color: _hasLetter ? Colors.orange : null,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text("1 letter"),
                   ],
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.check_box_outline_blank, size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
+                    Icon(
+                      _hasNumberOrSpecial
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 16,
+                      color: _hasNumberOrSpecial ? Colors.orange : null,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
                       child: Text(
                           "1 number or special character (example: # ? ! &)"),
                     )
                   ],
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.check_box_outline_blank, size: 16),
-                    SizedBox(width: 8),
-                    Text("10 characters"),
+                    Icon(
+                      _hasMinLength
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 16,
+                      color: _hasMinLength ? Colors.orange : null,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text("10 characters"),
                   ],
                 ),
               ],
@@ -261,7 +360,9 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _nextPage,
+            onPressed: (_hasLetter && _hasNumberOrSpecial && _hasMinLength)
+                ? _nextPage
+                : null,
             child: const Text("Next"),
           ),
         ],
@@ -281,7 +382,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 icon: const Icon(Icons.arrow_back),
               ),
               const Spacer(),
-              const Text("Step 2 of 4"),
+              const Text("Step 3 of 5"),
             ],
           ),
           const SizedBox(height: 16),
@@ -327,7 +428,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 icon: const Icon(Icons.arrow_back),
               ),
               const Spacer(),
-              const Text("Step 3 of 4"),
+              const Text("Step 4 of 5"),
             ],
           ),
           const SizedBox(height: 16),
@@ -336,20 +437,61 @@ class _RegisterPageState extends State<RegisterPage> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          TextField(
-            decoration: const InputDecoration(
-              labelText: "ID (with flag)",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _phoneController,
-            decoration: const InputDecoration(
-              labelText: "Number",
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.phone,
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  showCountryPicker(
+                    context: context,
+                    onSelect: (Country country) {
+                      setState(() {
+                        _selectedCountry = country;
+                      });
+                    },
+                    countryListTheme: CountryListThemeData(
+                      flagSize: 25,
+                      backgroundColor: Colors.white,
+                      textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                      bottomSheetHeight: 500,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20.0),
+                        topRight: Radius.circular(20.0),
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "${_selectedCountry.flagEmoji} +${_selectedCountry.phoneCode}",
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    labelText: "Number",
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -373,7 +515,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 icon: const Icon(Icons.arrow_back),
               ),
               const Spacer(),
-              const Text("Step 4 of 4"),
+              const Text("Step 5 of 5"),
             ],
           ),
           const SizedBox(height: 16),
@@ -383,8 +525,7 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           const SizedBox(height: 24),
           CheckboxListTile(
-            title:
-                const Text("I don't want to receive marketing from MyLessons"),
+            title: const Text("I don't want to receive marketing from MyLessons"),
             value: _dontReceiveMarketing,
             onChanged: (bool? value) {
               setState(() {
@@ -393,8 +534,7 @@ class _RegisterPageState extends State<RegisterPage> {
             },
           ),
           CheckboxListTile(
-            title: const Text(
-                "I agree with the terms and conditions of MyLessons"),
+            title: const Text("I agree with the terms and conditions of MyLessons"),
             value: _agreeTerms,
             onChanged: (bool? value) {
               setState(() {

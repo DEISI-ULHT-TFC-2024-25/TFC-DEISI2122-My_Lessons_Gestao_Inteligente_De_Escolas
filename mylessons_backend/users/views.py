@@ -979,3 +979,9 @@ def daily_timeline(request):
             })
 
     return Response(final_timeline, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def get_all_usernames(request):
+    # Query the UserAccount model and extract all usernames as a list.
+    usernames = list(UserAccount.objects.values_list('username', flat=True))
+    return Response(usernames, status=status.HTTP_200_OK)
