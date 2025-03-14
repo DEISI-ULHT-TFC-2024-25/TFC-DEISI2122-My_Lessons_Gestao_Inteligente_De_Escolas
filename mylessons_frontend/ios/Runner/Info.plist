@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mylessons Frontend</string>
+	<string>My Lessons</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,8 +45,6 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	
-
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -58,6 +56,5 @@
 			</array>
 		</dict>
 	</array>
-	
 </dict>
 </plist>

@@ -4,8 +4,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-//const String baseUrl = 'https://mylessons.pythonanywhere.com';
-const String baseUrl = 'http://127.0.0.1:8000';
+const String baseUrl = 'https://mylessons.pythonanywhere.com';
+//const String baseUrl = 'http://127.0.0.1:8000';
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
@@ -181,8 +181,7 @@ Future<bool> canStillReschedule(int lessonId) async {
   }
 }
 
-Future<String?> schedulePrivateLesson(
-    int lessonId, DateTime newDate, String newTime) async {
+Future<String?> schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) async {
   final headers = await getAuthHeaders();
   final newDateStr = DateFormat('yyyy-MM-dd').format(newDate);
   final payload = {
@@ -190,18 +189,24 @@ Future<String?> schedulePrivateLesson(
     "new_date": newDateStr,
     "new_time": newTime,
   };
+
   final response = await http.post(
     Uri.parse('$baseUrl/api/lessons/schedule_private_lesson/'),
     headers: headers,
     body: jsonEncode(payload),
   );
+
+  print("Response Status: ${response.statusCode}");
+  print("Response Body: ${response.body}");
+
   if (response.statusCode == 200) {
-    return null;
+    return null; // Success, no error message
   } else {
     final data = jsonDecode(response.body);
     return data['error'] ?? "Failed to schedule lesson";
   }
 }
+
 
 Future<void> markNotificationsAsRead(List<int> notificationIds) async {
   if (notificationIds.isEmpty) return;
