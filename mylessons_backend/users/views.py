@@ -477,8 +477,8 @@ def book_pack_view(request):
                 if not school_obj:
                     raise ValueError("No School available for fallback.")
             else:
-                # Assume school_identifier is a numeric ID.
-                school_obj = get_object_or_404(School, id=school_identifier)
+                # Assume school_identifier is the name.
+                school_obj = get_object_or_404(School, name=school_identifier)
             
             # Convert the expiration_date if needed.
             # (Assuming it's already in YYYY-MM-DD format from the payload.)
