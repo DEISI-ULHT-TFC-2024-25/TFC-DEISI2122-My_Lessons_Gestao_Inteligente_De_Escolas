@@ -981,7 +981,11 @@ def daily_timeline(request):
     return Response(final_timeline, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-def get_all_usernames(request):
-    # Query the UserAccount model and extract all usernames as a list.
-    usernames = list(UserAccount.objects.values_list('username', flat=True))
-    return Response(usernames, status=status.HTTP_200_OK)
+@permission_classes([AllowAny])
+def check_username_availability(request):
+    username = request.query_params.get('username', '').strip().lower()
+    if not username:
+        return Response({"error": "Username parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+    # Check if any user exists with the given username (case-insensitive).
+    exists = UserAccount.objects.filter(username__iexact=username).exists()
+    return Response({"available": not exists}, status=status.HTTP_200_OK)

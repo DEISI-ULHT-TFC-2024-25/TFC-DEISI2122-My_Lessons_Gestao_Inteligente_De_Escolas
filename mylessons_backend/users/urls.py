@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import get_all_usernames, daily_timeline, get_selected_students, login_view, google_oauth_start, register_user, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view, store_google_credentials
+from .views import  check_username_availability, daily_timeline, get_selected_students, login_view, google_oauth_start, register_user, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view, store_google_credentials
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -21,7 +21,7 @@ urlpatterns = [
     path('book_pack/', book_pack_view, name='book_pack'),
     path('update_availability/', update_availability, name='update_availability'),
     path('daily_timeline/', daily_timeline, name='daily_timeline'),  
-    path('usernames/', get_all_usernames, name='usernames'),    
+    path('check_username/', check_username_availability, name='check_username'),
 
     # Add more paths (e.g., /google/callback) as needed
 ]
