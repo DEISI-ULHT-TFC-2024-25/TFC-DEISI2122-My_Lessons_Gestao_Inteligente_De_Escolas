@@ -47,34 +47,10 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _hasNumberOrSpecial = false;
   bool _hasMinLength = false;
 
-  // Username availability data.
-  List<String> _allUsernames = [];
-  bool _isUsernamesLoading = true;
-
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(_validatePassword);
-    _fetchAllUsernames();
-  }
-
-  // Fetch all usernames from backend when the register page loads.
-  Future<void> _fetchAllUsernames() async {
-    try {
-      final usernames = await fetchAllUsernames();
-      setState(() {
-        // Store all usernames in lowercase for easier comparison.
-        _allUsernames = usernames.map((u) => u.toLowerCase()).toList();
-        _isUsernamesLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isUsernamesLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error fetching usernames: $e")),
-      );
-    }
   }
 
   void _validatePassword() {
@@ -90,7 +66,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _nextPage() async {
-    // Step 1: Verify username availability on the email page.
+    // On Step 1, check username availability.
     if (_currentPage == 0) {
       final email = _emailController.text;
       if (email.isEmpty) {
@@ -102,15 +78,15 @@ class _RegisterPageState extends State<RegisterPage> {
       // Convert email to lowercase.
       final username = email.toLowerCase();
       _emailController.text = username;
-      // Check if the username exists in the pre-fetched list.
-      if (_allUsernames.contains(username)) {
+      // Check availability via the dedicated endpoint.
+      bool available = await isUsernameAvailable(username);
+      if (!available) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Username is already taken.")),
         );
         return;
       }
     }
-
     // Ensure the current step's required field(s) are filled before proceeding.
     if ((_currentPage == 0 && _emailController.text.isNotEmpty) ||
         (_currentPage == 1 && _passwordController.text.isNotEmpty) ||
@@ -122,7 +98,9 @@ class _RegisterPageState extends State<RegisterPage> {
         _currentPage++;
       });
       _pageController.nextPage(
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -132,7 +110,9 @@ class _RegisterPageState extends State<RegisterPage> {
         _currentPage--;
       });
       _pageController.previousPage(
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -140,7 +120,8 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_agreeTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("You must accept the terms and conditions to proceed.")),
+          content: Text("You must accept the terms and conditions to proceed."),
+        ),
       );
       return;
     }
@@ -240,13 +221,10 @@ class _RegisterPageState extends State<RegisterPage> {
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 24),
-          // Show a loading animation until usernames are fetched.
-          _isUsernamesLoading
-              ? const CircularProgressIndicator()
-              : ElevatedButton(
-                  onPressed: _nextPage,
-                  child: const Text("Next"),
-                ),
+          ElevatedButton(
+            onPressed: _nextPage,
+            child: const Text("Next"),
+          ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

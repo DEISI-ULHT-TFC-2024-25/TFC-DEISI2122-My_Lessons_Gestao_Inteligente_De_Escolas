@@ -29,13 +29,13 @@ Future<http.Response> registerUser({
   return response;
 }
 
-Future<List<String>> fetchAllUsernames() async {
-  final url = Uri.parse('$baseUrl/api/users/usernames/');
-  final response = await http.get(url, headers: {"Content-Type": "application/json"},);
+Future<bool> isUsernameAvailable(String username) async {
+  final url = Uri.parse('$baseUrl/api/users/check_username/?username=$username');
+  final response = await http.get(url, headers: {"Content-Type": "application/json"});
   if (response.statusCode == 200) {
-    final List<dynamic> data = jsonDecode(response.body);
-    return data.map((u) => u.toString()).toList();
+    final data = jsonDecode(response.body);
+    return data['available'] as bool;
   } else {
-    throw Exception("Failed to load usernames");
+    throw Exception("Failed to check username availability");
   }
 }
