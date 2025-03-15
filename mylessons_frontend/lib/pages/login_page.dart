@@ -1,24 +1,28 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:mylessons_frontend/services/api_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
-  
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
-  
+
 class _LoginPageState extends State<LoginPage> {
   bool _isSigningInWithGoogle = false;
-  
+
   // Navigate to the email login screen.
   void _continueWithEmail() {
     Navigator.pushNamed(context, '/email_login');
   }
-  
+
   // Google sign-in logic using GoogleSignIn & FirebaseAuth.
   Future<void> _signInWithGoogle() async {
     setState(() => _isSigningInWithGoogle = true);
@@ -31,24 +35,48 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+
+      // After successful sign in with FirebaseAuth
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+
+      // Send the token to your backend endpoint.
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/users/firebase_login/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'firebase_token': idToken}),
+      );
+
+      // Check if the response status code is 200 before navigating.
+      if (response.statusCode == 200) {
+        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      } else {
+        // Optionally handle the error response.
+        debugPrint('Backend error: ${response.body}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error logging in. Please try again.')),
+        );
+      }
     } catch (e) {
       debugPrint('Error signing in with Google: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error signing in with Google.')),
+      );
     } finally {
       setState(() => _isSigningInWithGoogle = false);
     }
   }
-  
+
   // Placeholder for Facebook sign-in.
   void _signInWithFacebook() {
     debugPrint('Facebook sign-in clicked');
   }
-  
+
   // Placeholder for Apple sign-in.
   void _signInWithApple() {
     debugPrint('Apple sign-in clicked');
   }
-  
+
   // Extracted widget for the buttons area.
   Widget _buildButtonsArea() {
     return Column(
@@ -177,11 +205,12 @@ class _LoginPageState extends State<LoginPage> {
       ],
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
-    
+    bool isPortrait =
+        MediaQuery.of(context).orientation == Orientation.portrait;
+
     // Portrait layout remains unchanged.
     Widget portraitContent = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
@@ -214,7 +243,7 @@ class _LoginPageState extends State<LoginPage> {
         ],
       ),
     );
-    
+
     // Landscape layout: use a Column without Expanded so it doesn't force a minimum height.
     Widget landscapeContent = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
@@ -249,7 +278,7 @@ class _LoginPageState extends State<LoginPage> {
         ],
       ),
     );
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(

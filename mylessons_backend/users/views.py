@@ -28,74 +28,39 @@ from google.auth.transport import requests as google_requests
 
 logger = logging.getLogger(__name__)
 
-GOOGLE_CLIENT_ID = '368273500882-813i1dn6kojsob4dmlbd3i26lgrsmh0a.apps.googleusercontent.com'
-
-
 User = get_user_model()
 
-@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def google_login(request):
-    """
-    Logs in a user via Google. If the user doesn't exist, creates a new UserAccount and returns an auth token.
-    """
-    data = request.data
-    google_token = data.get('google_token')
-
-    if not google_token:
-        return Response(
-            {'error': 'google_token field is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+def firebase_login(request):
+    firebase_token = request.data.get('firebase_token')
+    if not firebase_token:
+        return Response({'error': 'firebase_token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Verify the token against Google's servers.
-        idinfo = id_token.verify_oauth2_token(google_token, google_requests.Request(), GOOGLE_CLIENT_ID)
-        
-        # Extract user information.
-        email = idinfo.get("email")
-        first_name = idinfo.get("given_name", "")
-        last_name = idinfo.get("family_name", "")
-        
-        if not email:
-            return Response(
-                {'error': 'Unable to retrieve email from Google token.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Verify the Firebase token.
+        decoded_token = firebase_auth.verify_id_token(firebase_token)
+        email = decoded_token.get('email')
+        first_name = decoded_token.get('name', '').split()[0] if decoded_token.get('name') else ''
+        last_name = ' '.join(decoded_token.get('name', '').split()[1:]) if decoded_token.get('name') else ''
 
-        # Try to get the user; if not exist, create a new one.
+        # Get or create your user.
         user, created = UserAccount.objects.get_or_create(
             email=email,
             defaults={
                 'username': email,
                 'first_name': first_name,
                 'last_name': last_name,
-                # You might want to set a unusable password since Google is handling authentication.
-                'password': make_password(None),
+                # You might set a random or unusable password.
             }
         )
 
-        # Create (or retrieve) the token for the user.
+        # Generate your backend token.
         token, _ = Token.objects.get_or_create(user=user)
-
-        return Response(
-            {'message': 'User logged in successfully', 'token': token.key},
-            status=status.HTTP_200_OK
-        )
-        
-    except ValueError as e:
-        # This will be raised if the token is invalid.
-        return Response(
-            {'error': 'Invalid token', 'details': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'message': 'User logged in successfully', 'token': token.key}, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
