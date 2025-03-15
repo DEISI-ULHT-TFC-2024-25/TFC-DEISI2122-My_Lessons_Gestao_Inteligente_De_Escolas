@@ -21,7 +21,7 @@ from django.db.models import Q
 from django.utils.timezone import now
 from django.utils.dateparse import parse_date, parse_time
 import firebase_admin
-from firebase_admin import auth as firebase_auth, initialize_app, credentials as firebase_credentials
+from firebase_admin import auth as firebase_auth, initialize_app, credentials
 import os
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -30,20 +30,33 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Now build the full path to the JSON file inside "mylessons_backend".
+json_path = os.path.join(BASE_DIR, "mylessons-7b4ed-firebase-adminsdk-fbsvc-8e5b80bdbe.json")
+
+cred = credentials.Certificate(json_path)
+firebase_admin.initialize_app(cred)
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def firebase_login(request):
     firebase_token = request.data.get('firebase_token')
     if not firebase_token:
+        logger.debug("No firebase_token provided in request data.")
         return Response({'error': 'firebase_token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        logger.debug("Verifying Firebase token.")
         # Verify the Firebase token.
         decoded_token = firebase_auth.verify_id_token(firebase_token)
+        logger.debug("Firebase token verified successfully: %s", decoded_token)
+
         email = decoded_token.get('email')
         first_name = decoded_token.get('name', '').split()[0] if decoded_token.get('name') else ''
         last_name = ' '.join(decoded_token.get('name', '').split()[1:]) if decoded_token.get('name') else ''
 
+        logger.debug("Attempting to get or create user with email: %s", email)
         # Get or create your user.
         user, created = UserAccount.objects.get_or_create(
             email=email,
@@ -51,14 +64,22 @@ def firebase_login(request):
                 'username': email,
                 'first_name': first_name,
                 'last_name': last_name,
-                # You might set a random or unusable password.
             }
         )
 
+        if created:
+            logger.debug("Created new user for email: %s", email)
+        elif user:
+            logger.debug("Found existing user for email: %s", email)
+
+        logger.debug("Generating backend token for user: %s", email)
         # Generate your backend token.
         token, _ = Token.objects.get_or_create(user=user)
+        logger.debug("Token generated: %s", token.key)
+
         return Response({'message': 'User logged in successfully', 'token': token.key}, status=status.HTTP_200_OK)
     except Exception as e:
+        logger.exception("Error during firebase login process.")
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
 @csrf_exempt
