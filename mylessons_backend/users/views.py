@@ -10,8 +10,6 @@ from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
 import logging
 from django.contrib.auth.hashers import make_password
 from .models import GoogleCredential, Student, Unavailability, UserAccount, Instructor
@@ -25,12 +23,78 @@ from django.utils.dateparse import parse_date, parse_time
 import firebase_admin
 from firebase_admin import auth as firebase_auth, initialize_app, credentials as firebase_credentials
 import os
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 logger = logging.getLogger(__name__)
 
+GOOGLE_CLIENT_ID = '368273500882-813i1dn6kojsob4dmlbd3i26lgrsmh0a.apps.googleusercontent.com'
 
 
 User = get_user_model()
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def google_login(request):
+    """
+    Logs in a user via Google. If the user doesn't exist, creates a new UserAccount and returns an auth token.
+    """
+    data = request.data
+    google_token = data.get('google_token')
+
+    if not google_token:
+        return Response(
+            {'error': 'google_token field is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Verify the token against Google's servers.
+        idinfo = id_token.verify_oauth2_token(google_token, google_requests.Request(), GOOGLE_CLIENT_ID)
+        
+        # Extract user information.
+        email = idinfo.get("email")
+        first_name = idinfo.get("given_name", "")
+        last_name = idinfo.get("family_name", "")
+        
+        if not email:
+            return Response(
+                {'error': 'Unable to retrieve email from Google token.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Try to get the user; if not exist, create a new one.
+        user, created = UserAccount.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': email,
+                'first_name': first_name,
+                'last_name': last_name,
+                # You might want to set a unusable password since Google is handling authentication.
+                'password': make_password(None),
+            }
+        )
+
+        # Create (or retrieve) the token for the user.
+        token, _ = Token.objects.get_or_create(user=user)
+
+        return Response(
+            {'message': 'User logged in successfully', 'token': token.key},
+            status=status.HTTP_200_OK
+        )
+        
+    except ValueError as e:
+        # This will be raised if the token is invalid.
+        return Response(
+            {'error': 'Invalid token', 'details': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 @csrf_exempt
 @api_view(['POST'])
@@ -52,46 +116,6 @@ def login_view(request):
     else:
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def google_oauth_start(request):
-    token = request.data.get('token')
-    logger.info(f'entrou no google oauth start com o token: {token}')
-    if not token:
-        return Response({'error': 'Token não fornecido.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), '147437937321-v39oeirc3e8hjgjeiugp3eia6vlmjbg.apps.googleusercontent.com')
-
-        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
-            raise ValueError('Emissor inválido.')
-
-        email = idinfo.get('email')
-        first_name = idinfo.get('given_name')
-        last_name = idinfo.get('family_name')
-
-        user, created = User.objects.get_or_create(email=email, defaults={
-            'username': email,
-            'first_name': first_name,
-            'last_name': last_name
-        })
-
-        if created:
-            user.set_unusable_password()
-            user.save()
-
-        return Response({'message': 'Login com Google bem-sucedido', 'user': {'email': email}}, status=status.HTTP_200_OK)
-
-    except ValueError as e:
-        logger.error(f'Erro ao validar o token do Google: {e}')
-        return Response({'error': f'Token inválido: {str(e)}'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    except Exception as e:
-        logger.error(f'Erro inesperado: {e}')
-        return Response({'error': f'Erro inesperado: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
     
 @csrf_exempt
 @api_view(['POST'])
@@ -546,66 +570,6 @@ def book_pack_view(request):
     
     logger.debug("Booked packs successfully: %s", booked_packs)
     return Response({"booked_packs": booked_packs}, status=status.HTTP_201_CREATED)
-
-
-# Initialize Firebase Admin using the service account key from an environment variable
-if not firebase_admin._apps:
-    service_account_path = os.environ.get('FIREBASE_SERVICE_ACCOUNT_KEY')
-    if service_account_path is None:
-        raise Exception("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.")
-    cred = firebase_credentials.Certificate(service_account_path)
-    firebase_admin.initialize_app(cred)
-
-
-@api_view(['POST'])
-def store_google_credentials(request):
-    id_token_value = request.data.get('idToken')
-    access_token = request.data.get('accessToken')
-
-    if not id_token_value or not access_token:
-        return Response({'error': 'Missing tokens'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Verify the ID token using Firebase Admin SDK
-    try:
-        decoded_token = firebase_auth.verify_id_token(id_token_value)
-    except Exception as e:
-        return Response({'error': 'Invalid token', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Extract user details from the decoded token
-    email = decoded_token.get('email')
-    if not email:
-        return Response({'error': 'Email not found in token'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Optionally extract additional info (e.g., display name)
-    display_name = decoded_token.get('name', email.split('@')[0])
-    
-    # Create or retrieve the user
-    user, created = UserAccount.objects.get_or_create(
-        email=email,
-        defaults={'username': email.split('@')[0], 'first_name': display_name}
-    )
-    
-    # Serialize the tokens as a JSON string (or any format you prefer)
-    serialized_credentials = json.dumps({
-        'idToken': id_token_value,
-        'accessToken': access_token,
-    })
-    
-    # Create or update the GoogleCredential for the user
-    google_credential, created_gc = GoogleCredential.objects.update_or_create(
-        user=user,
-        defaults={'credentials': serialized_credentials},
-    )
-    
-    return Response(
-        {
-            'message': 'Credentials stored successfully.',
-            'user_created': created,
-            'google_credential_created': created_gc,
-        },
-        status=status.HTTP_200_OK
-    )
-    
     
     
 # Helper to map weekday names to Python's date.weekday() indices
