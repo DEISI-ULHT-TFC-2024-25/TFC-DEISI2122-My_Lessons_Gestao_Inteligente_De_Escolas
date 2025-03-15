@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -46,10 +47,17 @@ class _LoginPageState extends State<LoginPage> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'firebase_token': idToken}),
       );
-
+      final data = jsonDecode(response.body);
       // Check if the response status code is 200 before navigating.
       if (response.statusCode == 200) {
-        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        if (data.containsKey('token')) {
+          // Store the token securely.
+          final storage = const FlutterSecureStorage();
+          await storage.write(key: 'auth_token', value: data['token']);
+          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        } else {
+          throw Exception("Unexpected error: Token not received.");
+        }
       } else {
         // Optionally handle the error response.
         debugPrint('Backend error: ${response.body}');

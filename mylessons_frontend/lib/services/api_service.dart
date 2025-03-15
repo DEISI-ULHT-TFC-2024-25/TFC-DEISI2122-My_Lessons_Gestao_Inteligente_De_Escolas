@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 const String baseUrl = 'https://mylessons.pythonanywhere.com';
 //const String baseUrl = 'http://127.0.0.1:8000';
+//const String baseUrl = 'http://192.168.1.66:8000';
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
