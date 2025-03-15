@@ -9,19 +9,19 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/services/api_service.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+class RegisterLandingPage extends StatefulWidget {
+  const RegisterLandingPage({Key? key}) : super(key: key);
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<RegisterLandingPage> createState() => _RegisterLandingPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _RegisterLandingPageState extends State<RegisterLandingPage> {
   bool _isSigningInWithGoogle = false;
 
-  // Navigate to the email login screen.
+  // Navigate to the email register screen.
   void _continueWithEmail() {
-    Navigator.pushNamed(context, '/email_login');
+    Navigator.pushNamed(context, '/register_page');
   }
 
   // Google sign-in logic using GoogleSignIn & FirebaseAuth.
@@ -192,16 +192,16 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text(
-              "Don't have an account?",
+              "Already have an account?",
               style: TextStyle(color: Colors.black),
             ),
             const SizedBox(width: 4),
             GestureDetector(
               onTap: () {
-                Navigator.pushNamed(context, '/register_landing_page');
+                Navigator.pushNamed(context, '/login');
               },
               child: const Text(
-                'Sign Up',
+                'Log In',
                 style: TextStyle(
                   color: Colors.orange,
                   decoration: TextDecoration.underline,
@@ -236,9 +236,9 @@ class _LoginPageState extends State<LoginPage> {
                     color: Colors.black,
                   ),
                   children: [
-                    TextSpan(text: 'Log In To \n'),
+                    TextSpan(text: 'Sign Up\n'),
                     TextSpan(
-                      text: 'My Lessons',
+                      text: 'For Free!',
                       style: TextStyle(color: Colors.orange),
                     ),
                   ],
@@ -272,9 +272,9 @@ class _LoginPageState extends State<LoginPage> {
                     color: Colors.black,
                   ),
                   children: [
-                    TextSpan(text: 'Log In To \n'),
+                    TextSpan(text: 'Sign Up\n'),
                     TextSpan(
-                      text: 'My Lessons',
+                      text: 'For Free!',
                       style: TextStyle(color: Colors.orange),
                     ),
                   ],
