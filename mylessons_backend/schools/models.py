@@ -279,7 +279,6 @@ class School(models.Model):
             Checks for overlapping min/max in a 'fixed' list, but only
             if the two entries share the same 'duration'.
             """
-            # Sort primarily by duration, then by min_students
             sorted_list = sorted(
                 fixed_list,
                 key=lambda x: (x.get("duration", 0), x.get("min_students", 0))
@@ -287,18 +286,14 @@ class School(models.Model):
             for i in range(len(sorted_list) - 1):
                 current = sorted_list[i]
                 nxt = sorted_list[i + 1]
-                # Only compare if durations match
                 if current.get("duration") == nxt.get("duration"):
                     if nxt["min_students"] <= current["max_students"]:
-                        # They overlap
                         conflicts.append(
                             f"Overlapping min/max in {context_label}: "
                             f"{current['min_students']}-{current['max_students']} "
                             f"and {nxt['min_students']}-{nxt['max_students']} "
                             f"for duration={current['duration']}."
                         )
-                        # If you only want to report the first overlap, break here.
-                        # break
 
         # ------------------------------------------------------------------
         # Helper: Coverage Check
@@ -338,7 +333,8 @@ class School(models.Model):
         # (A) Overlap checks (ALWAYS)
         for role, role_data in school_payment_types.items():
             for service_key, details in role_data.items():
-                fixed_list = details.get("fixed", [])
+                # Only attempt to get 'fixed' if details is a dict.
+                fixed_list = details.get("fixed", []) if isinstance(details, dict) else []
                 check_overlaps(fixed_list, f"school {role}/{service_key}")
 
         # (B) Coverage checks (ONLY if commission == 0), plus missing-entry checks
@@ -352,23 +348,25 @@ class School(models.Model):
                 # Suppose we only care about "instructor" role coverage. Adjust if needed.
                 instructor_data = school_payment_types.get("instructor", {})
 
-                # If there's no entry at all for that pack_type, that's automatically a conflict
-                # (since you can't cover the service if there's no payment type).
                 if pack_type not in instructor_data:
                     conflicts.append(
                         f"School is missing payment type '{pack_type}' under 'instructor' "
                         f"for service: {service_label}."
                     )
                 else:
-                    # We have some data; only do coverage checks if commission == 0
                     pack_data = instructor_data[pack_type]
-                    commission_val = pack_data.get("commission", None)
-                    if commission_val == 0:
+                    # If pack_data is a dict, proceed with commission and fixed list checks.
+                    if isinstance(pack_data, dict):
+                        commission_val = pack_data.get("commission", None)
                         fixed_list = pack_data.get("fixed", [])
-                        check_service_coverage(
-                            service_label, pricing_options, fixed_list,
-                            f"School instructor/{pack_type}"
-                        )
+                        if commission_val == 0:
+                            check_service_coverage(
+                                service_label, pricing_options, fixed_list,
+                                f"School instructor/{pack_type}"
+                            )
+                    else:
+                        # When pack_data is not a dict (e.g., a monthly rate value), skip coverage check.
+                        pass
 
         # ------------------------------------------------------------------
         # 2) INSTRUCTOR-LEVEL VALIDATIONS
@@ -380,7 +378,7 @@ class School(models.Model):
             # (A) Overlap checks (ALWAYS)
             for role, role_data in user_school_payment_types.items():
                 for service_key, details in role_data.items():
-                    fixed_list = details.get("fixed", [])
+                    fixed_list = details.get("fixed", []) if isinstance(details, dict) else []
                     check_overlaps(fixed_list, f"user {user.id} {role}/{service_key}")
 
             # (B) Coverage checks (ONLY if commission == 0), plus missing-entry checks
@@ -391,25 +389,26 @@ class School(models.Model):
                     service_label = f"{service.get('name', 'Unnamed Service')} ({pack_type})"
                     pricing_options = service.get("details", {}).get("pricing_options", [])
 
-                    # We assume 'instructor' role. Adjust if needed.
                     user_instructor_data = user_school_payment_types.get("instructor", {})
 
-                    # If there's no entry at all for that pack_type, conflict
                     if pack_type not in user_instructor_data:
                         conflicts.append(
                             f"Instructor {user.id} is missing payment type '{pack_type}' "
                             f"for service: {service_label}."
                         )
                     else:
-                        # We have the data; check if commission == 0 for coverage checks
                         pack_data = user_instructor_data[pack_type]
-                        commission_val = pack_data.get("commission", None)
-                        if commission_val == 0:
+                        if isinstance(pack_data, dict):
+                            commission_val = pack_data.get("commission", None)
                             fixed_list = pack_data.get("fixed", [])
-                            check_service_coverage(
-                                service_label, pricing_options, fixed_list,
-                                f"Instructor {user.id} {pack_type}"
-                            )
+                            if commission_val == 0:
+                                check_service_coverage(
+                                    service_label, pricing_options, fixed_list,
+                                    f"Instructor {user.id} {pack_type}"
+                                )
+                        else:
+                            # Non-dict (e.g., monthly rate value) – skip coverage check.
+                            pass
 
         # ------------------------------------------------------------------
         # Return final result
