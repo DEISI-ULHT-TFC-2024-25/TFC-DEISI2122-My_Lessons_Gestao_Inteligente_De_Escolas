@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mylessons_frontend/pages/register_landing_page.dart';
 import 'pages/email_login_page.dart';
 import 'pages/landing_page.dart';
 import 'pages/login_page.dart';
@@ -146,6 +147,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => LandingPage(),
         '/main': (context) => const MainScreen(), // New main route with navbar
         '/login': (context) => const LoginPage(),
+        '/register_landing_page': (context) => const RegisterLandingPage(),
         '/register_page': (context) => const RegisterPage(),
         '/email_login': (context) => const EmailLoginPage(),
       },
