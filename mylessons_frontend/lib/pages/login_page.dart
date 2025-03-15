@@ -31,7 +31,7 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
-      Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     } catch (e) {
       debugPrint('Error signing in with Google: $e');
     } finally {
