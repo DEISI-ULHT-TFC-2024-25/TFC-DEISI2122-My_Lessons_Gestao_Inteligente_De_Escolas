@@ -102,7 +102,17 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     if (schoolDetails == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    final List services = (schoolDetails!['services'] as List?) ?? [];
+    final dynamic servicesData = schoolDetails!['services'];
+    final List services;
+    if (servicesData is List) {
+      services = servicesData;
+    } else if (servicesData is Map) {
+      // If you want to convert the Map values to a list, do:
+      services = servicesData.values.toList();
+    } else {
+      services = [];
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 100),
       child: SingleChildScrollView(
@@ -326,7 +336,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         break;
       case 5:
         // Locations tab: show the Location modal.
-        if (schoolDetails != null && schoolDetails!['school_id'] != null ) {
+        if (schoolDetails != null && schoolDetails!['school_id'] != null) {
           await showModalBottomSheet(
             context: context,
             isScrollControlled: true,

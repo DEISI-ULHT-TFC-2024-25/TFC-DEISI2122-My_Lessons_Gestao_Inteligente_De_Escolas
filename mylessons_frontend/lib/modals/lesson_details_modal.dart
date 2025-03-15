@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:mylessons_frontend/modals/instructors_modal.dart';
 import '../services/api_service.dart';
 import 'students_modal.dart';
 import 'subject_modal.dart'; // Make sure this file exports SubjectModal
@@ -202,8 +203,6 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
           };
 
           labelsWithAction = [
-            'Date',
-            'Time',
             'Is Done',
             'Students',
             'Subject',
@@ -419,6 +418,27 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 ),
                                                 builder: (context) =>
                                                     StudentsModal(
+                                                        lessonId: lessonId),
+                                              );
+                                              if (updated == true) {
+                                                await widget.fetchData();
+                                                _refreshLessonDetails();
+                                              }
+                                            } else if (label == "Instructors" && widget.currentRole != "Parent") {
+                                              bool? updated =
+                                                  await showModalBottomSheet<
+                                                      bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape:
+                                                    const RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.vertical(
+                                                          top: Radius.circular(
+                                                              16)),
+                                                ),
+                                                builder: (context) =>
+                                                    InstructorsModal(
                                                         lessonId: lessonId),
                                               );
                                               if (updated == true) {

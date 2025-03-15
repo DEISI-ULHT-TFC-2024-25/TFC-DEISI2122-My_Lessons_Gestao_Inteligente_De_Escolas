@@ -1,23 +1,48 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:mylessons_frontend/modals/instructors_modal.dart';
 import '../services/api_service.dart';
+import 'subject_modal.dart';
+import 'students_modal.dart';
 
-class PackDetailsModal extends StatelessWidget {
+class PackDetailsModal extends StatefulWidget {
   final dynamic pack;
   final String currentRole;
+  final Future<void> Function()
+      fetchData; // Optional callback to refresh home page
 
   const PackDetailsModal({
-    super.key,
+    Key? key,
     required this.pack,
     required this.currentRole,
-  });
+    required this.fetchData,
+  }) : super(key: key);
 
-  // Fetch pack details from API.
-  Future<Map<String, dynamic>?> _fetchPackDetails(int packId) =>
-      fetchPackDetails(packId);
+  @override
+  _PackDetailsModalState createState() => _PackDetailsModalState();
+}
 
-  // Helper: Format keys (e.g. lessons_remaining => LESSONS REMAINING)
+class _PackDetailsModalState extends State<PackDetailsModal> {
+  late Future<Map<String, dynamic>?> _packDetailsFuture;
+  late final int packId;
+
+  @override
+  void initState() {
+    super.initState();
+    packId = widget.pack['pack_id'] ?? widget.pack['id'];
+    _refreshPackDetails();
+  }
+
+  /// Refresh the modal's pack details.
+  void _refreshPackDetails() {
+    setState(() {
+      _packDetailsFuture = fetchPackDetails(packId);
+    });
+  }
+
+  // Helper: Format keys.
   String _formatKey(String key) {
     return key.replaceAll('_', ' ').toUpperCase();
   }
@@ -34,10 +59,8 @@ class PackDetailsModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Extract pack id from the pack.
-    final int packId = pack['pack_id'] ?? pack['id'];
     return FutureBuilder<Map<String, dynamic>?>(
-      future: _fetchPackDetails(packId),
+      future: _packDetailsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -54,8 +77,7 @@ class PackDetailsModal extends StatelessWidget {
               children: [
                 Text(
                   "Pack Details",
-                  style: GoogleFonts.lato(
-                      fontSize: 20, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 const Text("Could not fetch pack details."),
@@ -64,8 +86,7 @@ class PackDetailsModal extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child:
-                        const Text("Close", selectionColor: Colors.orange),
+                    child: const Text("Close", selectionColor: Colors.orange),
                   ),
                 ),
               ],
@@ -74,51 +95,30 @@ class PackDetailsModal extends StatelessWidget {
         }
 
         final details = snapshot.data!;
-
-        // Format any date fields if needed.
         if (details.containsKey("date")) {
           details["date"] = _formatDate(details["date"].toString());
         }
 
-        // For both roles, filter out these keys.
-        final Set<String> ignoredKeys = {
-          "students_ids",
-          "instructors_ids",
-          "pack_id",
-          "id",
-          "days_until_expiration",
-          "school_id",
-          "unscheduled_lessons",
-          "is_paid",
-        };
-
-        // For Parent role, additionally ignore "is_done" and "is_suspended".
-        if (currentRole == "Parent") {
-          ignoredKeys.addAll(["is_done", "is_suspended"]);
-        }
-
-        // Build grid items based on role using mapping logic.
+        // Build grid items based on role.
         List<Map<String, dynamic>> gridItems = [];
         Map<String, IconData> leftIconMapping = {};
         List<String> labelsWithAction = [];
         Map<String, IconData> actionIconMapping = {};
         Map<String, String> actionNoteMapping = {};
 
-        if (currentRole == "Parent") {
-          // Define grid items for Parent.
+        if (widget.currentRole == "Parent") {
           gridItems = [
             {'label': 'Date', 'value': details['date'] ?? ''},
             {
               'label': 'Lessons Remaining',
-              'value':
-                  "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
+              'value': "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
             },
             {'label': 'Debt', 'value': details['debt']?.toString() ?? ''},
             {'label': 'Students', 'value': details['students_name'] ?? ''},
             {'label': 'Type', 'value': details['type'] ?? ''},
             {'label': 'School', 'value': details['school_name'] ?? ''},
             {'label': 'Instructors', 'value': details['instructors_name'] ?? ''},
-            {'label': 'Subject', 'value': details['sport'] ?? ''},
+            {'label': 'Subject', 'value': details['subject'] ?? ''},
           ];
 
           leftIconMapping = {
@@ -132,16 +132,12 @@ class PackDetailsModal extends StatelessWidget {
             'Instructors': Icons.person_outline,
           };
 
-          // For Parents, only show the "Debt" action if debt > 0.
-          final double debtValue =
-              double.tryParse(details['debt']?.toString() ?? '0') ?? 0;
+          final double debtValue = double.tryParse(details['debt']?.toString() ?? '0') ?? 0;
           labelsWithAction = [];
           if (debtValue > 0) {
             labelsWithAction.add('Debt');
           }
-          // Always allow actions on School and Instructors.
           labelsWithAction.addAll(['School', 'Instructors']);
-
           actionIconMapping = {
             'Debt': Icons.payment,
             'School': Icons.phone,
@@ -152,35 +148,32 @@ class PackDetailsModal extends StatelessWidget {
             'School': 'Contact school',
             'Instructors': 'Contact instructors',
           };
-        } else if (currentRole == "Instructor" || currentRole == "Admin") {
-          // Define grid items for Instructor/Admin.
+        } else if (widget.currentRole == "Instructor" || widget.currentRole == "Admin") {
           gridItems = [
             {'label': 'Date', 'value': details['date'] ?? ''},
             {
               'label': 'Lessons Remaining',
-              'value':
-                  "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
+              'value': "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
             },
             {'label': 'Debt', 'value': details['debt']?.toString() ?? ''},
             {'label': 'Students', 'value': details['students_name'] ?? ''},
             {'label': 'Type', 'value': details['type'] ?? ''},
             {'label': 'School', 'value': details['school_name'] ?? ''},
             {'label': 'Instructors', 'value': details['instructors_name'] ?? ''},
-            {'label': 'Subject', 'value': details['sport'] ?? ''},
+            {'label': 'Subject', 'value': details['subject'] ?? ''},
           ];
 
           leftIconMapping = {
             'Date': Icons.calendar_today,
             'Lessons Remaining': Icons.confirmation_number,
             'Debt': Icons.payments_outlined,
-            'Students': Icons.people,
+            'Students': Icons.edit,
             'Type': Icons.group,
-            'Subject': Icons.menu_book,
-            'School': Icons.school,
-            'Instructors': Icons.person_outline,
+            'Subject': Icons.edit,
+            'School': Icons.phone,
+            'Instructors': Icons.edit,
           };
 
-          // For Instructor/Admin, allow action on Debt, School, Instructors, Students, and Subject.
           labelsWithAction = ['Debt', 'School', 'Instructors', 'Students', 'Subject'];
           actionIconMapping = {
             'Debt': Icons.payment,
@@ -198,11 +191,8 @@ class PackDetailsModal extends StatelessWidget {
           };
         }
 
-        // Combine non-action items first, then the ones with actions.
-        final nonActionItems =
-            gridItems.where((item) => !labelsWithAction.contains(item['label'])).toList();
-        final actionItems =
-            gridItems.where((item) => labelsWithAction.contains(item['label'])).toList();
+        final nonActionItems = gridItems.where((item) => !labelsWithAction.contains(item['label'])).toList();
+        final actionItems = gridItems.where((item) => labelsWithAction.contains(item['label'])).toList();
         final combinedItems = [...nonActionItems, ...actionItems];
 
         return Container(
@@ -213,17 +203,13 @@ class PackDetailsModal extends StatelessWidget {
               children: [
                 Text(
                   "Pack Details",
-                  style: GoogleFonts.lato(
-                      fontSize: 20, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     double spacing = 8.0;
-                    // Two cards per row.
                     double itemWidth = (constraints.maxWidth - spacing) / 2;
-
-                    // Function to build a card.
                     Widget buildCard(Map<String, dynamic> item, {bool withAction = false}) {
                       final String label = item['label'];
                       final String value = item['value'].toString();
@@ -273,9 +259,45 @@ class PackDetailsModal extends StatelessWidget {
                                             actionIconMapping[label] ?? Icons.arrow_forward,
                                             color: Colors.orange,
                                           ),
-                                          onPressed: () {
-                                            // TODO: Implement the action for "$label"
-                                            debugPrint("Action pressed for $label");
+                                          onPressed: () async {
+                                            bool? updated;
+                                            if (label == "Subject" && widget.currentRole != "Parent") {
+                                              updated = await showModalBottomSheet<bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape: const RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                ),
+                                                builder: (context) => SubjectModal(packId: packId),
+                                              );
+                                            } else if (label == "Students" && widget.currentRole != "Parent") {
+                                              updated = await showModalBottomSheet<bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape: const RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                ),
+                                                builder: (context) => StudentsModal(packId: packId),
+                                              );
+                                            } else if (label == "Instructors") {
+                                              updated = await showModalBottomSheet<bool>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                shape: const RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                ),
+                                                builder: (context) => InstructorsModal(packId: packId),
+                                              );
+                                            } else if (label == "Debt" || label == "School") {
+                                              // For Debt or School actions, simply set updated true.
+                                              updated = true;
+                                            }
+                                            if (updated == true) {
+                                              if (widget.fetchData != null) {
+                                                await widget.fetchData!();
+                                              }
+                                              _refreshPackDetails();
+                                            }
                                           },
                                         ),
                                     ],

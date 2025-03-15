@@ -23,6 +23,8 @@ from django.utils.dateparse import parse_date, parse_time
 import firebase_admin
 from firebase_admin import auth as firebase_auth, initialize_app, credentials
 import os
+import secrets
+import string
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -37,6 +39,61 @@ json_path = os.path.join(BASE_DIR, "mylessons-7b4ed-firebase-adminsdk-fbsvc-8e5b
 
 cred = credentials.Certificate(json_path)
 firebase_admin.initialize_app(cred)
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    user = request.user
+
+    if request.method == 'GET':
+        # Build response data with allowed fields only.
+        data = {
+            'id': str(user.id),
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'country_code': str(user.country_code),
+            'phone': str(user.phone),
+            'birthday': user.birthday.isoformat() if user.birthday else None,
+            'photo': user.photo.url if user.photo else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        # Update allowed fields.
+        data = request.data
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.email = data.get('email', user.email)
+        user.country_code = data.get('country_code', user.country_code)
+        user.phone = data.get('phone', user.phone)
+        
+        birthday = data.get('birthday')
+        if birthday:
+            try:
+                user.birthday = datetime.strptime(birthday, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Invalid birthday format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # For photo update, this example assumes the photo field is updated with a URL or similar value.
+        if 'photo' in data:
+            user.photo = data.get('photo')
+
+        user.save()
+
+        updated_data = {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'country_code': user.country_code,
+            'phone': user.phone,
+            'birthday': user.birthday.isoformat() if user.birthday else None,
+            'photo': user.photo.url if user.photo else None,
+        }
+        return Response({'message': 'Profile updated successfully', 'profile': updated_data}, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -68,6 +125,9 @@ def firebase_login(request):
         )
 
         if created:
+            random_password = ''.join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(16))
+            user.set_password(random_password)
+            user.save()
             logger.debug("Created new user for email: %s", email)
         elif user:
             logger.debug("Found existing user for email: %s", email)
@@ -429,6 +489,44 @@ def get_selected_students(request):
     data = {
         "associated_students": StudentSerializer(associated_students, many=True).data,
         "all_students": StudentSerializer(all_students, many=True).data,
+    }
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_selected_instructors(request):
+    lesson_id = request.data.get("lesson_id")
+    pack_id = request.data.get("pack_id")
+
+    if lesson_id:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        associated_instructors = lesson.instructors.all()
+        all_instructors = lesson.school.instructors.all()
+    elif pack_id:
+        pack = get_object_or_404(Pack, id=pack_id)
+        associated_instructors = pack.instructors.all()
+        all_instructors = pack.school.instructors.all()
+    else:
+        associated_instructors = Instructor.objects.none()
+        all_instructors = Instructor.objects.all()
+
+    data = {
+        "associated_instructors": [
+            {
+                "id": instructor.id,
+                "name": str(instructor),
+                "birthday": str(instructor.user.birthday) if instructor.user.birthday else ""
+            }
+            for instructor in associated_instructors
+        ],
+        "all_instructors": [
+            {
+                "id": instructor.id,
+                "name": str(instructor),
+                "birthday": str(instructor.user.birthday) if instructor.user.birthday else ""
+            }
+            for instructor in all_instructors
+        ]
     }
     return Response(data)
 

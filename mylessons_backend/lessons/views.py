@@ -220,7 +220,7 @@ def pack_details(request, id):
         "finished_date": pack.finished_date,
         "school_name": str(pack.school) if pack.school else "",
         "school_id": pack.school.id if pack.school else "",
-        "sport": pack.sport.name if pack.sport else None,
+        "subject": pack.sport.name if pack.sport else None,
     }
     return Response(data)
 
@@ -726,181 +726,321 @@ def toggle_lesson_completion(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def edit_lesson_subject(request):
-    # TODO dev flutter and test
+def edit_subject(request):
     """
-    Edit the subject(s) associated with a lesson.
+    Edit the subject associated with a lesson or a pack.
     For adding: send action 'add' with either a subject_id or new_subject name.
-    For removing: send action 'remove' with subject_id.
+    For changing: send action 'change' with subject_id.
+    When a pack_id is provided:
+      - if pack.type == "private": update the subject for all lessons in the pack.
+      - otherwise, update only the pack.subject.
     """
-    lesson_id = request.data.get("lesson_id")
     subject_id = request.data.get("subject_id")
-    if not lesson_id:
-        return Response({"error": "É necessário fornecer lesson_id"}, status=400)
     if not subject_id:
-        return Response({"error": "É necessário fornecer subject_id"}, status=400)
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+        return Response({"error": "subject_id is required"}, status=400)
     action = request.data.get('action')
-    
-    if action == 'add':
-        subject = Sport.objects.create(name=subject_id)
-        lesson.sport = subject
-        lesson.school.sports.add(subject)
-        status_msg = f"subject created: {subject.name}"
-        
-    elif action == 'change':
-        subject = get_object_or_404(Sport, id=subject_id)
-        lesson.sport = subject
-        status_msg = f"subject changed to {subject.name}"
+    # If pack_id is provided, update the pack and possibly its lessons.
+    if request.data.get("pack_id"):
+        pack_id = request.data.get("pack_id")
+        pack = get_object_or_404(Pack, id=pack_id)
+        if action == 'add':
+            subject = Sport.objects.create(name=subject_id)
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.sport = subject
+                    lesson.save()
+            pack.sport = subject
+            pack.school.sports.add(subject)
+            pack.save()
+            pack.school.save()
+            status_msg = f"subject created: {subject.name}"
+        elif action == 'change':
+            subject = get_object_or_404(Sport, id=subject_id)
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.sport = subject
+                    lesson.save()
+            pack.sport = subject
+            pack.save()
+            status_msg = f"subject changed to {subject.name}"
+        else:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"status": status_msg}, status=status.HTTP_200_OK)
     else:
-        return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
-    
-    lesson.save()
-    return Response({"status": status_msg}, status=status.HTTP_200_OK)
-
+        # Fallback to lesson update.
+        lesson_id = request.data.get("lesson_id")
+        if not lesson_id:
+            return Response({"error": "lesson_id is required"}, status=400)
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        if action == 'add':
+            subject = Sport.objects.create(name=subject_id)
+            lesson.sport = subject
+            lesson.school.sports.add(subject)
+            status_msg = f"subject created: {subject.name}"
+        elif action == 'change':
+            subject = get_object_or_404(Sport, id=subject_id)
+            lesson.sport = subject
+            status_msg = f"subject changed to {subject.name}"
+        else:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+        lesson.save()
+        return Response({"status": status_msg}, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def edit_lesson_students(request):
+def edit_students(request):
     """
-    Edit the students for a lesson.
+    Edit the students for a lesson or a pack.
     For adding: send action 'add' with either student_id or new_student data.
     For removing: send action 'remove' with student_id.
+    When a pack_id is provided:
+      - Add or remove the student from the pack.
+      - If pack.type == "private", apply the change to every lesson in the pack.
     """
-    lesson_id = request.data.get("lesson_id")
-    
-    if not lesson_id:
-        return Response({"error": "É necessário fornecer lesson_id"}, status=400)
-    lesson = get_object_or_404(Lesson, id=lesson_id)
     action = request.data.get('action')
-    
-    if action == 'add':
-        new_student = request.data.get('new_student')
-        student = None
-        if new_student:
-            first_name = request.data.get('first_name')
-            last_name = request.data.get('last_name')
-            birthday_str = request.data.get('birthday')
-            if not all([first_name, last_name, birthday_str]):
-                return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            try:
-                # Convert the birthday string (expected in 'YYYY-MM-DD') to a date object.
-                birthday_date = datetime.strptime(birthday_str, '%Y-%m-%d').date()
-            except ValueError:
-                return Response({'error': 'Birthday must be in YYYY-MM-DD format.'}, status=status.HTTP_400_BAD_REQUEST)
-            try:
-                # Create the student.
+    # If pack_id provided, update pack students.
+    if request.data.get("pack_id"):
+        pack_id = request.data.get("pack_id")
+        pack = get_object_or_404(Pack, id=pack_id)
+        if action == 'add':
+            new_student = request.data.get('new_student')
+            if new_student:
+                first_name = request.data.get('first_name')
+                last_name = request.data.get('last_name')
+                birthday_str = request.data.get('birthday')
+                if not all([first_name, last_name, birthday_str]):
+                    return Response({'error': 'Missing required fields.'}, status=400)
+                try:
+                    birthday_date = datetime.strptime(birthday_str, '%Y-%m-%d').date()
+                except ValueError:
+                    return Response({'error': 'Birthday must be in YYYY-MM-DD format.'}, status=400)
                 student = Student.objects.create(
                     first_name=first_name,
                     last_name=last_name,
                     birthday=birthday_date,
                     level=1
                 )
-            except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        else:
+                pack.school.students.add(student)
+                pack.school.save()
+            else:
+                student_id = request.data.get('student_id')
+                student = get_object_or_404(Student, id=student_id)
+            pack.students.add(student)
+            
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.students.add(student)
+                    lesson.save()
+            pack.save()
+            status_msg = "student added"
+        elif action == 'remove':
             student_id = request.data.get('student_id')
             student = get_object_or_404(Student, id=student_id)
-        lesson.students.add(student)
-        lesson.school.students.add(student) 
-        status_msg = "student added"
-        
-    elif action == 'remove':
-        student_id = request.data.get('student_id')
-        student = get_object_or_404(Student, id=student_id)
-        lesson.students.remove(student)
-        status_msg = "student removed"
+            pack.students.remove(student)
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.students.remove(student)
+                    lesson.save()
+            pack.save()
+            status_msg = "student removed"
+        else:
+            return Response({"error": "Invalid action"}, status=400)
+        return Response({"status": status_msg}, status=200)
     else:
-        return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
-    
-    lesson.save()
-    return Response({"status": status_msg}, status=status.HTTP_200_OK)
-
+        # Fallback to lesson update.
+        lesson_id = request.data.get("lesson_id")
+        if not lesson_id:
+            return Response({"error": "lesson_id is required"}, status=400)
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        if action == 'add':
+            new_student = request.data.get('new_student')
+            if new_student:
+                first_name = request.data.get('first_name')
+                last_name = request.data.get('last_name')
+                birthday_str = request.data.get('birthday')
+                if not all([first_name, last_name, birthday_str]):
+                    return Response({'error': 'Missing required fields.'}, status=400)
+                try:
+                    birthday_date = datetime.strptime(birthday_str, '%Y-%m-%d').date()
+                except ValueError:
+                    return Response({'error': 'Birthday must be in YYYY-MM-DD format.'}, status=400)
+                student = Student.objects.create(
+                    first_name=first_name,
+                    last_name=last_name,
+                    birthday=birthday_date,
+                    level=1
+                )
+            else:
+                student_id = request.data.get('student_id')
+                student = get_object_or_404(Student, id=student_id)
+            lesson.students.add(student)
+            lesson.school.students.add(student)
+            status_msg = "student added"
+        elif action == 'remove':
+            student_id = request.data.get('student_id')
+            student = get_object_or_404(Student, id=student_id)
+            lesson.students.remove(student)
+            status_msg = "student removed"
+        else:
+            return Response({"error": "Invalid action"}, status=400)
+        lesson.save()
+        return Response({"status": status_msg}, status=200)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def edit_lesson_instructors(request):
-    # TODO test and dev flutter
+def edit_instructors(request):
     """
-    Edit the instructors for a lesson.
+    Edit the instructors for a lesson or a pack.
     For adding: send action 'add' with either instructor_id or new_instructor data.
     For removing: send action 'remove' with instructor_id.
+    When a pack_id is provided:
+      - Update the instructors on the pack.
+      - If pack.type == "private", update the instructors for every lesson in the pack.
     """
-    lesson_id = request.data.get("lesson_id")
-    if not lesson_id:
-        return Response({"error": "É necessário fornecer lesson_id"}, status=400)
-    lesson = get_object_or_404(Lesson, id=lesson_id)
     action = request.data.get('action')
-    
-    if action == 'add':
-        new_instructor = request.data.get('new_instructor')
-        
-        if new_instructor:
-            user_id = request.data.get('user_id')
-            user = get_object_or_404(UserAccount, id=user_id)
-            if not user_id:
-                return Response({"error": "É necessário fornecer user_id"}, status=400)
-            instructor = Instructor.objects.create(user=user)
-        else:
+    if request.data.get("pack_id"):
+        pack_id = request.data.get("pack_id")
+        pack = get_object_or_404(Pack, id=pack_id)
+        if action == 'add':
+            new_instructor = request.data.get('new_instructor')
+            if new_instructor:
+                user_id = request.data.get('user_id')
+                if not user_id:
+                    return Response({"error": "user_id is required"}, status=400)
+                user = get_object_or_404(UserAccount, id=user_id)
+                instructor = Instructor.objects.create(user=user)
+                pack.school.instructors.add(instructor)
+                pack.school.save()
+            else:
+                instructor_id = request.data.get('instructor_id')
+                instructor = get_object_or_404(Instructor, id=instructor_id)
+            pack.instructors.add(instructor)
+            
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.instructors.add(instructor)
+                    lesson.save()
+            pack.save()
+            status_msg = "instructor added"
+        elif action == 'remove':
             instructor_id = request.data.get('instructor_id')
             instructor = get_object_or_404(Instructor, id=instructor_id)
-        lesson.instructors.add(instructor)
-        lesson.school.add_instructor(instructor)
-        status_msg = "instructor added"
-        
-    elif action == 'remove':
-        instructor_id = request.data.get('instructor_id')
-        instructor = get_object_or_404(Instructor, id=instructor_id)
-        lesson.instructors.remove(instructor)
-        status_msg = "instructor removed"
+            pack.instructors.remove(instructor)
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.instructors.remove(instructor)
+                    lesson.save()
+            pack.save()
+            status_msg = "instructor removed"
+        else:
+            return Response({"error": "Invalid action"}, status=400)
+        return Response({"status": status_msg}, status=200)
     else:
-        return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
-    
-    lesson.save()
-    return Response({"status": status_msg}, status=status.HTTP_200_OK)
+        lesson_id = request.data.get("lesson_id")
+        if not lesson_id:
+            return Response({"error": "lesson_id is required"}, status=400)
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        if action == 'add':
+            instructor_id = request.data.get('instructor_id')
+            instructor = get_object_or_404(Instructor, id=instructor_id)
+            lesson.instructors.add(instructor)
+            lesson.school.add_instructor(instructor)
+            status_msg = "instructor added"
+        elif action == 'remove':
+            instructor_id = request.data.get('instructor_id')
+            instructor = get_object_or_404(Instructor, id=instructor_id)
+            lesson.instructors.remove(instructor)
+            status_msg = "instructor removed"
+        else:
+            return Response({"error": "Invalid action"}, status=400)
+        lesson.save()
+        return Response({"status": status_msg}, status=200)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def edit_lesson_location(request):
+def edit_location(request):
     """
-    Edit the location for a lesson.
-    For setting: send action 'add' with either location_id or new_location data.
-    For removing: send action 'remove'.
+    Edit the location for a lesson or a pack.
+    For setting: send action 'add' with either location_id or new location data.
+    For changing: send action 'change' with location_id.
+    When a pack_id is provided:
+      - Update the pack’s location.
+      - If pack.type == "private", update the location for every lesson in the pack.
     """
-    lesson_id = request.data.get("lesson_id")
-    if not lesson_id:
-        return Response({"error": "É necessário fornecer lesson_id"}, status=400)
-    lesson = get_object_or_404(Lesson, id=lesson_id)
     action = request.data.get('action')
-    
-    if action == 'add':
-        
-        location_name = request.data.get("location_name")
-        location_address = request.data.get("location_address")
-        if not location_name:
-            return Response({"error": "É necessário fornecer location_name"}, status=400)
-        if not location_address:
-            return Response({"error": "É necessário fornecer location_address"}, status=400)
-        location = Location.objects.create(name=location_name, address=location_address)
-        lesson.school.locations.add(location)
-        lesson.location = location
-        status_msg = "location set"
-        
-    elif action == 'change':
-        location_id = request.data.get("location_id")
-        if not location_id:
-            return Response({"error": "É necessário fornecer location_id"}, status=400)
-        location = get_object_or_404(Location, id=location_id)
-        lesson.location = location
-        status_msg = "location changed"
+    if request.data.get("pack_id"):
+        pack_id = request.data.get("pack_id")
+        pack = get_object_or_404(Pack, id=pack_id)
+        if action == 'add':
+            location_name = request.data.get("location_name")
+            location_address = request.data.get("location_address")
+            if not location_name:
+                return Response({"error": "location_name is required"}, status=400)
+            if not location_address:
+                return Response({"error": "location_address is required"}, status=400)
+            location = Location.objects.create(name=location_name, address=location_address)
+            # Assume pack has a locations relation and a primary location field.
+            pack.locations.add(location)
+            pack.school.locations.add(location)
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.location = location
+                    lesson.save()
+            pack.location = location
+            pack.save()
+            pack.school.save()
+            status_msg = "location set"
+        elif action == 'change':
+            location_id = request.data.get("location_id")
+            if not location_id:
+                return Response({"error": "location_id is required"}, status=400)
+            location = get_object_or_404(Location, id=location_id)
+            if pack.type == 'private':
+                lessons = Lesson.objects.filter(pack=pack)
+                for lesson in lessons:
+                    lesson.location = location
+                    lesson.save()
+            pack.location = location
+            pack.save()
+            status_msg = "location changed"
+        else:
+            return Response({"error": "Invalid action"}, status=400)
+        return Response({"status": status_msg}, status=200)
     else:
-        return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
-    
-    lesson.save()
-    return Response({"status": status_msg}, status=status.HTTP_200_OK)
-
+        lesson_id = request.data.get("lesson_id")
+        if not lesson_id:
+            return Response({"error": "lesson_id is required"}, status=400)
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        if action == 'add':
+            location_name = request.data.get("location_name")
+            location_address = request.data.get("location_address")
+            if not location_name:
+                return Response({"error": "location_name is required"}, status=400)
+            if not location_address:
+                return Response({"error": "location_address is required"}, status=400)
+            location = Location.objects.create(name=location_name, address=location_address)
+            lesson.school.locations.add(location)
+            lesson.location = location
+            status_msg = "location set"
+        elif action == 'change':
+            location_id = request.data.get("location_id")
+            if not location_id:
+                return Response({"error": "location_id is required"}, status=400)
+            location = get_object_or_404(Location, id=location_id)
+            lesson.location = location
+            status_msg = "location changed"
+        else:
+            return Response({"error": "Invalid action"}, status=400)
+        lesson.save()
+        return Response({"status": status_msg}, status=200)
 
 # ------------------------------
 # PACK VIEWS

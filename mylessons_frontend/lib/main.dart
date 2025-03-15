@@ -35,10 +35,7 @@ class MyApp extends StatelessWidget {
       title: 'MyLessons App',
       theme: ThemeData(
         primarySwatch: Colors.orange,
-        timePickerTheme: TimePickerThemeData(
-         
-          
-        ),
+        timePickerTheme: TimePickerThemeData(),
         datePickerTheme: DatePickerThemeData(
           // Header
           headerBackgroundColor: Colors.orange,
@@ -102,6 +99,13 @@ class MyApp extends StatelessWidget {
           labelColor: Colors.orange,
           unselectedLabelColor: Colors.grey,
           indicatorColor: Colors.orange,
+          labelStyle: TextStyle(
+            fontSize: 18.0,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontSize: 14.0,
+          ),
         ),
         // ElevatedButtons
         elevatedButtonTheme: ElevatedButtonThemeData(

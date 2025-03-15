@@ -128,16 +128,21 @@ class _SubjectModalState extends State<SubjectModal>
       ),
     );
     if (confirmed == true) {
-      final url = "$baseUrl/api/lessons/edit_lesson_subject/";
+      final url = "$baseUrl/api/lessons/edit_subject/";
+      // Build payload including all possible IDs.
+      Map<String, dynamic> payload = {
+        "subject_id": subject["id"],
+        "action": "change",
+      };
+      if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+      if (widget.packId != null) payload["pack_id"] = widget.packId;
+      if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+
       try {
         final response = await http.post(
           Uri.parse(url),
           headers: await getAuthHeaders(),
-          body: jsonEncode({
-            "lesson_id": widget.lessonId,
-            "subject_id": subject["id"],
-            "action": "change",
-          }),
+          body: jsonEncode(payload),
         );
         if (response.statusCode == 200) {
           Navigator.pop(context, true);
@@ -180,8 +185,7 @@ class _SubjectModalState extends State<SubjectModal>
     }
   }
 
-  // Updated subject creation: pass only lesson_id if lessonId isn't null,
-  // else pass pack_id if packId isn't null, else pass school_id if schoolId isn't null.
+  // Updated subject creation: include all provided IDs.
   void _createSubject() async {
     if (_newSubjectController.text.trim().isEmpty) return;
     bool? confirmed = await showDialog<bool>(
@@ -203,17 +207,13 @@ class _SubjectModalState extends State<SubjectModal>
     if (confirmed != true) return;
 
     final url = "$baseUrl/api/schools/create_subject/";
-    // Build the payload based on which ID is available.
+    // Build payload including all possible IDs.
     Map<String, dynamic> payload = {
       "subject_name": _newSubjectController.text.trim(),
     };
-    if (widget.lessonId != null) {
-      payload["lesson_id"] = widget.lessonId;
-    } else if (widget.packId != null) {
-      payload["pack_id"] = widget.packId;
-    } else if (widget.schoolId != null) {
-      payload["school_id"] = widget.schoolId;
-    }
+    if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+    if (widget.packId != null) payload["pack_id"] = widget.packId;
+    if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
 
     try {
       final response = await http.post(
