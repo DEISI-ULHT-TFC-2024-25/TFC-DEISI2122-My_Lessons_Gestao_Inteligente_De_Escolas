@@ -43,8 +43,7 @@ class _HomePageState extends State<HomePage> {
 
   // Search and filter state for each tab.
   String upcomingSearchQuery = "";
-  List<Map<String, String>> upcomingFilters =
-      []; // e.g., filter by type: {"type": "lessonType", "value": "group"}
+  List<Map<String, String>> upcomingFilters = []; // e.g., lessonType filters
   String lastLessonsSearchQuery = "";
   List<Map<String, String>> lastLessonsFilters = [];
   String activePacksSearchQuery = "";
@@ -292,6 +291,7 @@ class _HomePageState extends State<HomePage> {
       builder: (context) => PackDetailsModal(
         pack: pack,
         currentRole: currentRole,
+        fetchData: fetchData,
       ),
     );
   }
@@ -317,7 +317,6 @@ class _HomePageState extends State<HomePage> {
     bool isLoading = false;
     bool isScheduling = false;
 
-    // Capture parent context so we can later show a SnackBar
     final parentContext = context;
 
     showModalBottomSheet(
@@ -327,227 +326,228 @@ class _HomePageState extends State<HomePage> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      child: SfDateRangePicker(
-                        view: DateRangePickerView.month,
-                        todayHighlightColor: Colors.orange,
-                        selectionColor: Colors.orange,
-                        rangeSelectionColor: Colors.orange,
-                        startRangeSelectionColor: const Color(0xFFFF9800),
-                        endRangeSelectionColor: Colors.orange,
-                        selectionMode: DateRangePickerSelectionMode.single,
-                        showActionButtons: true,
-                        initialDisplayDate: DateTime.now(),
-                        minDate: DateTime.now(),
-                        maxDate: lesson['expiration_date'] != "None"
-                            ? DateTime.parse(lesson['expiration_date'])
-                            : null,
-                        onSelectionChanged:
-                            (DateRangePickerSelectionChangedArgs args) {
-                          if (args.value is DateTime) {
-                            setModalState(() {
-                              selectedDate = args.value;
-                              availableTimes = [];
-                              isLoading = true;
-                            });
-                            _fetchAvailableTimes(
-                                    lessonId, selectedDate!, increment)
-                                .then((times) {
-                              setModalState(() {
-                                availableTimes = times;
-                                isLoading = false;
-                              });
-                            });
-                          }
-                        },
-                        monthViewSettings:
-                            const DateRangePickerMonthViewSettings(
-                          firstDayOfWeek: 1,
-                          showTrailingAndLeadingDates: true,
-                        ),
-                        headerStyle: const DateRangePickerHeaderStyle(
-                          textAlign: TextAlign.center,
-                          textStyle: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        children: [
-                          const Text("Increment: "),
-                          DropdownButton<int>(
-                            value: increment,
-                            items: [15, 30, 60].map((value) {
-                              return DropdownMenuItem<int>(
-                                value: value,
-                                child: Text("$value minutes"),
-                              );
-                            }).toList(),
-                            onChanged: (newValue) {
-                              if (newValue != null) {
-                                setModalState(() {
-                                  increment = newValue;
-                                  if (selectedDate != null) {
-                                    isLoading = true;
-                                    availableTimes = [];
-                                  }
-                                });
-                                if (selectedDate != null) {
-                                  _fetchAvailableTimes(
-                                          lessonId, selectedDate!, increment)
-                                      .then((times) {
-                                    setModalState(() {
-                                      availableTimes = times;
-                                      isLoading = false;
-                                    });
-                                  });
-                                }
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isLoading) const CircularProgressIndicator(),
-                    if (!isLoading && availableTimes.isNotEmpty)
-                      Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
                         padding: const EdgeInsets.all(8.0),
-                        child: GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 2,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
+                        child: SfDateRangePicker(
+                          view: DateRangePickerView.month,
+                          todayHighlightColor: Colors.orange,
+                          selectionColor: Colors.orange,
+                          rangeSelectionColor: Colors.orange,
+                          startRangeSelectionColor: const Color(0xFFFF9800),
+                          endRangeSelectionColor: Colors.orange,
+                          selectionMode: DateRangePickerSelectionMode.single,
+                          showActionButtons: true,
+                          initialDisplayDate: DateTime.now(),
+                          minDate: DateTime.now(),
+                          maxDate: lesson['expiration_date'] != "None"
+                              ? DateTime.parse(lesson['expiration_date'])
+                              : null,
+                          onSelectionChanged:
+                              (DateRangePickerSelectionChangedArgs args) {
+                            if (args.value is DateTime) {
+                              setModalState(() {
+                                selectedDate = args.value;
+                                availableTimes = [];
+                                isLoading = true;
+                              });
+                              _fetchAvailableTimes(
+                                      lessonId, selectedDate!, increment)
+                                  .then((times) {
+                                setModalState(() {
+                                  availableTimes = times;
+                                  isLoading = false;
+                                });
+                              });
+                            }
+                          },
+                          monthViewSettings:
+                              const DateRangePickerMonthViewSettings(
+                            firstDayOfWeek: 1,
+                            showTrailingAndLeadingDates: true,
                           ),
-                          itemCount: availableTimes.length,
-                          itemBuilder: (context, index) {
-                            String timeStr = availableTimes[index];
-                            return InkWell(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext dialogContext) {
-                                    return StatefulBuilder(
-                                      builder: (BuildContext dialogContext,
-                                          StateSetter setDialogState) {
-                                        return AlertDialog(
-                                          title:
-                                              const Text("Confirm Reschedule"),
-                                          // Wrap content in a SizedBox with fixed height.
-                                          content: SizedBox(
-                                            height: 80,
-                                            child: Center(
-                                              child: isScheduling
-                                                  ? const CircularProgressIndicator()
-                                                  : Text(
-                                                      "Reschedule lesson to ${DateFormat('d MMM yyyy').format(selectedDate!).toLowerCase()} at $timeStr?",
-                                                    ),
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: isScheduling
-                                                  ? null
-                                                  : () => Navigator.of(
-                                                          dialogContext)
-                                                      .pop(),
-                                              child: const Text("Cancel"),
-                                            ),
-                                            TextButton(
-                                              onPressed: isScheduling
-                                                  ? null
-                                                  : () {
-                                                      setDialogState(() {
-                                                        isScheduling = true;
-                                                      });
-                                                      _schedulePrivateLesson(
-                                                              lessonId,
-                                                              selectedDate!,
-                                                              timeStr)
-                                                          .then((errorMessage) {
-                                                        setDialogState(() {
-                                                          isScheduling = false;
-                                                        });
-                                                        if (errorMessage ==
-                                                            null) {
-                                                          // Close both the confirmation dialog and the scheduling modal
-                                                          Navigator.of(
-                                                                  dialogContext)
-                                                              .pop(); // close dialog
-                                                          Navigator.of(context)
-                                                              .pop(); // close modal bottom sheet
-                                                          fetchData();
-                                                          ScaffoldMessenger.of(
-                                                                  parentContext)
-                                                              .showSnackBar(
-                                                                  const SnackBar(
-                                                                      content: Text(
-                                                                          "Lesson successfully scheduled")));
-                                                        } else {
-                                                          Navigator.of(
-                                                                  dialogContext)
-                                                              .pop();
-                                                          ScaffoldMessenger.of(
-                                                                  parentContext)
-                                                              .showSnackBar(SnackBar(
-                                                                  content: Text(
-                                                                      errorMessage)));
-                                                        }
-                                                      });
-                                                    },
-                                              child: isScheduling
-                                                  ? const SizedBox(
-                                                      width: 20,
-                                                      height: 20,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                      ))
-                                                  : const Text("Confirm"),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    );
-                                  },
+                          headerStyle: const DateRangePickerHeaderStyle(
+                            textAlign: TextAlign.center,
+                            textStyle: TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          children: [
+                            const Text("Increment: "),
+                            DropdownButton<int>(
+                              value: increment,
+                              items: [15, 30, 60].map((value) {
+                                return DropdownMenuItem<int>(
+                                  value: value,
+                                  child: Text("$value minutes"),
                                 );
+                              }).toList(),
+                              onChanged: (newValue) {
+                                if (newValue != null) {
+                                  setModalState(() {
+                                    increment = newValue;
+                                    if (selectedDate != null) {
+                                      isLoading = true;
+                                      availableTimes = [];
+                                    }
+                                  });
+                                  if (selectedDate != null) {
+                                    _fetchAvailableTimes(
+                                            lessonId, selectedDate!, increment)
+                                        .then((times) {
+                                      setModalState(() {
+                                        availableTimes = times;
+                                        isLoading = false;
+                                      });
+                                    });
+                                  }
+                                }
                               },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  timeStr,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isLoading) const CircularProgressIndicator(),
+                      if (!isLoading && availableTimes.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 2,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: availableTimes.length,
+                            itemBuilder: (context, index) {
+                              String timeStr = availableTimes[index];
+                              return InkWell(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext dialogContext) {
+                                      return StatefulBuilder(
+                                        builder: (BuildContext dialogContext,
+                                            StateSetter setDialogState) {
+                                          return AlertDialog(
+                                            title: const Text(
+                                                "Confirm Reschedule"),
+                                            content: SizedBox(
+                                              height: 80,
+                                              child: Center(
+                                                child: isScheduling
+                                                    ? const CircularProgressIndicator()
+                                                    : Text(
+                                                        "Reschedule lesson to ${DateFormat('d MMM yyyy').format(selectedDate!).toLowerCase()} at $timeStr?",
+                                                      ),
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: isScheduling
+                                                    ? null
+                                                    : () => Navigator.of(
+                                                            dialogContext)
+                                                        .pop(),
+                                                child: const Text("Cancel"),
+                                              ),
+                                              TextButton(
+                                                onPressed: isScheduling
+                                                    ? null
+                                                    : () {
+                                                        setDialogState(() {
+                                                          isScheduling = true;
+                                                        });
+                                                        _schedulePrivateLesson(
+                                                                lessonId,
+                                                                selectedDate!,
+                                                                timeStr)
+                                                            .then(
+                                                                (errorMessage) {
+                                                          setDialogState(() {
+                                                            isScheduling =
+                                                                false;
+                                                          });
+                                                          if (errorMessage ==
+                                                              null) {
+                                                            Navigator.of(
+                                                                    dialogContext)
+                                                                .pop();
+                                                            Navigator.of(
+                                                                    context)
+                                                                .pop();
+                                                            fetchData();
+                                                            ScaffoldMessenger.of(
+                                                                    parentContext)
+                                                                .showSnackBar(
+                                                                    const SnackBar(
+                                                                        content:
+                                                                            Text("Lesson successfully scheduled")));
+                                                          } else {
+                                                            Navigator.of(
+                                                                    dialogContext)
+                                                                .pop();
+                                                            ScaffoldMessenger.of(
+                                                                    parentContext)
+                                                                .showSnackBar(
+                                                                    SnackBar(
+                                                                        content:
+                                                                            Text(errorMessage)));
+                                                          }
+                                                        });
+                                                      },
+                                                child: isScheduling
+                                                    ? const SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                                strokeWidth: 2),
+                                                      )
+                                                    : const Text("Confirm"),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    timeStr,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            );
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ));
           },
         );
       },
@@ -604,8 +604,8 @@ class _HomePageState extends State<HomePage> {
                               final notification = notifications[index];
                               final formattedDate =
                                   DateFormat("dd MMM yyyy, HH:mm").format(
-                                DateTime.parse(notification['created_at']),
-                              );
+                                      DateTime.parse(
+                                          notification['created_at']));
                               return Card(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -656,14 +656,526 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // New helper for stats skeleton loading in the stats tab.
-  Widget _buildStatsSkeleton() {
+  // ------------------- Filtering Bar Widget -------------------
+
+  Widget _buildSearchFilterBar({
+    required String hint,
+    required String query,
+    required Function(String) onQueryChanged,
+    required VoidCallback onFilterPressed,
+    required List<Map<String, String>> filters,
+    required VoidCallback onClearFilters,
+  }) {
     return Column(
-      children: List.generate(3, (index) => _buildLoadingCard()),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: hint,
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+            ),
+            onChanged: onQueryChanged,
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            children: [
+              TextButton.icon(
+                onPressed: onFilterPressed,
+                icon: const Icon(Icons.filter_list, color: Colors.black),
+                label: const Text('Filters',
+                    style: TextStyle(color: Colors.black)),
+              ),
+              const SizedBox(width: 4),
+              ...filters.map((filter) => Padding(
+                    padding: const EdgeInsets.only(right: 2.0),
+                    child: Chip(
+                      label: Text(filter['value']!),
+                      deleteIcon: const Icon(Icons.close, color: Colors.black),
+                      onDeleted: onClearFilters,
+                      backgroundColor: Colors.transparent,
+                      side: const BorderSide(color: Colors.transparent),
+                      labelStyle: const TextStyle(color: Colors.black),
+                    ),
+                  )),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  // Updated header: if _isLoading, show placeholder skeleton instead.
+  Widget _buildLoadingCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(color: Colors.orange),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 16,
+                    width: double.infinity,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 14,
+                    width: 100,
+                    color: Colors.grey[300],
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ------------------- Tab Views -------------------
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = const [
+      Tab(text: "Next Lessons"),
+      Tab(text: "Last Lessons"),
+      Tab(text: "Active Packs"),
+      Tab(text: "Last Packs"),
+      Tab(text: "Stats"),
+    ];
+
+    final tabViews = [
+      // Upcoming Lessons Tab
+      RefreshIndicator(
+        onRefresh: () async {
+          await fetchData();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildSearchFilterBar(
+                hint: "Search lessons...",
+                query: upcomingSearchQuery,
+                onQueryChanged: (q) {
+                  setState(() {
+                    upcomingSearchQuery = q;
+                  });
+                },
+                onFilterPressed: () =>
+                    _showLessonFilterModal(true, upcomingLessons),
+                filters: upcomingFilters,
+                onClearFilters: () {
+                  setState(() {
+                    upcomingFilters.clear();
+                  });
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _isLoading
+                    ? Column(
+                        children:
+                            List.generate(3, (index) => _buildLoadingCard()),
+                      )
+                    : _filterLessons(upcomingLessons, upcomingSearchQuery,
+                                upcomingFilters)
+                            .isNotEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _filterLessons(upcomingLessons,
+                                    upcomingSearchQuery, upcomingFilters)
+                                .map((lesson) => _buildLessonCard(lesson))
+                                .toList(),
+                          )
+                        : const Center(child: Text("No upcoming lessons")),
+              ),
+            ],
+          ),
+        ),
+      ),
+      // Last Lessons Tab
+      RefreshIndicator(
+        onRefresh: () async {
+          await fetchData();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildSearchFilterBar(
+                hint: "Search lessons...",
+                query: lastLessonsSearchQuery,
+                onQueryChanged: (q) {
+                  setState(() {
+                    lastLessonsSearchQuery = q;
+                  });
+                },
+                onFilterPressed: () =>
+                    _showLessonFilterModal(false, lastLessons),
+                filters: lastLessonsFilters,
+                onClearFilters: () {
+                  setState(() {
+                    lastLessonsFilters.clear();
+                  });
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _isLoading
+                    ? Column(
+                        children:
+                            List.generate(3, (index) => _buildLoadingCard()),
+                      )
+                    : _filterLessons(lastLessons, lastLessonsSearchQuery,
+                                lastLessonsFilters)
+                            .isNotEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _filterLessons(lastLessons,
+                                    lastLessonsSearchQuery, lastLessonsFilters)
+                                .map((lesson) => _buildLessonCard(lesson,
+                                    isLastLesson: true))
+                                .toList(),
+                          )
+                        : const Center(child: Text("No last lessons")),
+              ),
+            ],
+          ),
+        ),
+      ),
+      // Active Packs Tab
+      RefreshIndicator(
+        onRefresh: () async {
+          await fetchData();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildSearchFilterBar(
+                hint: "Search packs...",
+                query: activePacksSearchQuery,
+                onQueryChanged: (q) {
+                  setState(() {
+                    activePacksSearchQuery = q;
+                  });
+                },
+                onFilterPressed: () => _showPackFilterModal(true, activePacks),
+                filters: activePacksFilters,
+                onClearFilters: () {
+                  setState(() {
+                    activePacksFilters.clear();
+                  });
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _isLoading
+                    ? Column(
+                        children:
+                            List.generate(3, (index) => _buildLoadingCard()),
+                      )
+                    : _filterPacks(activePacks, activePacksSearchQuery,
+                                activePacksFilters)
+                            .isNotEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _filterPacks(activePacks,
+                                    activePacksSearchQuery, activePacksFilters)
+                                .map((pack) => _buildPackCard(pack))
+                                .toList(),
+                          )
+                        : const Center(child: Text("No active packs")),
+              ),
+            ],
+          ),
+        ),
+      ),
+      // Last Packs Tab
+      RefreshIndicator(
+        onRefresh: () async {
+          await fetchData();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildSearchFilterBar(
+                hint: "Search packs...",
+                query: lastPacksSearchQuery,
+                onQueryChanged: (q) {
+                  setState(() {
+                    lastPacksSearchQuery = q;
+                  });
+                },
+                onFilterPressed: () => _showPackFilterModal(false, lastPacks),
+                filters: lastPacksFilters,
+                onClearFilters: () {
+                  setState(() {
+                    lastPacksFilters.clear();
+                  });
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _isLoading
+                    ? Column(
+                        children:
+                            List.generate(3, (index) => _buildLoadingCard()),
+                      )
+                    : _filterPacks(lastPacks, lastPacksSearchQuery,
+                                lastPacksFilters)
+                            .isNotEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _filterPacks(lastPacks,
+                                    lastPacksSearchQuery, lastPacksFilters)
+                                .map((pack) => _buildPackCard(pack))
+                                .toList(),
+                          )
+                        : const Center(child: Text("No last packs")),
+              ),
+            ],
+          ),
+        ),
+      ),
+      // Stats Tab remains as-is.
+      currentRole == "Admin" || currentRole == "Instructor"
+          ? _isLoading
+              ? _buildStatsSkeleton()
+              : (currentRole == "Admin"
+                  ? _buildAdminStats()
+                  : _buildInstructorStats())
+          : _buildNoStats(),
+    ];
+
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: DefaultTabController(
+                  length: tabs.length,
+                  child: Column(
+                    children: [
+                      TabBar(
+                        labelColor: Colors.orange,
+                        unselectedLabelColor: Colors.grey,
+                        isScrollable: true,
+                        tabs: tabs,
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: TabBarView(
+                          children: tabViews,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Simple message for roles with no stats.
+  Widget _buildNoStats() {
+    return const Center(child: Text("No stats available"));
+  }
+
+  // ------------------- Card Builders -------------------
+
+  List<dynamic> _filterLessons(
+      List<dynamic> lessons, String query, List<Map<String, String>> filters) {
+    return lessons.where((lesson) {
+      final name = lesson['students_name'].toString();
+      final matchesQuery =
+          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
+      final appliedTypes = filters
+          .where((f) => f['type'] == 'lessonType')
+          .map((f) => f['value']!.toLowerCase())
+          .toList();
+      final lessonType = lesson['type']?.toString().toLowerCase() ?? '';
+      final matchesFilter =
+          appliedTypes.isEmpty || appliedTypes.contains(lessonType);
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  List<dynamic> _filterPacks(
+      List<dynamic> packs, String query, List<Map<String, String>> filters) {
+    return packs.where((pack) {
+      final name = pack['students_name'].toString();
+      final matchesQuery =
+          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
+      final appliedTypes = filters
+          .where((f) => f['type'] == 'packType')
+          .map((f) => f['value']!.toLowerCase())
+          .toList();
+      final packType = pack['type']?.toString().toLowerCase() ?? '';
+      final matchesFilter =
+          appliedTypes.isEmpty || appliedTypes.contains(packType);
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  void _showLessonFilterModal(bool isUpcoming, List<dynamic> lessons) {
+    const options = ['Group', 'Private'];
+    List<Map<String, String>> tempFilters =
+        isUpcoming ? List.from(upcomingFilters) : List.from(lastLessonsFilters);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setModalState) {
+          bool isSelected(String value) {
+            return tempFilters
+                .any((f) => f['type'] == 'lessonType' && f['value'] == value);
+          }
+
+          return Padding(
+            padding: MediaQuery.of(context).viewInsets,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ExpansionTile(
+                    title: const Text('Lesson Type'),
+                    children: options.map((opt) {
+                      return CheckboxListTile(
+                        title: Text(opt),
+                        value: isSelected(opt),
+                        onChanged: (checked) {
+                          setModalState(() {
+                            if (checked == true) {
+                              tempFilters.insert(
+                                  0, {'type': 'lessonType', 'value': opt});
+                            } else {
+                              tempFilters.removeWhere((f) =>
+                                  f['type'] == 'lessonType' &&
+                                  f['value'] == opt);
+                            }
+                          });
+                          setState(() {
+                            if (isUpcoming) {
+                              upcomingFilters = List.from(tempFilters);
+                            } else {
+                              lastLessonsFilters = List.from(tempFilters);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close',
+                          style: TextStyle(color: Colors.black)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showPackFilterModal(bool isActive, List<dynamic> packs) {
+    const options = ['Group', 'Private'];
+    List<Map<String, String>> tempFilters =
+        isActive ? List.from(activePacksFilters) : List.from(lastPacksFilters);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setModalState) {
+          bool isSelected(String value) {
+            return tempFilters
+                .any((f) => f['type'] == 'packType' && f['value'] == value);
+          }
+
+          return Padding(
+            padding: MediaQuery.of(context).viewInsets,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ExpansionTile(
+                    title: const Text('Pack Type'),
+                    children: options.map((opt) {
+                      return CheckboxListTile(
+                        title: Text(opt),
+                        value: isSelected(opt),
+                        onChanged: (checked) {
+                          setModalState(() {
+                            if (checked == true) {
+                              tempFilters.insert(
+                                  0, {'type': 'packType', 'value': opt});
+                            } else {
+                              tempFilters.removeWhere((f) =>
+                                  f['type'] == 'packType' && f['value'] == opt);
+                            }
+                          });
+                          setState(() {
+                            if (isActive) {
+                              activePacksFilters = List.from(tempFilters);
+                            } else {
+                              lastPacksFilters = List.from(tempFilters);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close',
+                          style: TextStyle(color: Colors.black)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
   Widget _buildHeader() {
     if (_isLoading) {
       return Padding(
@@ -746,529 +1258,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
-  // ------------------- Filtering logic for lessons and packs -------------------
-
-  // Filter lessons by search query and selected filters.
-  List<dynamic> _filterLessons(
-      List<dynamic> lessons, String query, List<Map<String, String>> filters) {
-    return lessons.where((lesson) {
-      final name = lesson['students_name'].toString();
-      final matchesQuery =
-          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
-      // For lesson filters, we use filter type "lessonType" and values like "group" or "private".
-      final appliedTypes = filters
-          .where((f) => f['type'] == 'lessonType')
-          .map((f) => f['value']!.toLowerCase())
-          .toList();
-      final lessonType = lesson['type']?.toString().toLowerCase() ?? '';
-      final matchesFilter =
-          appliedTypes.isEmpty || appliedTypes.contains(lessonType);
-      return matchesQuery && matchesFilter;
-    }).toList();
-  }
-
-  // Filter packs similarly.
-  List<dynamic> _filterPacks(
-      List<dynamic> packs, String query, List<Map<String, String>> filters) {
-    return packs.where((pack) {
-      final name = pack['students_name'].toString();
-      final matchesQuery =
-          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
-      final appliedTypes = filters
-          .where((f) => f['type'] == 'packType')
-          .map((f) => f['value']!.toLowerCase())
-          .toList();
-      final packType = pack['type']?.toString().toLowerCase() ?? '';
-      final matchesFilter =
-          appliedTypes.isEmpty || appliedTypes.contains(packType);
-      return matchesQuery && matchesFilter;
-    }).toList();
-  }
-
-  // Show filter modal for lessons.
-  void _showLessonFilterModal(bool isUpcoming, List<dynamic> lessons) {
-    // Options for lesson type.
-    const options = ['Group', 'Private'];
-    List<Map<String, String>> tempFilters =
-        isUpcoming ? List.from(upcomingFilters) : List.from(lastLessonsFilters);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setModalState) {
-          bool isSelected(String value) {
-            return tempFilters
-                .any((f) => f['type'] == 'lessonType' && f['value'] == value);
-          }
-
-          return Padding(
-            padding: MediaQuery.of(context).viewInsets,
-            child: Container(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ExpansionTile(
-                    title: const Text('Lesson Type'),
-                    children: options.map((opt) {
-                      return CheckboxListTile(
-                        title: Text(opt),
-                        value: isSelected(opt),
-                        onChanged: (checked) {
-                          setModalState(() {
-                            if (checked == true) {
-                              tempFilters.insert(
-                                  0, {'type': 'lessonType', 'value': opt});
-                            } else {
-                              tempFilters.removeWhere((f) =>
-                                  f['type'] == 'lessonType' &&
-                                  f['value'] == opt);
-                            }
-                          });
-                          setState(() {
-                            if (isUpcoming) {
-                              upcomingFilters = List.from(tempFilters);
-                            } else {
-                              lastLessonsFilters = List.from(tempFilters);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Close',
-                          style: TextStyle(color: Colors.black)),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          );
-        });
-      },
-    );
-  }
-
-  // Show filter modal for packs.
-  void _showPackFilterModal(bool isActive, List<dynamic> packs) {
-    // Options for pack type.
-    const options = ['Group', 'Private'];
-    List<Map<String, String>> tempFilters =
-        isActive ? List.from(activePacksFilters) : List.from(lastPacksFilters);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(builder: (context, setModalState) {
-          bool isSelected(String value) {
-            return tempFilters
-                .any((f) => f['type'] == 'packType' && f['value'] == value);
-          }
-
-          return Padding(
-            padding: MediaQuery.of(context).viewInsets,
-            child: Container(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ExpansionTile(
-                    title: const Text('Pack Type'),
-                    children: options.map((opt) {
-                      return CheckboxListTile(
-                        title: Text(opt),
-                        value: isSelected(opt),
-                        onChanged: (checked) {
-                          setModalState(() {
-                            if (checked == true) {
-                              tempFilters.insert(
-                                  0, {'type': 'packType', 'value': opt});
-                            } else {
-                              tempFilters.removeWhere((f) =>
-                                  f['type'] == 'packType' && f['value'] == opt);
-                            }
-                          });
-                          setState(() {
-                            if (isActive) {
-                              activePacksFilters = List.from(tempFilters);
-                            } else {
-                              lastPacksFilters = List.from(tempFilters);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Close',
-                          style: TextStyle(color: Colors.black)),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          );
-        });
-      },
-    );
-  }
-
-  // Helper widget to build a search bar and filter chips row.
-  Widget _buildSearchFilterBar({
-    required String hint,
-    required String query,
-    required Function(String) onQueryChanged,
-    required VoidCallback onFilterPressed,
-    required List<Map<String, String>> filters,
-    required VoidCallback onClearFilters,
-  }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: hint,
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-            ),
-            onChanged: onQueryChanged,
-          ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: onFilterPressed,
-                icon: const Icon(Icons.filter_list, color: Colors.black),
-                label: const Text('Filters',
-                    style: TextStyle(color: Colors.black)),
-              ),
-              const SizedBox(width: 4),
-              ...filters.map((filter) => Padding(
-                    padding: const EdgeInsets.only(right: 2.0),
-                    child: Chip(
-                      label: Text(filter['value']!),
-                      deleteIcon: const Icon(Icons.close, color: Colors.black),
-                      onDeleted: onClearFilters,
-                      backgroundColor: Colors.transparent,
-                      side: const BorderSide(color: Colors.transparent),
-                      labelStyle: const TextStyle(color: Colors.black),
-                    ),
-                  )),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // A reusable loading card widget that mimics your card dimensions.
-  Widget _buildLoadingCard() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: CircularProgressIndicator(color: Colors.orange),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 16,
-                    width: double.infinity,
-                    color: Colors.grey[300],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 14,
-                    width: 100,
-                    color: Colors.grey[300],
-                  ),
-                ],
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ------------------- Tab Views -------------------
-
-  @override
-  Widget build(BuildContext context) {
-    final tabs = const [
-      Tab(text: "Upcoming Lessons"),
-      Tab(text: "Last Lessons"),
-      Tab(text: "Active Packs"),
-      Tab(text: "Last Packs"),
-      Tab(text: "Stats"),
-    ];
-
-    final tabViews = [
-      // Upcoming Lessons Tab
-      Column(
-        children: [
-          _buildSearchFilterBar(
-            hint: "Search lessons...",
-            query: upcomingSearchQuery,
-            onQueryChanged: (q) {
-              setState(() {
-                upcomingSearchQuery = q;
-              });
-            },
-            onFilterPressed: () =>
-                _showLessonFilterModal(true, upcomingLessons),
-            filters: upcomingFilters,
-            onClearFilters: () {
-              setState(() {
-                upcomingFilters.clear();
-              });
-            },
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await fetchData();
-              },
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8.0),
-                child: _isLoading
-                    ? Column(
-                        children:
-                            List.generate(3, (index) => _buildLoadingCard()),
-                      )
-                    : _filterLessons(upcomingLessons, upcomingSearchQuery,
-                                upcomingFilters)
-                            .isNotEmpty
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _filterLessons(upcomingLessons,
-                                    upcomingSearchQuery, upcomingFilters)
-                                .map((lesson) => _buildLessonCard(lesson))
-                                .toList(),
-                          )
-                        : const Center(child: Text("No upcoming lessons")),
-              ),
-            ),
-          ),
-        ],
-      ),
-      // Last Lessons Tab
-      Column(
-        children: [
-          _buildSearchFilterBar(
-            hint: "Search lessons...",
-            query: lastLessonsSearchQuery,
-            onQueryChanged: (q) {
-              setState(() {
-                lastLessonsSearchQuery = q;
-              });
-            },
-            onFilterPressed: () => _showLessonFilterModal(false, lastLessons),
-            filters: lastLessonsFilters,
-            onClearFilters: () {
-              setState(() {
-                lastLessonsFilters.clear();
-              });
-            },
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await fetchData();
-              },
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8.0),
-                child: _isLoading
-                    ? Column(
-                        children:
-                            List.generate(3, (index) => _buildLoadingCard()),
-                      )
-                    : _filterLessons(lastLessons, lastLessonsSearchQuery,
-                                lastLessonsFilters)
-                            .isNotEmpty
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _filterLessons(lastLessons,
-                                    lastLessonsSearchQuery, lastLessonsFilters)
-                                .map((lesson) => _buildLessonCard(lesson,
-                                    isLastLesson: true))
-                                .toList(),
-                          )
-                        : const Center(child: Text("No last lessons")),
-              ),
-            ),
-          ),
-        ],
-      ),
-      // Active Packs Tab
-      Column(
-        children: [
-          _buildSearchFilterBar(
-            hint: "Search packs...",
-            query: activePacksSearchQuery,
-            onQueryChanged: (q) {
-              setState(() {
-                activePacksSearchQuery = q;
-              });
-            },
-            onFilterPressed: () => _showPackFilterModal(true, activePacks),
-            filters: activePacksFilters,
-            onClearFilters: () {
-              setState(() {
-                activePacksFilters.clear();
-              });
-            },
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await fetchData();
-              },
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8.0),
-                child: _isLoading
-                    ? Column(
-                        children:
-                            List.generate(3, (index) => _buildLoadingCard()),
-                      )
-                    : _filterPacks(activePacks, activePacksSearchQuery,
-                                activePacksFilters)
-                            .isNotEmpty
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _filterPacks(activePacks,
-                                    activePacksSearchQuery, activePacksFilters)
-                                .map((pack) => _buildPackCard(pack))
-                                .toList(),
-                          )
-                        : const Center(child: Text("No active packs")),
-              ),
-            ),
-          ),
-        ],
-      ),
-      // Last Packs Tab
-      Column(
-        children: [
-          _buildSearchFilterBar(
-            hint: "Search packs...",
-            query: lastPacksSearchQuery,
-            onQueryChanged: (q) {
-              setState(() {
-                lastPacksSearchQuery = q;
-              });
-            },
-            onFilterPressed: () => _showPackFilterModal(false, lastPacks),
-            filters: lastPacksFilters,
-            onClearFilters: () {
-              setState(() {
-                lastPacksFilters.clear();
-              });
-            },
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await fetchData();
-              },
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8.0),
-                child: _isLoading
-                    ? Column(
-                        children:
-                            List.generate(3, (index) => _buildLoadingCard()),
-                      )
-                    : _filterPacks(lastPacks, lastPacksSearchQuery,
-                                lastPacksFilters)
-                            .isNotEmpty
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _filterPacks(lastPacks,
-                                    lastPacksSearchQuery, lastPacksFilters)
-                                .map((pack) => _buildPackCard(pack))
-                                .toList(),
-                          )
-                        : const Center(child: Text("No last packs")),
-              ),
-            ),
-          ),
-        ],
-      ),
-      // Stats Tab
-      currentRole == "Admin" || currentRole == "Instructor"
-          ? _isLoading
-              ? _buildStatsSkeleton()
-              : (currentRole == "Admin"
-                  ? _buildAdminStats()
-                  : _buildInstructorStats())
-          : _buildNoStats(),
-    ];
-
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: DefaultTabController(
-                  length: tabs.length,
-                  child: Column(
-                    children: [
-                      TabBar(
-                        labelColor: Colors.orange,
-                        unselectedLabelColor: Colors.grey,
-                        isScrollable: true,
-                        tabs: tabs,
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: TabBarView(
-                          children: tabViews,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Simple message for roles with no stats.
-  Widget _buildNoStats() {
-    return const Center(child: Text("No stats available"));
-  }
-
-  // ------------------- Card Builders -------------------
 
   Widget _buildLessonCard(dynamic lesson, {bool isLastLesson = false}) {
     final isGroup = lesson['type']?.toString().toLowerCase() == 'group';
@@ -1291,33 +1280,25 @@ class _HomePageState extends State<HomePage> {
                 ),
                 onPressed: () {
                   if (isLastLesson) {
-                    // New behavior for report icon on last lessons.
                     if (currentRole == "Parent") {
-                      // For parents, open the report view page.
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => LessonReportPage(
-                            lesson: lesson,
-                            mode: 'view',
-                          ),
+                          builder: (_) =>
+                              LessonReportPage(lesson: lesson, mode: 'view'),
                         ),
                       );
                     } else if (currentRole == "Instructor" ||
                         currentRole == "Admin") {
-                      // For instructors/admins, open the report edit/build page.
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => LessonReportPage(
-                            lesson: lesson,
-                            mode: 'edit',
-                          ),
+                          builder: (_) =>
+                              LessonReportPage(lesson: lesson, mode: 'edit'),
                         ),
                       );
                     }
                   } else {
-                    // Existing behavior for non-last lessons.
                     if (isGroup) {
                       showDialog(
                         context: context,
@@ -1462,7 +1443,7 @@ class _HomePageState extends State<HomePage> {
                   icon: const Icon(Icons.more_vert,
                       size: 28, color: Colors.orange),
                   onPressed: () {
-                    _showPackDetailsModal(pack);
+                    _showPackDetailsModal(pack,);
                   },
                 ),
               ],
@@ -1474,7 +1455,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ------------------- Stats Card Builders -------------------
+  Widget _buildStatsSkeleton() {
+    return Column(
+      children: List.generate(3, (index) => _buildLoadingCard()),
+    );
+  }
 
   Widget _buildAdminStats() {
     final formattedStart = DateFormat('MMM dd, yyyy').format(startDate);
@@ -1612,13 +1597,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildStatCard(
-    String title,
-    String value, {
-    String? actionLabel,
-    IconData? icon,
-    VoidCallback? onAction,
-  }) {
+  Widget _buildStatCard(String title, String value,
+      {String? actionLabel, IconData? icon, VoidCallback? onAction}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

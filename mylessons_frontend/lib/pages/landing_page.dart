@@ -74,7 +74,7 @@ class LandingPage extends StatelessWidget {
                   ),
                 ),
                 onPressed: () {
-                  Navigator.pushNamed(context, '/register_page');
+                  Navigator.pushNamed(context, '/register_landing_page');
                 },
                 child: const Text(
                   'Sign up for free',

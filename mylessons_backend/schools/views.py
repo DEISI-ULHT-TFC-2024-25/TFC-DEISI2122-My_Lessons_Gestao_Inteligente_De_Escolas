@@ -943,6 +943,10 @@ def create_location(request):
     elif pack_id:
         pack = get_object_or_404(Pack, id=pack_id)
         pack.school.locations.add(location)
+        if pack.type == "private":
+            for lesson in pack.lessons.all():
+                lesson.location = location
+                lesson.save()
         pack.location = location
         pack.save()
     elif school_id:
@@ -989,6 +993,10 @@ def create_subject(request):
     elif pack_id:
         pack = get_object_or_404(Pack, id=pack_id)
         pack.school.sports.add(subject)
+        if pack.type == "private":
+            for lesson in pack.lessons.all():
+                lesson.sport = subject
+                lesson.save()
         pack.sport = subject
         pack.save()
     elif school_id:

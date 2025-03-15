@@ -7,7 +7,9 @@ import '../services/api_service.dart';
 class StudentsModal extends StatefulWidget {
   final int? lessonId;
   final int? packId;
-  const StudentsModal({super.key, this.lessonId, this.packId});
+  final int? schoolId; // added schoolId for full payload support
+
+  const StudentsModal({super.key, this.lessonId, this.packId, this.schoolId});
 
   @override
   _StudentsModalState createState() => _StudentsModalState();
@@ -41,12 +43,16 @@ class _StudentsModalState extends State<StudentsModal>
       isLoading = true;
     });
     try {
-      // Prepare the POST body with either lesson_id or pack_id.
+      // Prepare the POST body with lesson_id, pack_id, and school_id if available.
       Map<String, dynamic> body = {};
       if (widget.lessonId != null) {
         body["lesson_id"] = widget.lessonId;
-      } else if (widget.packId != null) {
+      }
+      if (widget.packId != null) {
         body["pack_id"] = widget.packId;
+      }
+      if (widget.schoolId != null) {
+        body["school_id"] = widget.schoolId;
       }
 
       final response = await http.post(
@@ -123,16 +129,21 @@ class _StudentsModalState extends State<StudentsModal>
       },
     );
     if (confirmed == true) {
-      final url = "$baseUrl/api/lessons/edit_lesson_students/";
+      final url = "$baseUrl/api/lessons/edit_students/";
+      // Build payload including all available IDs.
+      Map<String, dynamic> payload = {
+        "student_id": student["id"],
+        "action": action,
+      };
+      if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+      if (widget.packId != null) payload["pack_id"] = widget.packId;
+      if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+
       try {
         final response = await http.post(
           Uri.parse(url),
           headers: await getAuthHeaders(),
-          body: jsonEncode({
-            "lesson_id": widget.lessonId,
-            "student_id": student["id"],
-            "action": action,
-          }),
+          body: jsonEncode(payload),
         );
         if (response.statusCode == 200) {
           setState(() {
@@ -152,8 +163,7 @@ class _StudentsModalState extends State<StudentsModal>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content:
-                    Text("Error updating student: ${utf8.decode(response.bodyBytes)}")),
+                content: Text("Error updating student: ${utf8.decode(response.bodyBytes)}")),
           );
         }
       } catch (e) {
@@ -209,27 +219,31 @@ class _StudentsModalState extends State<StudentsModal>
     );
     if (confirmed != true) return;
 
-    final url = "$baseUrl/api/lessons/edit_lesson_students/";
+    final url = "$baseUrl/api/lessons/edit_students/";
+    // Build payload including all available IDs.
+    Map<String, dynamic> payload = {
+      "action": "add",
+      "new_student": true,
+      "first_name": _firstNameController.text.trim(),
+      "last_name": _lastNameController.text.trim(),
+      "birthday": _birthdayController.text.trim(),
+    };
+    if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+    if (widget.packId != null) payload["pack_id"] = widget.packId;
+    if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+
     try {
       final response = await http.post(
         Uri.parse(url),
         headers: await getAuthHeaders(),
-        body: jsonEncode({
-          "lesson_id": widget.lessonId,
-          "action": "add",
-          "new_student": true,
-          "first_name": _firstNameController.text.trim(),
-          "last_name": _lastNameController.text.trim(),
-          "birthday": _birthdayController.text.trim(),
-        }),
+        body: jsonEncode(payload),
       );
       if (response.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content:
-                  Text("Error creating student: ${utf8.decode(response.bodyBytes)}")),
+              content: Text("Error creating student: ${utf8.decode(response.bodyBytes)}")),
         );
       }
     } catch (e) {

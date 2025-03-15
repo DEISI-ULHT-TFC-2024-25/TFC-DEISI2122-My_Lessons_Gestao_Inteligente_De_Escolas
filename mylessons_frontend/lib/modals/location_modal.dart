@@ -128,16 +128,21 @@ class _LocationModalState extends State<LocationModal>
       ),
     );
     if (confirmed == true) {
-      final url = "$baseUrl/api/lessons/edit_lesson_location/";
+      final url = "$baseUrl/api/lessons/edit_location/";
+      // Build payload including all available IDs.
+      Map<String, dynamic> payload = {
+        "location_id": location["id"],
+        "action": "change",
+      };
+      if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+      if (widget.packId != null) payload["pack_id"] = widget.packId;
+      if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+
       try {
         final response = await http.post(
           Uri.parse(url),
           headers: await getAuthHeaders(),
-          body: jsonEncode({
-            "lesson_id": widget.lessonId,
-            "location_id": location["id"],
-            "action": "change",
-          }),
+          body: jsonEncode(payload),
         );
         if (response.statusCode == 200) {
           Navigator.pop(context, true);
@@ -157,13 +162,20 @@ class _LocationModalState extends State<LocationModal>
   // Update locations for multi-select mode.
   Future<void> _updateLocations() async {
     final url = "$baseUrl/api/schools/update_locations/";
+    // Build payload including all available IDs.
+    Map<String, dynamic> payload = {
+      "location_ids": _selectedIds,
+    };
+    if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+    if (widget.packId != null) payload["pack_id"] = widget.packId;
+    if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+
     try {
-      final response = await http.post(Uri.parse(url),
-          headers: await getAuthHeaders(),
-          body: jsonEncode({
-            "school_id": widget.schoolId,
-            "location_ids": _selectedIds,
-          }));
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await getAuthHeaders(),
+        body: jsonEncode(payload),
+      );
       if (response.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
@@ -201,18 +213,14 @@ class _LocationModalState extends State<LocationModal>
     );
     if (confirmed != true) return;
     final url = "$baseUrl/api/schools/create_location/";
-    // Build the payload based on which ID is available.
+    // Build the payload based on which IDs are available.
     Map<String, dynamic> payload = {
       "location_name": _newLocationNameController.text.trim(),
       "location_address": _newLocationAddressController.text.trim(),
     };
-    if (widget.lessonId != null) {
-      payload["lesson_id"] = widget.lessonId;
-    } else if (widget.packId != null) {
-      payload["pack_id"] = widget.packId;
-    } else if (widget.schoolId != null) {
-      payload["school_id"] = widget.schoolId;
-    }
+    if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
+    else if (widget.packId != null) payload["pack_id"] = widget.packId;
+    else if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
     try {
       final response = await http.post(
         Uri.parse(url),

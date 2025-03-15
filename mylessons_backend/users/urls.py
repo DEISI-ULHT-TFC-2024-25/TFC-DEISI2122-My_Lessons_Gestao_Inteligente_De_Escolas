@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  check_username_availability, daily_timeline, firebase_login, get_selected_students, login_view, register_user, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
+from .views import  check_username_availability, daily_timeline, firebase_login, get_selected_instructors, get_selected_students, login_view, profile_view, register_user, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -15,12 +15,15 @@ urlpatterns = [
     path("available_schools/", available_schools, name="available_schools"),
     path("students/", students, name="students"),
     path("get_selected_students/", get_selected_students, name="get_selected_students"),
+    path("get_selected_instructors/", get_selected_instructors, name="get_selected_instructors"),
     path('students/create/', create_student, name='create_student'),
     path('book_pack/', book_pack_view, name='book_pack'),
     path('update_availability/', update_availability, name='update_availability'),
     path('daily_timeline/', daily_timeline, name='daily_timeline'),  
     path('check_username/', check_username_availability, name='check_username'),
     path('firebase_login/', firebase_login, name='firebase_login'),
+    path('profile_data/', profile_view, name='profile_data'),
+    
 
     # Add more paths (e.g., /google/callback) as needed
 ]
