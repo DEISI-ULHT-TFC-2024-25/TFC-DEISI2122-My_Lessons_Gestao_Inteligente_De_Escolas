@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from payments.views import deeplink_payment_success, deeplink_payment_fail
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -25,4 +26,6 @@ urlpatterns = [
     path('api/lessons/', include('lessons.urls')), 
     path('api/notifications/', include('notifications.urls')),
     path('api/schools/', include('schools.urls')),
+    path("deeplink/payment-success/", deeplink_payment_success, name="deeplink_payment_success"),
+    path("deeplink/payment-fail/", deeplink_payment_fail, name="deeplink_payment_fail"),
 ]
