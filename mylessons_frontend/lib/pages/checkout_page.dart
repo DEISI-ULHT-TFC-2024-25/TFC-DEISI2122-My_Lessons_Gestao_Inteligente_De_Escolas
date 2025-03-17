@@ -444,7 +444,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final url = Uri.parse('$baseUrl/api/payments/create_checkout_session/');
       // Await the auth headers.
       final headers = await getAuthHeaders();
-      headers['Content-Type'] = 'application/json';
 
       final response = await http.post(
         url,
