@@ -175,6 +175,7 @@ endpoint_secret = 'whsec_5EcGjLPpcfMjRNDpGVbahPjQWAyZgGmZ'
 
 # Using Django
 @csrf_exempt
+<<<<<<< HEAD
 def my_webhook_view(request):
     logger.debug("WEBHOOK WAS HIT!!")
     payload = request.body
@@ -206,3 +207,30 @@ def my_webhook_view(request):
         logger.debug('Unhandled event type {}'.format(event.type))
 
     return HttpResponse(status=200)
+=======
+def stripe_webhook(request):
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    endpoint_secret = settings.STRIPE_WEBHOOK_SECRET  # Provided by Stripe
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError:
+        # Invalid payload
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError:
+        # Invalid signature
+        return HttpResponse(status=400)
+
+    # Handle the event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        # Fulfill the purchase, mark payment complete in DB, etc.
+        print("Payment was successful! Session ID:", session["id"])
+
+    # ... handle other event types if needed
+
+    return HttpResponse(status=200)
+>>>>>>> a30aac950ae6bce1309fcc5599ae122bfff3886e
