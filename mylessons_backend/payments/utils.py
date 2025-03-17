@@ -46,7 +46,7 @@ def create_checkout_session(user, cart, discount=0):
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url=settings.SUCCESS_URL + "?session_id={CHECKOUT_SESSION_ID}",
+        success_url=settings.SUCCESS_URL,
         cancel_url=settings.CANCEL_URL,
         metadata={
             "user_id": str(user.id),
