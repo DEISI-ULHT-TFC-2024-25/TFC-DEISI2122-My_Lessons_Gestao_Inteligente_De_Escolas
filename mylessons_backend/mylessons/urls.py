@@ -16,13 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from payments.views import stripe_webhook
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
     path('api/payments/', include('payments.urls')), 
-    path('stripe/webhook/', stripe_webhook, name='stripe-webhook'),
     path('api/users/', include('users.urls')), 
     path('api/lessons/', include('lessons.urls')), 
     path('api/notifications/', include('notifications.urls')),

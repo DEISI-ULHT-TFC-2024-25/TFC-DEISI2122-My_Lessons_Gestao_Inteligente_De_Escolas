@@ -133,7 +133,7 @@ STRIPE_SECRET_KEY = "sk_test_51QmkhvFKR0fDDDqcsd2utmLdfoOdnklem57fsmfJsgRwCoNGry
 
 STRIPE_PUBLISHABLE_KEY = "pk_test_51QmkhvFKR0fDDDqcMPjzGLnTRzcF73xgfXA7bQ2Z2LmHND06TQqgq9wG9fM3SPqRP9bpkFTSCovRagcFxjrkkR7L00hLeKz2Lf"
 
-STRIPE_WEBHOOK_SECRET = 'whsec_86b4d0b973573dabf6dc25baa2fd061397f6a5f2335c51ed313c3decb15634d7'
+STRIPE_WEBHOOK_SECRET = 'whsec_5EcGjLPpcfMjRNDpGVbahPjQWAyZgGmZ'
 
 SUCCESS_URL = "https://mylessons.pythonanywhere.com/api/payments/payment-success"
 CANCEL_URL = "https://mylessons.pythonanywhere.com/api/payments/payment-failed"
