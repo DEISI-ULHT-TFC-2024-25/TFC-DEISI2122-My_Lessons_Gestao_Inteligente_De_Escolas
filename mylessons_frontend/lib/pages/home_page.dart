@@ -8,8 +8,11 @@ import 'package:mylessons_frontend/modals/schedule_multiple_lessons_modal.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../modals/profile_completion_modal.dart';
 import '../services/api_service.dart';
+import '../services/profile_service.dart';
 import 'lesson_report_page.dart'; // Import our API services
+import 'profile_page.dart' as profile;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -85,11 +88,13 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
-        final profileData = json.decode(utf8.decode(profileResponse.bodyBytes));
-        final roleData = json.decode(utf8.decode(roleResponse.bodyBytes));
+        final decodedProfile = utf8.decode(profileResponse.bodyBytes);
+        final decodedRole = utf8.decode(roleResponse.bodyBytes);
+        final profileData = json.decode(decodedProfile);
+        final roleData = json.decode(decodedRole);
 
         setState(() {
-          firstName = profileData['first_name'];
+          firstName = profileData['first_name'] ?? '';
           notificationsCount =
               int.tryParse(profileData['notifications_count'].toString()) ?? 0;
           currentRole = roleData['current_role'];
@@ -107,6 +112,14 @@ class _HomePageState extends State<HomePage> {
                   .toString()
               : "";
         });
+
+        // Now, within the same block, check if essential profile info is missing.
+        if ((profileData['first_name'] == null ||
+                profileData['first_name'].toString().isEmpty) ||
+            (profileData['phone'] == null ||
+                profileData['phone'].toString().isEmpty)) {
+          _promptProfileCompletion();
+        }
       }
 
       if (currentRole == "Parent" ||
@@ -266,6 +279,39 @@ class _HomePageState extends State<HomePage> {
   Future<void> _markNotificationsAsRead(List<int> notificationIds) =>
       markNotificationsAsRead(notificationIds);
 
+  Future<void> _promptProfileCompletion() async {
+  final result = await showModalBottomSheet<Map<String, String>>(
+    context: context,
+    isDismissible: false,
+    isScrollControlled: true,
+    builder: (context) => const ProfileCompletionModal(),
+  );
+
+  if (result != null) {
+    // Build the payload using the modal result for first/last name, country code, and phone.
+    final payload = {
+      'first_name': result['firstName']!,
+      'last_name': result['lastName']!,
+      // Use existing values from your profile page controllers (or other stored values)
+      'country_code': result['id']!, // In our modal, 'id' holds the country code.
+      'phone': result['phone']!,
+    };
+
+    try {
+      final message = await ProfileService.updateProfileData(payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      await fetchData();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error updating profile: $e")),
+      );
+    }
+  }
+}
+
+
   _showLessonDetailsModal(lesson) {
     showModalBottomSheet(
       context: context,
@@ -296,12 +342,18 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showScheduleMultipleLessonsModal(List<dynamic> lessons) {
+  Future<void> _showScheduleMultipleLessonsModal(
+      List<dynamic> lessons, String expirationDate) async {
+    int schoolScheduleTimeLimit =
+        await fetchSchoolScheduleTimeLimit(lessons.first["school"]);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) => ScheduleMultipleLessonsModal(
         lessons: lessons,
+        expirationDate: expirationDate,
+        currentRole: currentRole,
+        schoolScheduleTimeLimit: schoolScheduleTimeLimit,
         onScheduleConfirmed: () {
           fetchData();
         },
@@ -309,13 +361,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showScheduleLessonModal(dynamic lesson) {
+  Future<void> _showScheduleLessonModal(dynamic lesson) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
     DateTime? selectedDate;
     int increment = 60;
     List<String> availableTimes = [];
     bool isLoading = false;
     bool isScheduling = false;
+    int schoolScheduleTimeLimit =
+        await fetchSchoolScheduleTimeLimit(lesson["school"]);
 
     final parentContext = context;
 
@@ -344,8 +398,16 @@ class _HomePageState extends State<HomePage> {
                           endRangeSelectionColor: Colors.orange,
                           selectionMode: DateRangePickerSelectionMode.single,
                           showActionButtons: true,
-                          initialDisplayDate: DateTime.now(),
-                          minDate: DateTime.now(),
+                          initialDisplayDate: currentRole == "Parent"
+                              ? DateTime.now().add(
+                                  Duration(hours: schoolScheduleTimeLimit),
+                                )
+                              : null,
+                          minDate: currentRole == "Parent"
+                              ? DateTime.now().add(
+                                  Duration(hours: schoolScheduleTimeLimit),
+                                )
+                              : null,
                           maxDate: lesson['expiration_date'] != "None"
                               ? DateTime.parse(lesson['expiration_date'])
                               : null,
@@ -738,7 +800,7 @@ class _HomePageState extends State<HomePage> {
                   Container(
                     height: 14,
                     width: 100,
-                    color: Colors.grey[300],
+                    color: Colors.grey[50],
                   ),
                 ],
               ),
@@ -764,6 +826,8 @@ class _HomePageState extends State<HomePage> {
     final tabViews = [
       // Upcoming Lessons Tab
       RefreshIndicator(
+        color: Colors.orange,
+        backgroundColor: Colors.white,
         onRefresh: () async {
           await fetchData();
         },
@@ -813,6 +877,8 @@ class _HomePageState extends State<HomePage> {
       ),
       // Last Lessons Tab
       RefreshIndicator(
+        color: Colors.orange,
+        backgroundColor: Colors.white,
         onRefresh: () async {
           await fetchData();
         },
@@ -863,6 +929,8 @@ class _HomePageState extends State<HomePage> {
       ),
       // Active Packs Tab
       RefreshIndicator(
+        color: Colors.orange,
+        backgroundColor: Colors.white,
         onRefresh: () async {
           await fetchData();
         },
@@ -911,6 +979,8 @@ class _HomePageState extends State<HomePage> {
       ),
       // Last Packs Tab
       RefreshIndicator(
+        color: Colors.orange,
+        backgroundColor: Colors.white,
         onRefresh: () async {
           await fetchData();
         },
@@ -1404,7 +1474,8 @@ class _HomePageState extends State<HomePage> {
                       },
                     );
                   } else {
-                    _showScheduleMultipleLessonsModal(pack['lessons']);
+                    _showScheduleMultipleLessonsModal(
+                        pack['lessons'], pack["expiration_date"]);
                   }
                 },
               ),
@@ -1443,7 +1514,9 @@ class _HomePageState extends State<HomePage> {
                   icon: const Icon(Icons.more_vert,
                       size: 28, color: Colors.orange),
                   onPressed: () {
-                    _showPackDetailsModal(pack,);
+                    _showPackDetailsModal(
+                      pack,
+                    );
                   },
                 ),
               ],

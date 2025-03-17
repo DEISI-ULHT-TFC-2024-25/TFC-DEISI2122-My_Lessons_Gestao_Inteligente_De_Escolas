@@ -1,13 +1,51 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart'; // Adjust the path if necessary
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'login_page.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({Key? key}) : super(key: key);
 
   @override
+  _LandingPageState createState() => _LandingPageState();
+}
+
+class _LandingPageState extends State<LandingPage> {
+  final _storage = const FlutterSecureStorage();
+  bool _isCheckingToken = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForToken();
+  }
+
+  Future<void> _checkForToken() async {
+    final token = await _storage.read(key: 'auth_token');
+    if (token != null && token.isNotEmpty) {
+      // Token found, so navigate to main screen
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      }
+    } else {
+      // No token found, so show this landing page
+      setState(() {
+        _isCheckingToken = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // While checking token, show a loading indicator
+    if (_isCheckingToken) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Otherwise, show the landing page UI
     return Scaffold(
-      backgroundColor: Colors.white, // White background
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
@@ -19,8 +57,6 @@ class LandingPage extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Title text with three lines
-                      // (Feel free to remove or tweak spacing as desired)
                       RichText(
                         textAlign: TextAlign.center,
                         text: const TextSpan(
@@ -62,8 +98,6 @@ class LandingPage extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Buttons pinned at the bottom
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,

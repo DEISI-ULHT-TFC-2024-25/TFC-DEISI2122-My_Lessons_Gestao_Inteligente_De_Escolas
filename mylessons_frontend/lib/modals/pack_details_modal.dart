@@ -27,6 +27,8 @@ class PackDetailsModal extends StatefulWidget {
 class _PackDetailsModalState extends State<PackDetailsModal> {
   late Future<Map<String, dynamic>?> _packDetailsFuture;
   late final int packId;
+  // Added state variable to track loading per action label.
+  Map<String, bool> _isActionLoading = {};
 
   @override
   void initState() {
@@ -255,48 +257,64 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                                       ),
                                       if (withAction)
                                         IconButton(
-                                          icon: Icon(
-                                            actionIconMapping[label] ?? Icons.arrow_forward,
-                                            color: Colors.orange,
-                                          ),
+                                          icon: _isActionLoading[label] == true
+                                              ? SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                                                  ),
+                                                )
+                                              : Icon(
+                                                  actionIconMapping[label] ?? Icons.arrow_forward,
+                                                  color: Colors.orange,
+                                                ),
                                           onPressed: () async {
-                                            bool? updated;
-                                            if (label == "Subject" && widget.currentRole != "Parent") {
-                                              updated = await showModalBottomSheet<bool>(
-                                                context: context,
-                                                isScrollControlled: true,
-                                                shape: const RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                                ),
-                                                builder: (context) => SubjectModal(packId: packId),
-                                              );
-                                            } else if (label == "Students" && widget.currentRole != "Parent") {
-                                              updated = await showModalBottomSheet<bool>(
-                                                context: context,
-                                                isScrollControlled: true,
-                                                shape: const RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                                ),
-                                                builder: (context) => StudentsModal(packId: packId),
-                                              );
-                                            } else if (label == "Instructors") {
-                                              updated = await showModalBottomSheet<bool>(
-                                                context: context,
-                                                isScrollControlled: true,
-                                                shape: const RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                                ),
-                                                builder: (context) => InstructorsModal(packId: packId),
-                                              );
-                                            } else if (label == "Debt" || label == "School") {
-                                              // For Debt or School actions, simply set updated true.
-                                              updated = true;
-                                            }
-                                            if (updated == true) {
-                                              if (widget.fetchData != null) {
-                                                await widget.fetchData!();
+                                            setState(() {
+                                              _isActionLoading[label] = true;
+                                            });
+                                            try {
+                                              bool? updated;
+                                              if (label == "Subject" && widget.currentRole != "Parent") {
+                                                updated = await showModalBottomSheet<bool>(
+                                                  context: context,
+                                                  isScrollControlled: true,
+                                                  shape: const RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                  ),
+                                                  builder: (context) => SubjectModal(packId: packId),
+                                                );
+                                              } else if (label == "Students" && widget.currentRole != "Parent") {
+                                                updated = await showModalBottomSheet<bool>(
+                                                  context: context,
+                                                  isScrollControlled: true,
+                                                  shape: const RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                  ),
+                                                  builder: (context) => StudentsModal(packId: packId),
+                                                );
+                                              } else if (label == "Instructors") {
+                                                updated = await showModalBottomSheet<bool>(
+                                                  context: context,
+                                                  isScrollControlled: true,
+                                                  shape: const RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                  ),
+                                                  builder: (context) => InstructorsModal(packId: packId),
+                                                );
+                                              } else if (label == "Debt" || label == "School") {
+                                                // For Debt or School actions, simply set updated true.
+                                                updated = true;
                                               }
-                                              _refreshPackDetails();
+                                              if (updated == true) {
+                                                await widget.fetchData();
+                                                _refreshPackDetails();
+                                              }
+                                            } finally {
+                                              setState(() {
+                                                _isActionLoading[label] = false;
+                                              });
                                             }
                                           },
                                         ),

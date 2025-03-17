@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/profile_service.dart';
 import 'school_setup_page.dart';
+import '../../main.dart'; // Ensure this imports your global routeObserver
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,7 +12,7 @@ class ProfilePage extends StatefulWidget {
   _ProfilePageState createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with RouteAware {
   final storage = const FlutterSecureStorage();
   bool isLoading = true;
   bool isEditing = false;
@@ -20,9 +21,7 @@ class _ProfilePageState extends State<ProfilePage> {
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
   late TextEditingController _emailController;
-  // For phone we'll use a custom layout.
   late TextEditingController _phoneController;
-  // For birthday we'll use a custom layout.
   late TextEditingController _birthdayController;
 
   // For country picker, we keep a selected Country.
@@ -54,7 +53,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _birthdayController = TextEditingController();
-    // Set a default country. (Change as needed.)
+    // Set a default country.
     _selectedCountry = Country(
       countryCode: 'PT',
       phoneCode: '351',
@@ -67,6 +66,34 @@ class _ProfilePageState extends State<ProfilePage> {
       e164Key: '351-PT-0',
       example: '912345678',
     );
+    fetchProfileData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route changes.
+    final ModalRoute? route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _birthdayController.dispose();
+    super.dispose();
+  }
+
+  // This method is called when the current route has been popped back to.
+  @override
+  void didPopNext() {
+    // Refresh profile data when coming back to ProfilePage.
     fetchProfileData();
   }
 
@@ -84,13 +111,11 @@ class _ProfilePageState extends State<ProfilePage> {
         availableSchools = profileData.availableSchools;
         currentSchoolId = profileData.currentSchoolId;
         currentSchoolName = profileData.currentSchoolName;
-        // Optionally update _selectedCountry from the country code if available.
+        // Update _selectedCountry if countryCode exists.
         if (profileData.countryCode.isNotEmpty) {
-          // You could use the country_picker package's lookup method if desired.
-          // For now, we'll update the phone code as well if available.
           _selectedCountry = Country(
             countryCode: profileData.countryCode,
-            phoneCode: "",
+            phoneCode: "", // update accordingly if needed
             e164Sc: 0,
             geographic: true,
             level: 1,
@@ -316,123 +341,131 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(title: const Text("Profile")),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  // Profile Info Card
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          // Optionally, you can show the profile photo here.
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                "Profile Info",
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    isEditing = !isEditing;
-                                  });
-                                },
-                                child: Text(isEditing ? "Cancel" : "Edit"),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          buildProfileInputField(
-                              "First Name", _firstNameController),
-                          buildProfileInputField(
-                              "Last Name", _lastNameController),
-                          buildProfileInputField("Email", _emailController),
-                          buildBirthdayField(),
-                          buildCountryAndPhoneField(),
-                          if (isEditing)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 16.0),
-                              child: ElevatedButton(
-                                onPressed: updateProfile,
-                                child: const Text("Save Profile"),
-                              ),
+          : RefreshIndicator(
+              color: Colors.orange,
+              backgroundColor: Colors.white,
+              onRefresh: fetchProfileData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Profile Info Card
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            // Optionally, you can show the profile photo here.
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  "Profile Info",
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      isEditing = !isEditing;
+                                    });
+                                  },
+                                  child: Text(isEditing ? "Cancel" : "Edit"),
+                                ),
+                              ],
                             ),
-                        ],
+                            const SizedBox(height: 16),
+                            buildProfileInputField(
+                                "First Name", _firstNameController),
+                            buildProfileInputField(
+                                "Last Name", _lastNameController),
+                            buildProfileInputField("Email", _emailController),
+                            buildBirthdayField(),
+                            buildCountryAndPhoneField(),
+                            if (isEditing)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16.0),
+                                child: ElevatedButton(
+                                  onPressed: updateProfile,
+                                  child: const Text("Save Profile"),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Role Switching Buttons.
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: availableRoles.map((role) {
-                      return ElevatedButton(
-                        onPressed: () => changeRole(role),
-                        child: Text("Switch to $role"),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-                  // School Switching Buttons (only for Admin if more than one school).
-                  if (currentRole == "Admin" &&
-                      availableSchools.length > 1) ...[
-                    Text(
-                      "Current School: ${currentSchoolName ?? 'Not Set'}",
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
+                    // Role Switching Buttons.
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: availableSchools
-                          .where((school) =>
-                              school['id'].toString() != currentSchoolId)
-                          .map((school) => ElevatedButton(
-                                onPressed: () =>
-                                    changeSchool(school['id'].toString()),
-                                child: Text("Switch to ${school['name']}"),
-                              ))
-                          .toList(),
+                      children: availableRoles.map((role) {
+                        return ElevatedButton(
+                          onPressed: () => changeRole(role),
+                          child: Text("Switch to $role"),
+                        );
+                      }).toList(),
                     ),
                     const SizedBox(height: 20),
-                  ],
-                  // Manage School / Create School button (for Admin).
-                  if (currentRole == "Admin")
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SchoolSetupPage(
-                              isCreatingSchool: availableSchools.isEmpty,
+                    // School Switching Buttons (only for Admin if more than one school).
+                    if (currentRole == "Admin" &&
+                        availableSchools.length > 1) ...[
+                      Text(
+                        "Current School: ${currentSchoolName ?? 'Not Set'}",
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: availableSchools
+                            .where((school) =>
+                                school['id'].toString() != currentSchoolId)
+                            .map((school) => ElevatedButton(
+                                  onPressed: () =>
+                                      changeSchool(school['id'].toString()),
+                                  child: Text("Switch to ${school['name']}"),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    // Manage School / Create School button (for Admin).
+                    if (currentRole == "Admin")
+                      ElevatedButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SchoolSetupPage(
+                                isCreatingSchool: availableSchools.isEmpty,
+                                fetchProfileData: fetchProfileData,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      child: Text(availableSchools.isEmpty
-                          ? "Create School"
-                          : "Manage School"),
+                          );
+                        },
+                        child: Text(availableSchools.isEmpty
+                            ? "Create School"
+                            : "Manage School"),
+                      ),
+                    const SizedBox(height: 20),
+                    // Logout Button.
+                    ElevatedButton(
+                      onPressed: logout,
+                      style:
+                          ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text("Logout",
+                          style: TextStyle(color: Colors.white)),
                     ),
-                  const SizedBox(height: 20),
-                  // Logout Button.
-                  ElevatedButton(
-                    onPressed: logout,
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    child: const Text("Logout",
-                        style: TextStyle(color: Colors.white)),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
     );

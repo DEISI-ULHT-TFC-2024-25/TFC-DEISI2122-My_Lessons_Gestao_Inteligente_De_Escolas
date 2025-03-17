@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../modals/student_selection_modal.dart'; // Updated import
+import '../modals/student_selection_modal.dart';
 
-/// Helper function that uses intl to get the currency symbol.
+/// Returns the currency symbol for a given currency code.
 String getCurrencySymbol(String currencyCode) {
   return NumberFormat.simpleCurrency(name: currencyCode).currencySymbol;
 }
 
 class ServiceDetailsContent extends StatefulWidget {
   final Map<String, dynamic> service;
-  const ServiceDetailsContent({super.key, required this.service});
+  const ServiceDetailsContent({Key? key, required this.service})
+      : super(key: key);
 
   @override
   _ServiceDetailsContentState createState() => _ServiceDetailsContentState();
@@ -20,7 +22,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
   late final ScrollController _scrollController;
   int _currentPage = 0;
 
-  // Variables for pack pricing (only used if service type is pack).
+  // Pricing variables for pack‑type services.
   int? selectedDuration;
   String? currency;
   int? selectedPeople;
@@ -28,10 +30,10 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
   double? currentPrice;
   int? currentTimeLimit;
 
-  // Toggle between progressive (grid) and table view.
+  // Toggle view for pricing details.
   bool isTableView = false;
 
-  // ADDED: Keep track of how many students are currently selected.
+  // Track selected student count.
   int _selectedStudentsCount = 0;
 
   @override
@@ -40,7 +42,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     _pageController = PageController();
     _scrollController = ScrollController();
 
-    // Initialize pricing values if service type is pack.
+    // Initialize pricing values if the service is a pack.
     if (widget.service['type'] is Map &&
         widget.service['type'].containsKey('pack')) {
       final pricingOptions =
@@ -64,7 +66,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     super.dispose();
   }
 
-  /// Scrolls down so that the Book Service button is visible.
+  /// Scrolls down so that elements become visible.
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -81,6 +83,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return StudentSelectionModal(
           service: widget.service,
@@ -100,57 +104,243 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     );
   }
 
-  /// Renders the details card below the main service card.
-  /// Shows how many students are selected, number of classes, price, etc.
-  Widget _buildSelectedDetailsCard() {
-    if (selectedPeople == null ||
-        selectedClasses == null ||
-        currentPrice == null ||
-        currentTimeLimit == null) {
-      return const SizedBox.shrink();
-    }
+  /// ------------------ Book Service Tab ------------------
+  /// This tab combines the booking call-to-action with current details (pricing or activity).
+  Widget _buildBookTab() {
+    Widget detailsWidget;
 
-    return Card(
-      margin: const EdgeInsets.only(top: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
+    // For pack‑type services, show pricing details along with toggle buttons.
+    if (widget.service['type'] is Map &&
+        widget.service['type'].containsKey('pack')) {
+      detailsWidget = Column(
+        children: [
+          // Toggle buttons for "Choose Options" and "View Table".
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: isTableView
+                      ? OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              isTableView = false;
+                            });
+                          },
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.orange),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(32)),
+                          ),
+                          child: Text("Choose Options",
+                              style: GoogleFonts.lato(
+                                  color: Colors.orange, fontSize: 16)),
+                        )
+                      : ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              isTableView = false;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(32)),
+                          ),
+                          child: Text("Choose Options",
+                              style: GoogleFonts.lato(
+                                  color: Colors.white, fontSize: 16)),
+                        ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: isTableView
+                      ? ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              isTableView = true;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(32)),
+                          ),
+                          child: Text("View Table",
+                              style: GoogleFonts.lato(
+                                  color: Colors.white, fontSize: 16)),
+                        )
+                      : OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              isTableView = true;
+                            });
+                          },
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.orange),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(32)),
+                          ),
+                          child: Text("View Table",
+                              style: GoogleFonts.lato(
+                                  color: Colors.orange, fontSize: 16)),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Pricing section that switches based on isTableView.
+          _buildPricingSection(),
+        ],
+      );
+    } else if (widget.service['type'] is Map &&
+        widget.service['type'].containsKey('activity')) {
+      final details = widget.service['details'] as Map<String, dynamic>?;
+      if (details == null || details.isEmpty) {
+        detailsWidget = Center(
+            child: Text('No additional details available.',
+                style: GoogleFonts.lato()));
+      } else {
+        final filteredKeys =
+            details.keys.where((key) => key != 'pricing_options').toList();
+        detailsWidget = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Number of People: $_selectedStudentsCount / $selectedPeople",
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              "Duration: $selectedDuration",
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              "Number of Classes: $selectedClasses",
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              "Price: $currentPrice${getCurrencySymbol(currency!)}",
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              "Time Limit: $currentTimeLimit days",
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text('Activity Details',
+                style: GoogleFonts.lato(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ...filteredKeys.map((key) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child:
+                      Text('$key: ${details[key]}', style: GoogleFonts.lato()),
+                )),
           ],
-        ),
+        );
+      }
+    } else {
+      detailsWidget = Center(
+          child: Text('No details available.', style: GoogleFonts.lato()));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          detailsWidget,
+          const SizedBox(height: 24),
+          // Book Service button appears only in the Options view.
+          if (!isTableView)
+            Center(
+              child: ElevatedButton(
+                onPressed: _showStudentSelectionModal,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(32)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                ),
+                child: Text('Book Service',
+                    style: GoogleFonts.lato(fontSize: 16, color: Colors.white)),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  /// Progressive view: uses a 2x2 grid layout for "pack" pricing.
-  Widget buildPackPricingProgressive() {
+  /// ------------------ Benefits Tab ------------------
+  Widget _buildBenefitsTab() {
+    final List<String> benefits = (widget.service['benefits'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: benefits.isEmpty
+          ? Center(
+              child: Text('No benefits provided.',
+                  style: GoogleFonts.lato(fontSize: 14)))
+          : Column(
+              children: benefits.map((b) {
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check, size: 20, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(b,
+                              style: GoogleFonts.lato(
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  /// ------------------ Locations Tab ------------------
+  Widget _buildLocationsTab() {
+    final List<String> locations =
+        (widget.service['locations'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: locations.isEmpty
+          ? Center(
+              child: Text('No locations provided.',
+                  style: GoogleFonts.lato(fontSize: 14)))
+          : Column(
+              children: locations.map((loc) {
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on,
+                            size: 20, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(loc,
+                              style: GoogleFonts.lato(
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  /// ------------------ Pack Pricing (Progressive) ------------------
+  Widget _buildPackPricingProgressive() {
     final pricingOptions =
         widget.service['details']?['pricing_options'] as List<dynamic>?;
     if (pricingOptions == null || pricingOptions.isEmpty) {
-      return const Text('No pricing options available.');
+      return Text('No pricing options available.',
+          style: GoogleFonts.lato(fontSize: 14));
     }
-
     final String currencySymbol = getCurrencySymbol(widget.service['currency']);
     final durations = pricingOptions
         .map((e) => e['duration'] as int)
@@ -185,26 +375,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header with toggle button.
-        Row(
-          children: [
-            const Text(
-              'Pricing Options',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  isTableView = true;
-                });
-              },
-              child: const Text("Table View"),
-            ),
-          ],
-        ),
         const SizedBox(height: 16),
-        // 2x2 grid layout.
         Table(
           columnWidths: const {
             0: FlexColumnWidth(1),
@@ -212,7 +383,6 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           children: [
-            // Row 1: Duration and People.
             TableRow(
               children: [
                 Padding(
@@ -220,8 +390,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Duration:',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Duration:',
+                          style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       DropdownButton<int>(
                         isExpanded: true,
@@ -229,7 +399,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                         items: durations
                             .map((d) => DropdownMenuItem<int>(
                                   value: d,
-                                  child: Text('$d minutes'),
+                                  child: Text('$d minutes',
+                                      style: GoogleFonts.lato()),
                                 ))
                             .toList(),
                         onChanged: (val) {
@@ -247,8 +418,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('People:',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('People:',
+                          style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       DropdownButton<int>(
                         isExpanded: true,
@@ -256,7 +427,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                         items: peopleOptions
                             .map((p) => DropdownMenuItem<int>(
                                   value: p,
-                                  child: Text('$p'),
+                                  child: Text('$p', style: GoogleFonts.lato()),
                                 ))
                             .toList(),
                         onChanged: (val) {
@@ -271,7 +442,6 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                 ),
               ],
             ),
-            // Row 2: Classes and Price details.
             TableRow(
               children: [
                 Padding(
@@ -279,8 +449,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Classes:',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Classes:',
+                          style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       DropdownButton<int>(
                         isExpanded: true,
@@ -288,7 +458,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                         items: classesOptions
                             .map((c) => DropdownMenuItem<int>(
                                   value: c,
-                                  child: Text('$c'),
+                                  child: Text('$c', style: GoogleFonts.lato()),
                                 ))
                             .toList(),
                         onChanged: (val) {
@@ -305,10 +475,6 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                   padding: const EdgeInsets.all(16.0),
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blueAccent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -316,18 +482,15 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                           currentPrice != null
                               ? 'Price: ${currentPrice!.toStringAsFixed(2)} $currencySymbol'
                               : 'No pricing available',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueAccent,
-                          ),
+                          style: GoogleFonts.lato(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange),
                         ),
                         const SizedBox(height: 8),
                         if (currentTimeLimit != null)
-                          Text(
-                            'Time Limit: ${currentTimeLimit!} days',
-                            style: const TextStyle(fontSize: 16),
-                          ),
+                          Text('Time Limit: ${currentTimeLimit!} days',
+                              style: GoogleFonts.lato(fontSize: 16)),
                       ],
                     ),
                   ),
@@ -340,207 +503,133 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     );
   }
 
-  /// Table view: displays all pricing options in a DataTable.
-  Widget buildPackPricingTable() {
+  /// ------------------ Pack Pricing Table View ------------------
+  Widget _buildPackPricingTable() {
     final pricingOptions =
         widget.service['details']?['pricing_options'] as List<dynamic>?;
     if (pricingOptions == null || pricingOptions.isEmpty) {
-      return const Text('No pricing options available.');
+      return Text('No pricing options available.',
+          style: GoogleFonts.lato(fontSize: 14));
     }
     final String currencySymbol = getCurrencySymbol(widget.service['currency']);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header with toggle button.
-        Row(
-          children: [
-            const Text(
-              'Pricing Options',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  isTableView = false;
-                });
-              },
-              child: const Text("Progressive View"),
-            ),
-          ],
-        ),
         const SizedBox(height: 16),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 12,
-            columns: const [
-              DataColumn(label: Text('Duration')),
-              DataColumn(label: Text('People')),
-              DataColumn(label: Text('Classes')),
-              DataColumn(label: Text('Price')),
-              DataColumn(label: Text('Time Limit')),
-            ],
-            rows: pricingOptions.map((option) {
-              return DataRow(cells: [
-                DataCell(Text('${option['duration']} min')),
-                DataCell(Text('${option['people']}')),
-                DataCell(Text('${option['classes']}')),
-                DataCell(Text(
-                    '${(option['price'] as double).toStringAsFixed(2)} $currencySymbol')),
-                DataCell(Text('${option['time_limit']} days')),
-              ]);
-            }).toList(),
+        // Wrap the DataTable in a Container to add a border and padding.
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.orangeAccent),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              showCheckboxColumn: false,
+              headingTextStyle: GoogleFonts.lato(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange),
+              dataTextStyle:
+                  GoogleFonts.lato(fontSize: 14, color: Colors.black87),
+              dividerThickness: 1,
+              columnSpacing: 12,
+              columns: [
+                DataColumn(label: Text('Duration')),
+                DataColumn(label: Text('People')),
+                DataColumn(label: Text('Classes')),
+                DataColumn(label: Text('Price')),
+                DataColumn(label: Text('Time Limit')),
+              ],
+              rows: pricingOptions.map((option) {
+                return DataRow(
+                  onSelectChanged: (selected) {
+                    if (selected ?? false) {
+                      setState(() {
+                        selectedDuration = option['duration'];
+                        selectedPeople = option['people'];
+                        selectedClasses = option['classes'];
+                        currentPrice = option['price'];
+                        currentTimeLimit = option['time_limit'];
+                      });
+                      _showStudentSelectionModal();
+                    }
+                  },
+                  cells: [
+                    DataCell(Text('${option['duration']} min')),
+                    DataCell(Text('${option['people']}')),
+                    DataCell(Text('${option['classes']}')),
+                    DataCell(Text(
+                        '${(option['price'] as double).toStringAsFixed(2)} $currencySymbol')),
+                    DataCell(Text('${option['time_limit']} days')),
+                  ],
+                );
+              }).toList(),
+            ),
           ),
         ),
       ],
     );
   }
 
-  /// Chooses which pricing view to show (progressive or table).
-  Widget buildPackPricing() {
+  /// Chooses between progressive and table view for pricing.
+  Widget _buildPricingSection() {
     return isTableView
-        ? buildPackPricingTable()
-        : buildPackPricingProgressive();
+        ? _buildPackPricingTable()
+        : _buildPackPricingProgressive();
   }
 
-  /// Widget to display activity-specific details.
-  Widget buildActivityDetails() {
-    final details = widget.service['details'] as Map<String, dynamic>?;
-    if (details == null || details.isEmpty) {
-      return const Text('No additional details available.');
-    }
-    final filteredKeys =
-        details.keys.where((key) => key != 'pricing_options').toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Activity Details',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ...filteredKeys.map((key) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Text('$key: ${details[key]}'),
-            )),
-      ],
-    );
-  }
-
+  /// ------------------ Build ------------------
   @override
   Widget build(BuildContext context) {
-    // Extract the images robustly.
-    final List<String> images =
-        widget.service.containsKey('photos') && widget.service['photos'] is List
-            ? List<String>.from(widget.service['photos'])
-            : [widget.service['image'] ?? 'https://via.placeholder.com/300'];
+    final String description =
+        widget.service['description'] ?? 'No description available.';
 
-    final List<String> benefits = (widget.service['benefits'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        ['benefit 1', 'benefit 2'];
-    final List<String> locations =
-        (widget.service['locations'] as List<dynamic>?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            ['location a', 'location b'];
+    // Define the tabs.
+    List<Tab> tabs = [
+      const Tab(text: 'Book Service'),
+      const Tab(text: 'Locations'),
+      const Tab(text: 'Benefits'),
+    ];
+    List<Widget> tabViews = [
+      _buildBookTab(),
+      _buildLocationsTab(),
+      _buildBenefitsTab(),
+    ];
 
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Text(
-              widget.service['school_name'] ?? 'School Name',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 200,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: images.length,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentPage = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                return Padding(
-                  key: ValueKey(index), // <-- added key here
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      images[index],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey,
-                          child: const Icon(Icons.error),
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: 16),
-          // Service description.
-          Text(
-            widget.service['description'] ?? 'No description available.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-          // Benefits.
-          const Text('Benefits',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          ...benefits.map((b) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check, size: 16),
-                    const SizedBox(width: 4),
-                    Text(b),
-                  ],
+    return DefaultTabController(
+      length: tabs.length,
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.orange),
+          // Make the title a column to hold both the service name and the description.
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                description,
+                style: GoogleFonts.lato(
+                  fontSize: 14,
+                  color: Colors.black54,
                 ),
-              )),
-          const SizedBox(height: 16),
-          // Locations.
-          const Text('Available Locations',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          ...locations.map((loc) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 16),
-                    const SizedBox(width: 4),
-                    Text(loc),
-                  ],
-                ),
-              )),
-          const SizedBox(height: 16),
-          // Pricing or activity details.
-          if (widget.service['type'] is Map &&
-              widget.service['type'].containsKey('pack'))
-            buildPackPricing()
-          else if (widget.service['type'] is Map &&
-              widget.service['type'].containsKey('activity'))
-            buildActivityDetails(),
-          const SizedBox(height: 40),
-          Center(
-            child: ElevatedButton(
-              onPressed: _showStudentSelectionModal,
-              child: const Text('Book Service'),
-            ),
+              ),
+            ],
           ),
-        ],
+          // Put the TabBar at the bottom of the AppBar.
+          bottom: TabBar(
+            isScrollable: true,
+            labelColor: Colors.orange,
+            unselectedLabelColor: Colors.black54,
+            indicatorColor: Colors.orange,
+            tabs: tabs,
+          ),
+        ),
+        body: TabBarView(
+          children: tabViews,
+        ),
       ),
     );
   }

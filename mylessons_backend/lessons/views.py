@@ -73,7 +73,8 @@ def get_lessons_data(user, date_lookup, is_done_flag):
             "students_name": lesson.get_students_name(),
             "type": lesson.type,
             "duration_in_minutes": lesson.duration_in_minutes,
-            "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None"
+            "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
+            "school": str(lesson.school) if lesson.school else "" 
         }
         for lesson in lessons
     ]
@@ -118,7 +119,8 @@ def get_packs_data(user, is_done_flag):
             "lessons": [
                             {
                                 "lesson_id" : str(lesson.id),
-                                "lesson_str": str(lesson)
+                                "lesson_str": str(lesson),
+                                "school": str(lesson.school) if lesson.school else "",
                             }
                             for lesson in pack.lessons.all()
                         ],
@@ -126,7 +128,8 @@ def get_packs_data(user, is_done_flag):
             "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
             "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
             "students_name": pack.get_students_name(),
-            "type": pack.type
+            "type": pack.type,
+            "expiration_date": str(pack.expiration_date),
         }
         for pack in packs
     ]

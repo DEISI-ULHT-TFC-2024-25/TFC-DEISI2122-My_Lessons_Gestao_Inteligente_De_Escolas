@@ -22,6 +22,7 @@ class CheckoutPage extends StatefulWidget {
 class _CheckoutPageState extends State<CheckoutPage> {
   List<Map<String, dynamic>> get cartItems => CartService().items;
 
+
   // Derives the currency symbol from the first cart item.
   String get cartCurrencySymbol {
     if (cartItems.isEmpty) return '';
@@ -54,6 +55,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     });
   }
 
+
   Future<void> _handleConfirmBooking() async {
     final cartItems = CartService().items;
     // Filter only pack services.
@@ -83,7 +85,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final checkoutDetails =
           packItem['service']['checkout_details'] as Map<String, dynamic>;
 
-      // Determine timeLimitDays from checkoutDetails['time_limit'].
+      // Determine timeLimit from checkoutDetails['time_limit'].
       final dynamic rawTimeLimit = checkoutDetails['time_limit'] ?? "0";
       final int timeLimitDays = rawTimeLimit is int
           ? rawTimeLimit
@@ -126,8 +128,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-                "All packs booked successfully! Please pay by cash upon service."),
+            content: Text("All packs booked successfully! Please pay by cash upon service."),
           ),
         );
 
@@ -174,21 +175,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
-  Future<String?> _schedulePrivateLesson(
-          int lessonId, DateTime newDate, String newTime) =>
+  Future<String?> _schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) =>
       schedulePrivateLesson(lessonId, newDate, newTime);
 
-  Future<List<String>> _fetchAvailableTimes(
-          int lessonId, DateTime date, int increment) =>
+  Future<List<String>> _fetchAvailableTimes(int lessonId, DateTime date, int increment) =>
       fetchAvailableTimes(lessonId, date, increment);
 
-  Future<void> _showScheduleLessonModal(
-      dynamic lesson, Map<String, dynamic> checkoutItem) async {
+  Future<void> _showScheduleLessonModal(dynamic lesson, Map<String, dynamic> checkoutItem) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
     DateTime? selectedDate;
     int increment = 60;
     List<String> availableTimes = [];
     bool isLoading = false;
+
+    // Fetch the school's schedule time limit (in hours) from the API.
+    int schoolScheduleTimeLimit = await fetchSchoolScheduleTimeLimit(lesson["school"]);
+    debugPrint( "school schedule limit: $schoolScheduleTimeLimit");
 
     return await showModalBottomSheet(
       context: context,
@@ -232,21 +234,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         view: DateRangePickerView.month,
                         selectionMode: DateRangePickerSelectionMode.single,
                         showActionButtons: true,
-                        initialDisplayDate: DateTime.now(),
-                        minDate: DateTime.now(),
+                        // Set the initialDisplayDate and minDate to now + schoolScheduleTimeLimit (in hours).
+                        initialDisplayDate: DateTime.now().add(
+                          Duration(hours: schoolScheduleTimeLimit),
+                        ),
+                        minDate: DateTime.now().add(
+                          Duration(hours: schoolScheduleTimeLimit),
+                        ),
                         maxDate: lesson['expiration_date'] != "None"
                             ? DateTime.parse(lesson['expiration_date'])
                             : null,
-                        onSelectionChanged:
-                            (DateRangePickerSelectionChangedArgs args) {
+                        onSelectionChanged: (DateRangePickerSelectionChangedArgs args) {
                           if (args.value is DateTime) {
                             setModalState(() {
                               selectedDate = args.value;
                               availableTimes = [];
                               isLoading = true;
                             });
-                            _fetchAvailableTimes(
-                                    lessonId, selectedDate!, increment)
+                            _fetchAvailableTimes(lessonId, selectedDate!, increment)
                                 .then((times) {
                               setModalState(() {
                                 availableTimes = times;
@@ -255,8 +260,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             });
                           }
                         },
-                        monthViewSettings:
-                            const DateRangePickerMonthViewSettings(
+                        monthViewSettings: const DateRangePickerMonthViewSettings(
                           firstDayOfWeek: 1,
                           showTrailingAndLeadingDates: true,
                         ),
@@ -293,8 +297,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                   }
                                 });
                                 if (selectedDate != null) {
-                                  _fetchAvailableTimes(
-                                          lessonId, selectedDate!, increment)
+                                  _fetchAvailableTimes(lessonId, selectedDate!, increment)
                                       .then((times) {
                                     setModalState(() {
                                       availableTimes = times;
@@ -315,8 +318,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         child: GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 3,
                             childAspectRatio: 2,
                             crossAxisSpacing: 8,
@@ -338,33 +340,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(dialogContext).pop(),
+                                          onPressed: () => Navigator.of(dialogContext).pop(),
                                           child: const Text("Cancel"),
                                         ),
                                         TextButton(
                                           onPressed: () {
-                                            Navigator.of(dialogContext)
-                                                .pop(); // Close the dialog.
-                                            _schedulePrivateLesson(lessonId,
-                                                    selectedDate!, timeStr)
+                                            Navigator.of(dialogContext).pop(); // Close the dialog.
+                                            _schedulePrivateLesson(lessonId, selectedDate!, timeStr)
                                                 .then((errorMessage) {
                                               if (errorMessage == null) {
                                                 // Use sheetContext to pop the bottom sheet.
-                                                Navigator.of(sheetContext)
-                                                    .pop();
-                                                ScaffoldMessenger.of(
-                                                        sheetContext)
-                                                    .showSnackBar(
+                                                Navigator.of(sheetContext).pop();
+                                                ScaffoldMessenger.of(sheetContext).showSnackBar(
                                                   const SnackBar(
-                                                    content: Text(
-                                                        "Lesson successfully rescheduled"),
+                                                    content: Text("Lesson successfully rescheduled"),
                                                   ),
                                                 );
                                               } else {
-                                                ScaffoldMessenger.of(
-                                                        sheetContext)
-                                                    .showSnackBar(
+                                                ScaffoldMessenger.of(sheetContext).showSnackBar(
                                                   SnackBar(
                                                     content: Text(errorMessage),
                                                   ),
@@ -408,14 +401,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Future<void> _schedulePrivatePacks(
-      List<Map<String, dynamic>> packsToSchedule) async {
+  Future<void> _schedulePrivatePacks(List<Map<String, dynamic>> packsToSchedule) async {
     if (packsToSchedule.isEmpty) return;
     final currentPack = packsToSchedule.first;
     // We assume that currentPack['bookedPack']['lessons'] is a list.
     // Pass both the first lesson and the checkout item to the scheduling modal.
-    await _showScheduleLessonModal(
-        currentPack["bookedPack"]["lessons"][0], currentPack["checkoutItem"]);
+    await _showScheduleLessonModal(currentPack["bookedPack"]["lessons"][0], currentPack["checkoutItem"]);
     // Remove the current pack and recursively schedule the next one.
     packsToSchedule.removeAt(0);
     await _schedulePrivatePacks(packsToSchedule);
@@ -427,7 +418,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// This function should call your backend to create a Stripe Checkout session.
   Future<void> _initiateStripeCheckout() async {
     try {
-      // TODO : Replace with your actual Stripe integration.
+      // TODO: Replace with your actual Stripe integration.
       final sessionUrl = 'https://checkout.stripe.com/pay/cs_test_1234567890';
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Redirecting to Stripe Checkout...")),
@@ -442,8 +433,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Widget _buildCheckoutCard(Map<String, dynamic> checkoutItem) {
     final service = checkoutItem['service'] as Map<String, dynamic>? ?? {};
-    final checkoutDetails =
-        service['checkout_details'] as Map<String, dynamic>? ?? {};
+    final checkoutDetails = service['checkout_details'] as Map<String, dynamic>? ?? {};
 
     return Card(
       margin: const EdgeInsets.all(8.0),
@@ -459,8 +449,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             const Divider(),
             Text("Duration: ${checkoutDetails['duration'] ?? 'N/A'} minutes"),
             Text("Number of Classes: ${checkoutDetails['classes'] ?? 'N/A'}"),
-            Text(
-                "Number of Students: ${checkoutDetails['number_of_students'] ?? 'N/A'}"),
+            Text("Number of Students: ${checkoutDetails['number_of_students'] ?? 'N/A'}"),
             const SizedBox(height: 4),
             if (checkoutDetails['student_names'] is List)
               ...List<String>.from(checkoutDetails['student_names'])
@@ -479,8 +468,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// The [index] is used to remove the item when the delete icon is tapped.
   Widget _buildDetailsCard(Map<String, dynamic> cartItem, int index) {
     final service = cartItem['service'] as Map<String, dynamic>? ?? {};
-    final checkoutDetails =
-        service['checkout_details'] as Map<String, dynamic>? ?? {};
+    final checkoutDetails = service['checkout_details'] as Map<String, dynamic>? ?? {};
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -496,23 +484,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 children: [
                   Text(
                     "${checkoutDetails['service_name'] ?? 'N/A'} - ${checkoutDetails['school_name'] ?? 'N/A'}",
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Divider(),
-                  Text(
-                      "Duration: ${checkoutDetails['duration'] ?? 'N/A'} minutes"),
-                  Text(
-                      "Number of Classes: ${checkoutDetails['classes'] ?? 'N/A'}"),
-                  Text(
-                      "Number of Students: ${checkoutDetails['number_of_students'] ?? 'N/A'}"),
+                  Text("Duration: ${checkoutDetails['duration'] ?? 'N/A'} minutes"),
+                  Text("Number of Classes: ${checkoutDetails['classes'] ?? 'N/A'}"),
+                  Text("Number of Students: ${checkoutDetails['number_of_students'] ?? 'N/A'}"),
                   const SizedBox(height: 4),
                   if (checkoutDetails['student_names'] is List)
                     ...List<String>.from(checkoutDetails['student_names'])
                         .map((name) => Text("    - $name")),
                   const SizedBox(height: 4),
-                  Text(
-                      "Time Limit: ${checkoutDetails['time_limit'] ?? 'N/A'} days"),
+                  Text("Time Limit: ${checkoutDetails['time_limit'] ?? 'N/A'} days"),
                   Text("Price: ${checkoutDetails['formatted_price'] ?? 'N/A'}"),
                   const SizedBox(height: 40),
                 ],
@@ -561,8 +544,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               children: [
                 Text(
                   "Total: $cartCurrencySymbol${totalPrice.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 // Payment options buttons.

@@ -11,6 +11,9 @@ import 'package:flutter/rendering.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
+// Create a global RouteObserver instance.
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 Future<void> main() async {
   // 2. Ensure bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +37,34 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MyLessons App',
       theme: ThemeData(
+        scaffoldBackgroundColor: Colors.white,
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Colors.white, // Bottom navigation bar is white
+        ),
+        // Progress Indicator theme: orange color for loading indicators.
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: Colors.orange,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.black),
+          titleTextStyle: TextStyle(color: Colors.black, fontSize: 20),
+        ),
+        cardTheme: CardTheme(
+          color: Colors.grey[50], // Light grey
+        ),
+        // ---- SnackBar styling ----
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: Colors.orange, // Orange background
+          contentTextStyle: TextStyle(
+            color: Colors.white, // White text
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+          actionTextColor: Colors.white, // Action button text color
+          // You can also adjust the shape, behavior, etc.
+        ),
         primarySwatch: Colors.orange,
         timePickerTheme: TimePickerThemeData(),
         datePickerTheme: DatePickerThemeData(
@@ -100,7 +131,7 @@ class MyApp extends StatelessWidget {
           unselectedLabelColor: Colors.grey,
           indicatorColor: Colors.orange,
           labelStyle: TextStyle(
-            fontSize: 18.0,
+            fontSize: 16.0,
             fontWeight: FontWeight.bold,
           ),
           unselectedLabelStyle: TextStyle(
@@ -137,12 +168,19 @@ class MyApp extends StatelessWidget {
           selectionHandleColor: Colors.orange,
         ),
 
-        inputDecorationTheme: const InputDecorationTheme(
+        inputDecorationTheme: InputDecorationTheme(
           labelStyle: TextStyle(color: Colors.orange),
           floatingLabelStyle: TextStyle(color: Colors.orange),
-          border: OutlineInputBorder(),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(32.0),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(32.0),
+            borderSide: const BorderSide(color: Colors.orange),
+          ),
           focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.orange),
+            borderRadius: BorderRadius.circular(32.0),
+            borderSide: const BorderSide(color: Colors.orange),
           ),
         ),
       ),
@@ -155,6 +193,8 @@ class MyApp extends StatelessWidget {
         '/register_page': (context) => const RegisterPage(),
         '/email_login': (context) => const EmailLoginPage(),
       },
+      // Add the global RouteObserver to navigatorObservers
+      navigatorObservers: [routeObserver],
     );
   }
 }

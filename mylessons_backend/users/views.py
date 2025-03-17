@@ -95,6 +95,7 @@ def profile_view(request):
         }
         return Response({'message': 'Profile updated successfully', 'profile': updated_data}, status=status.HTTP_200_OK)
 
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def firebase_login(request):
@@ -110,37 +111,58 @@ def firebase_login(request):
         logger.debug("Firebase token verified successfully: %s", decoded_token)
 
         email = decoded_token.get('email')
-        first_name = decoded_token.get('name', '').split()[0] if decoded_token.get('name') else ''
-        last_name = ' '.join(decoded_token.get('name', '').split()[1:]) if decoded_token.get('name') else ''
+        full_name = decoded_token.get('name', '')
+        logger.debug("Decoded full name: '%s'", full_name)
+
+        first_name = full_name.split()[0] if full_name else ''
+        last_name = ' '.join(full_name.split()[1:]) if full_name and len(full_name.split()) > 1 else ''
+
+        # Retrieve phone number if available.
+        phone_number = decoded_token.get('phone')
+        if phone_number:
+            logger.debug("Phone number found: %s", phone_number)
 
         logger.debug("Attempting to get or create user with email: %s", email)
-        # Get or create your user.
-        user, created = UserAccount.objects.get_or_create(
-            email=email,
-            defaults={
-                'username': email,
-                'first_name': first_name,
-                'last_name': last_name,
-            }
-        )
+        defaults = {
+            'username': email,
+        }
+        # Only update the name if provided and not already set.
+        if full_name:
+            defaults['first_name'] = first_name
+            defaults['last_name'] = last_name
+
+        if phone_number:
+            defaults['phone'] = phone_number
+
+        user, created = UserAccount.objects.get_or_create(email=email, defaults=defaults)
 
         if created:
-            random_password = ''.join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(16))
+            random_password = ''.join(
+                secrets.choice(string.ascii_letters + string.digits + string.punctuation)
+                for _ in range(16)
+            )
             user.set_password(random_password)
             user.save()
             logger.debug("Created new user for email: %s", email)
-        elif user:
+        else:
             logger.debug("Found existing user for email: %s", email)
+            # If name was provided and user doesn't have a name already, update it.
+            if full_name and not user.first_name:
+                user.first_name = first_name
+                user.last_name = last_name
+            # Similarly, update phone if provided and missing.
+            if phone_number and not getattr(user, 'phone', None):
+                user.phone = phone_number
+            user.save()
 
         logger.debug("Generating backend token for user: %s", email)
-        # Generate your backend token.
         token, _ = Token.objects.get_or_create(user=user)
         logger.debug("Token generated: %s", token.key)
 
         return Response({'message': 'User logged in successfully', 'token': token.key}, status=status.HTTP_200_OK)
     except Exception as e:
         logger.exception("Error during firebase login process.")
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)    
     
 @csrf_exempt
 @api_view(['POST'])
@@ -215,7 +237,8 @@ def user_profile(request):
     data = {
         "id": user.id,
         "first_name": user.first_name,
-        "notifications_count": str(unread_notifications)
+        "notifications_count": str(unread_notifications),
+        "phone" : user.phone
     }
 
     return Response(data)
@@ -631,6 +654,7 @@ def book_pack_view(request):
                                     {
                                         "lesson_id" : lesson.id,
                                         "lesson_str": str(lesson),
+                                        "school": str(lesson.school) if lesson.school else "",
                                         "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
                                     }
                                     for lesson in new_pack.lessons.all()
