@@ -206,3 +206,25 @@ def my_webhook_view(request):
         logger.debug('Unhandled event type {}'.format(event.type))
 
     return HttpResponse(status=200)
+
+@csrf_exempt
+def verify_payment(request):
+    session_id = request.GET.get("session_id")
+    if not session_id:
+        return JsonResponse({"error": "No session_id provided."}, status=400)
+
+    try:
+        # Set your secret key
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+
+        # Retrieve the Checkout Session
+        session = stripe.checkout.Session.retrieve(session_id)
+
+        # Check the payment status.
+        # The session object has a 'payment_status' field that should be 'paid' if successful.
+        if session.payment_status == "paid":
+            return JsonResponse({"verified": True})
+        else:
+            return JsonResponse({"verified": False})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

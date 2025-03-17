@@ -27,6 +27,7 @@ dependencies:
   currency_picker: ^2.0.21
   provider: ^6.1.2
   url_launcher: ^6.3.1
+  app_links: ^6.4.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1

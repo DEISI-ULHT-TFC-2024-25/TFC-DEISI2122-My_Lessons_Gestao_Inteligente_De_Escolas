@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mylessons_frontend/pages/register_landing_page.dart';
 import 'pages/email_login_page.dart';
@@ -5,32 +6,79 @@ import 'pages/landing_page.dart';
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
 import 'main_layout.dart'; // Import MainScreen
+import 'pages/payment_success_page.dart';
+import 'pages/payment_fail_page.dart';
 import 'package:flutter/rendering.dart';
-
-// 1. Import the Firebase packages
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:app_links/app_links.dart';
 
 // Create a global RouteObserver instance.
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 Future<void> main() async {
-  // 2. Ensure bindings are initialized
+  // Ensure bindings are initialized.
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 3. Initialize Firebase
+  // Initialize Firebase.
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
   debugPaintSizeEnabled = false;
-  runApp(
-    MyApp(),
-  );
+  runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final AppLinks _appLinks;
+  StreamSubscription? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _appLinks = AppLinks();
+    _initDeepLinkListener();
+  }
+
+  void _initDeepLinkListener() {
+    _linkSubscription = _appLinks.uriLinkStream.listen((Uri? uri) {
+      if (uri != null) {
+        debugPrint("Received deep link: $uri");
+        // Check the host to determine which page to navigate to.
+        if (uri.host == 'payment-success') {
+          final sessionId = uri.queryParameters['session_id'];
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PaymentSuccessPage(sessionId: sessionId),
+            ),
+          );
+        } else if (uri.host == 'payment-fail') {
+          final sessionId = uri.queryParameters['session_id'];
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PaymentFailPage(sessionId: sessionId),
+            ),
+          );
+        }
+      }
+    }, onError: (err) {
+      debugPrint("Error receiving deep link: $err");
+    });
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +87,8 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.white, // Bottom navigation bar is white
+          backgroundColor: Colors.white,
         ),
-        // Progress Indicator theme: orange color for loading indicators.
         progressIndicatorTheme: const ProgressIndicatorThemeData(
           color: Colors.orange,
         ),
@@ -52,79 +99,51 @@ class MyApp extends StatelessWidget {
           titleTextStyle: TextStyle(color: Colors.black, fontSize: 20),
         ),
         cardTheme: CardTheme(
-          color: Colors.grey[50], // Light grey
+          color: Colors.grey[50],
         ),
-        // ---- SnackBar styling ----
         snackBarTheme: const SnackBarThemeData(
-          backgroundColor: Colors.orange, // Orange background
+          backgroundColor: Colors.orange,
           contentTextStyle: TextStyle(
-            color: Colors.white, // White text
+            color: Colors.white,
             fontSize: 14,
             fontWeight: FontWeight.bold,
           ),
-          actionTextColor: Colors.white, // Action button text color
-          // You can also adjust the shape, behavior, etc.
+          actionTextColor: Colors.white,
         ),
         primarySwatch: Colors.orange,
         timePickerTheme: TimePickerThemeData(),
         datePickerTheme: DatePickerThemeData(
-          // Header
           headerBackgroundColor: Colors.orange,
           headerForegroundColor: Colors.white,
-
-          // Highlight "today" with an orange border
-          todayBorder: const BorderSide(color: Colors.orange, width: 1.5),
-
-          // Day text color for different states
-          dayForegroundColor:
-              MaterialStateProperty.resolveWith<Color?>((states) {
+          todayBorder: BorderSide(color: Colors.orange, width: 1.5),
+          dayForegroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
-              // Selected day text = white
               return Colors.white;
             }
-            // Fallback to default text color
             return null;
           }),
-
-          // Day background color for different states
-          dayBackgroundColor:
-              MaterialStateProperty.resolveWith<Color?>((states) {
+          dayBackgroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
-              // Selected day background = orange
               return Colors.orange;
             }
-            // No background for unselected days
             return null;
           }),
-
-          // “Today” text color for different states
-          todayForegroundColor:
-              MaterialStateProperty.resolveWith<Color?>((states) {
-            // If "today" is also selected, use white text
+          todayForegroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
               return Colors.white;
             }
-            // Otherwise, orange text
             return Colors.orange;
           }),
-
-          // “Today” background color (only if you want a fill for today)
-          todayBackgroundColor:
-              MaterialStateProperty.resolveWith<Color?>((states) {
-            // If today is selected, fill it with orange
+          todayBackgroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
               return Colors.orange;
             }
-            // Otherwise transparent
             return null;
           }),
-
-          // Remove or customize the Material3 hover/ripple overlay (often purple-ish)
           dayOverlayColor: MaterialStateProperty.all(Colors.transparent),
         ),
-        // Make checkboxes orange when checked:
         checkboxTheme: CheckboxThemeData(
-          fillColor: WidgetStateProperty.all(Colors.orange),
+          fillColor: MaterialStateProperty.all(Colors.orange),
         ),
         tabBarTheme: const TabBarTheme(
           labelColor: Colors.orange,
@@ -138,39 +157,31 @@ class MyApp extends StatelessWidget {
             fontSize: 14.0,
           ),
         ),
-        // ElevatedButtons
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.orange,
-            foregroundColor: Colors.black, // <--- Button text color
+            foregroundColor: Colors.black,
           ),
         ),
-
-        // TextButtons
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
-            foregroundColor: Colors.black, // <--- Button text color
+            foregroundColor: Colors.black,
           ),
         ),
-
-        // OutlinedButtons (if you use them)
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.black, // <--- Button text color
+            foregroundColor: Colors.black,
             side: const BorderSide(color: Colors.orange),
           ),
         ),
-
-        // TextField cursor, selection, labels, etc.
         textSelectionTheme: TextSelectionThemeData(
           cursorColor: Colors.orange,
           selectionColor: Colors.orange.withOpacity(0.3),
           selectionHandleColor: Colors.orange,
         ),
-
         inputDecorationTheme: InputDecorationTheme(
-          labelStyle: TextStyle(color: Colors.orange),
-          floatingLabelStyle: TextStyle(color: Colors.orange),
+          labelStyle: const TextStyle(color: Colors.orange),
+          floatingLabelStyle: const TextStyle(color: Colors.orange),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
           ),
@@ -187,13 +198,12 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => LandingPage(),
-        '/main': (context) => const MainScreen(), // New main route with navbar
+        '/main': (context) => const MainScreen(),
         '/login': (context) => const LoginPage(),
         '/register_landing_page': (context) => const RegisterLandingPage(),
         '/register_page': (context) => const RegisterPage(),
         '/email_login': (context) => const EmailLoginPage(),
       },
-      // Add the global RouteObserver to navigatorObservers
       navigatorObservers: [routeObserver],
     );
   }
