@@ -17,6 +17,7 @@ import logging
 from datetime import datetime, timedelta
 from django.utils.timezone import now
 from django.db import transaction
+from django.http import HttpResponse
 
 
 logger = logging.getLogger(__name__)
@@ -169,46 +170,39 @@ def payment_failed(request):
 
 # TODO now seccess and cancel url and views
 
+stripe.api_key = 'sk_test_51QmkhlJwT5CCGmges88003pOz7TdN6vzhZquphq13zUEAm9PJqncJU7kcYgKhpYu1cUGjlIsPveyXYn7hKjpOnhG00jYIoinVr'
+endpoint_secret = 'whsec_5EcGjLPpcfMjRNDpGVbahPjQWAyZgGmZ'
+
+# Using Django
 @csrf_exempt
-def stripe_webhook(request):
-    """
-    Handles Stripe webhook for successful payments.
-    """
-    print(">>> Webhook endpoint was hit!")
-    logger.info("Webhook endpoint hit.")
+def my_webhook_view(request):
+    logger.debug("WEBHOOK WAS HIT!!")
     payload = request.body
-    logger.info("Webhook received with payload: %s", payload)
+    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
     event = None
 
     try:
-        event = json.loads(payload)
-    except json.JSONDecodeError as e:
-        logger.error("JSON decode error: %s", e)
-        return JsonResponse({'error': str(e)}, status=400)
+        event = stripe.Webhook.construct_event(
+        payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        logger.debug('Error parsing payload: {}'.format(str(e)))
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        logger.debug('Error verifying webhook signature: {}'.format(str(e)))
+        return HttpResponse(status=400)
 
-    if event.get("type") == "checkout.session.completed":
-        logger.info("Checkout session completed event received")
-        session = event["data"]["object"]
-        user_id = session["metadata"]["user_id"]
-        cart = json.loads(session["metadata"]["cart"])
-        discount = float(session["metadata"]["discount"])
-        student_ids_list = list(session["metadata"]["student_ids_list"])
-        user = UserAccount.objects.get(id=user_id)
-        students_list = []
+    # Handle the event
+    if event.type == 'payment_intent.succeeded':
+        payment_intent = event.data.object # contains a stripe.PaymentIntent
+        logger.debug('PaymentIntent was successful!')
+    elif event.type == 'payment_method.attached':
+        payment_method = event.data.object # contains a stripe.PaymentMethod
+        logger.debug('PaymentMethod was attached to a Customer!')
+    # ... handle other event types
+    else:
+        logger.debug('Unhandled event type {}'.format(event.type))
 
-        for id in student_ids_list:
-            student = Student.objects.get(id = id)
-            if student:
-                students_list.append(student)
-
-        for item in cart:
-            pack_type = item["type"]  # "group_pack" or "private_pack"
-            school = School.objects.get(name=item["school_name"])
-            instructor = item['instructor']
-
-            # TODO check book structure (is something is missing here)
-
-            #pack = Pack.book_new_pack(students=students_list, school=school, number_of_classes=item["number_of_classes"], duration_in_minutes=item["duration_in_minutes"], instructors=[instructor], price=item["price"], discount_id=discount)
-            #if not pack:
-            #    JsonResponse({"status": "cancel"}, status=200)
-    return JsonResponse({"status": "success"}, status=200)
+    return HttpResponse(status=200)
