@@ -3,7 +3,7 @@ from payments.models import Payment
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 import stripe
@@ -228,3 +228,14 @@ def verify_payment(request):
             return JsonResponse({"verified": False})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+def deeplink_payment_success(request):
+    # Get the session_id from the query parameters.
+    session_id = request.GET.get("session_id", "")
+    # Optionally, you can add extra logic or verification here.
+    # Redirect to the custom deep link URL.
+    return HttpResponseRedirect(f"myapp://payment-success?session_id={session_id}")
+
+def deeplink_payment_fail(request):
+    session_id = request.GET.get("session_id", "")
+    return HttpResponseRedirect(f"myapp://payment-fail?session_id={session_id}")

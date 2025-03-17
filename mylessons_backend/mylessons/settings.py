@@ -135,8 +135,9 @@ STRIPE_PUBLISHABLE_KEY = "pk_test_51QmkhvFKR0fDDDqcMPjzGLnTRzcF73xgfXA7bQ2Z2LmHN
 
 STRIPE_WEBHOOK_SECRET = 'whsec_5EcGjLPpcfMjRNDpGVbahPjQWAyZgGmZ'
 
-SUCCESS_URL = "myapp://payment-success?session_id={CHECKOUT_SESSION_ID}"
-CANCEL_URL = "myapp://payment-fail?session_id={CHECKOUT_SESSION_ID}"
+SUCCESS_URL = "https://mylessons.pythonanywhere.com/deeplink/payment-success?session_id={CHECKOUT_SESSION_ID}"
+CANCEL_URL = "https://mylessons.pythonanywhere.com/deeplink/payment-fail?session_id={CHECKOUT_SESSION_ID}"
+
 
 
 
