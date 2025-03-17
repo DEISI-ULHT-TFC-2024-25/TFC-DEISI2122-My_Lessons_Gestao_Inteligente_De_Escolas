@@ -124,26 +124,33 @@ def new_payment(request):
 def test_payment(request):
     return render(request, 'payments/test-payment.html')
 
-def start_test_checkout(request):
-    """
-    Simulate adding an item to a cart and initiating a Stripe Checkout session.
-    """
-    user = request.user  # Assuming authentication is in place
-    cart = [
-        {
-            "type": "private",
-            "number_of_classes": 4,
-            "duration_in_minutes": 60,
-            "price": 100.00,  # Test price
-            "school_name": "Test School",
-            "student_ids_list": [1, 2],  # Dummy student IDs
-        }
-    ]
-    discount = 10  # Test discount
+@csrf_exempt
+def create_checkout_session_view(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
 
-    session_url = create_checkout_session(user, cart, discount)
+            # 1) Extract cart & discount from the JSON payload:
+            cart = data.get('cart', [])
+            discount = data.get('discount', 0)
 
-    return redirect(session_url)
+            # 2) Get the user.
+            # If using Django’s session auth:
+            user = request.user
+            # or if your user is not logged in via session, you might parse user ID from data:
+            # user_id = data.get('user_id')
+            # user = MyUser.objects.get(id=user_id)
+
+            # 3) Now call your existing helper function:
+            session_url = create_checkout_session(user, cart, discount)
+            
+            # 4) Return the session URL in JSON:
+            return JsonResponse({'url': session_url}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def payment_success(request):
     session_id = request.GET.get("session_id")
