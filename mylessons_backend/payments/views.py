@@ -231,8 +231,39 @@ def verify_payment(request):
     
 def deeplink_payment_success(request):
     session_id = request.GET.get("session_id", "")
-    return redirect(f"myapp://payment-success?session_id={session_id}")
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Redirecting...</title>
+        <!-- Option A: Meta refresh -->
+        <meta http-equiv="refresh" content="0; url=myapp://payment-success?session_id={session_id}" />
+        
+        <!-- Option B: JavaScript (uncomment if you prefer JS):
+        <script>
+          window.location.href = "myapp://payment-success?session_id={session_id}";
+        </script>
+        -->
+      </head>
+      <body>
+        <p>Redirecting to the app...</p>
+      </body>
+    </html>
+    """
+    return HttpResponse(html_content)
 
 def deeplink_payment_fail(request):
     session_id = request.GET.get("session_id", "")
-    return redirect(f"myapp://payment-fail?session_id={session_id}")
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Redirecting...</title>
+        <meta http-equiv="refresh" content="0; url=myapp://payment-fail?session_id={session_id}" />
+      </head>
+      <body>
+        <p>Redirecting to the app...</p>
+      </body>
+    </html>
+    """
+    return HttpResponse(html_content)
