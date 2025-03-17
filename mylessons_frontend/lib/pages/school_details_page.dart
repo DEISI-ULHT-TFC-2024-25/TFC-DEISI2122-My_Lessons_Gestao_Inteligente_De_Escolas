@@ -1,60 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 class SchoolDetailsContent extends StatefulWidget {
   final Map<String, dynamic> school;
   final Function(Map<String, dynamic>) onServiceSelected;
-  const SchoolDetailsContent({super.key, required this.school, required this.onServiceSelected});
+  const SchoolDetailsContent({
+    Key? key,
+    required this.school,
+    required this.onServiceSelected,
+  }) : super(key: key);
 
   @override
   _SchoolDetailsContentState createState() => _SchoolDetailsContentState();
 }
 
 class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _purchasesKey = GlobalKey();
-  final GlobalKey _servicesKey = GlobalKey();
-  final GlobalKey _reviewsKey = GlobalKey();
-  final GlobalKey _locationsKey = GlobalKey();
-  final GlobalKey _contactsKey = GlobalKey();
-  final GlobalKey _aboutKey = GlobalKey();
-
-  void _scrollToSection(GlobalKey key) {
-    final context = key.currentContext;
-    if (context != null) {
-      Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 300),
-      );
-    }
-  }
-
-  List<Map<String, String>> reviews = [];
+  // Local reviews added by the user.
+  List<Map<String, String>> _localReviews = [];
 
   void _showAddReviewDialog() {
     final authorController = TextEditingController();
-    final reviewController = TextEditingController();
     final ratingController = TextEditingController();
+    final reviewController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Add Review'),
+          title: Text('Add Review', style: GoogleFonts.lato()),
           content: SingleChildScrollView(
             child: Column(
               children: [
                 TextField(
                   controller: authorController,
-                  decoration: const InputDecoration(labelText: 'Your Name'),
+                  decoration: InputDecoration(
+                    labelText: 'Your Name',
+                    labelStyle: GoogleFonts.lato(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: ratingController,
-                  decoration: const InputDecoration(labelText: 'Rating (1-5)'),
+                  decoration: InputDecoration(
+                    labelText: 'Rating (1-5)',
+                    labelStyle: GoogleFonts.lato(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                   keyboardType: TextInputType.number,
                 ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: reviewController,
-                  decoration: const InputDecoration(labelText: 'Review'),
+                  decoration: InputDecoration(
+                    labelText: 'Review',
+                    labelStyle: GoogleFonts.lato(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                   maxLines: 3,
                 ),
               ],
@@ -62,18 +70,22 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
           ),
           actions: [
             TextButton(
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: GoogleFonts.lato(color: Colors.orange)),
               onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
-              child: const Text('Submit'),
+              child: Text('Submit', style: GoogleFonts.lato()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               onPressed: () {
                 final currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
                 setState(() {
-                  reviews.add({
+                  _localReviews.add({
                     'author': authorController.text,
-                    'review': reviewController.text,
                     'rating': ratingController.text,
+                    'review': reviewController.text,
                     'date': currentDate,
                   });
                 });
@@ -86,288 +98,268 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Updated: Expect services to follow the new structure.
-    final services = widget.school['services'] as List<dynamic>? ?? [];
-    final reviews = widget.school['reviews'] as List<dynamic>? ?? [];
+  /// Helper widget for section headers.
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Text(
+        title,
+        style: GoogleFonts.lato(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  /// Last Purchases Tab.
+  Widget _buildLastPurchasesTab() {
     final lastPurchases = widget.school['lastPurchases'] as List<dynamic>? ?? [];
-    return Stack(
-      children: [
-        SingleChildScrollView(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (lastPurchases.isNotEmpty) ...[
-                Container(
-                  key: _purchasesKey,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Last Purchases',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 150,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: lastPurchases.length,
-                          itemBuilder: (context, index) {
-                            final purchase = lastPurchases[index] as Map<String, dynamic>;
-                            return Card(
-                              margin: const EdgeInsets.only(right: 12),
-                              child: Container(
-                                width: 160,
-                                padding: const EdgeInsets.all(8),
-                                height: 140,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      purchase['packName'] ?? 'Pack',
-                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text('Date: ${purchase['date'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                                    const SizedBox(height: 4),
-                                    Text('Price: ${purchase['price'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                                    const SizedBox(height: 8),
-                                    Center(
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Rebuy pressed')),
-                                          );
-                                        },
-                                        child: const Text('Rebuy'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: lastPurchases.isEmpty
+          ? Center(child: Text('No purchases available.', style: GoogleFonts.lato()))
+          : SizedBox(
+              height: 150,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: lastPurchases.length,
+                itemBuilder: (context, index) {
+                  final purchase = lastPurchases[index] as Map<String, dynamic>;
+                  return Card(
+                    margin: const EdgeInsets.only(right: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Container(
+                      width: 160,
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            purchase['packName'] ?? 'Pack',
+                            style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Date: ${purchase['date'] ?? ''}', style: GoogleFonts.lato(fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Text('Price: ${purchase['price'] ?? ''}', style: GoogleFonts.lato(fontSize: 12)),
+                          const Spacer(),
+                          Center(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Rebuy pressed', style: GoogleFonts.lato())),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                            );
-                          },
+                              child: Text('Rebuy', style: GoogleFonts.lato()),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+    );
+  }
+
+  /// Services Tab.
+  Widget _buildServicesTab() {
+    final services = widget.school['services'] as List<dynamic>? ?? [];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: services.isEmpty
+          ? Center(child: Text('No services provided.', style: GoogleFonts.lato()))
+          : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: services.length,
+              itemBuilder: (context, index) {
+                final service = services[index] as Map<String, dynamic>;
+                final imageUrl = (service['photos'] is List &&
+                        (service['photos'] as List).isNotEmpty)
+                    ? service['photos'][0]
+                    : 'https://via.placeholder.com/150';
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey,
+                          child: Icon(Icons.error, color: Colors.red),
                         ),
                       ),
-                    ],
+                    ),
+                    title: Text(service['name'] ?? 'Service',
+                        style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+                    subtitle: Text(
+                      service['description'] ?? 'No description provided.',
+                      style: GoogleFonts.lato(fontSize: 12),
+                    ),
+                    onTap: () {
+                      final updatedService = Map<String, dynamic>.from(service);
+                      updatedService['school_name'] = widget.school['name'] ?? 'N/A';
+                      widget.onServiceSelected(updatedService);
+                    },
                   ),
-                ),
-              ],
-              Container(
-                key: _servicesKey,
-                margin: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Services',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    services.isEmpty
-                        ? const Center(child: Text('No services provided.'))
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: services.length,
-                            itemBuilder: (context, index) {
-                              final service = services[index] as Map<String, dynamic>;
-                              // Use the first photo from the "photos" list; if empty, fallback to a placeholder.
-                              final imageUrl = (service['photos'] is List && (service['photos'] as List).isNotEmpty)
-                                  ? service['photos'][0]
-                                  : 'https://via.placeholder.com/150';
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                child: ListTile(
-                                  leading: SizedBox(
-                                    width: 60,
-                                    height: 60,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: Image.network(
-                                        imageUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            color: Colors.grey,
-                                            child: const Icon(Icons.error),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(service['name'] ?? 'Service'),
-                                  subtitle: Text(service['description'] ?? 'No description provided.'),
-                                  onTap: () {
-                                    // Pass the service to the onServiceSelected callback,
-                                    // but inject the school name as well.
-                                    final updatedService = Map<String, dynamic>.from(service);
-                                    updatedService['school_name'] = widget.school['name'] ?? 'N/A';
-                                    widget.onServiceSelected(updatedService);
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                  ],
-                ),
-              ),
-              Container(
-                key: _reviewsKey,
-                margin: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Reviews',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    reviews.isEmpty
-                        ? const Center(child: Text('No reviews provided.'))
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: reviews.length,
-                            itemBuilder: (context, index) {
-                              final review = reviews[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                child: ListTile(
-                                  title: Text('${review['author']} (${review['rating']}/5)'),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(review['review']!),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        review['date']!,
-                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                    Center(
-                      child: ElevatedButton(
-                        onPressed: _showAddReviewDialog,
-                        child: const Text('Add Review'),
+                );
+              },
+            ),
+    );
+  }
+
+  /// Reviews Tab.
+  Widget _buildReviewsTab() {
+    final reviewsFromData = widget.school['reviews'] as List<dynamic>? ?? [];
+    final allReviews = List<Map<String, String>>.from(
+      reviewsFromData.map((r) => {
+            'author': r['author'] ?? '',
+            'rating': r['rating']?.toString() ?? '',
+            'review': r['review'] ?? '',
+            'date': r['date'] ?? '',
+          }),
+    )..addAll(_localReviews);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          allReviews.isEmpty
+              ? Center(child: Text('No reviews provided.', style: GoogleFonts.lato()))
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: allReviews.length,
+                  itemBuilder: (context, index) {
+                    final review = allReviews[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        title: Text('${review['author']} (${review['rating']}/5)',
+                            style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(review['review']!, style: GoogleFonts.lato()),
+                            const SizedBox(height: 4),
+                            Text(review['date']!,
+                                style: GoogleFonts.lato(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
+          Center(
+            child: ElevatedButton(
+              onPressed: _showAddReviewDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              Container(
-                key: _locationsKey,
-                margin: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Locations',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    (widget.school['locations'] as List<String>).isEmpty
-                        ? const Text('No locations provided.')
-                        : Column(
-                            children: (widget.school['locations'] as List<String>)
-                                .map((location) => ListTile(
-                                      leading: const Icon(Icons.location_on),
-                                      title: Text(location),
-                                    ))
-                                .toList(),
-                          ),
-                  ],
-                ),
-              ),
-              Container(
-                key: _contactsKey,
-                margin: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Contacts',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 16),
-                    Center(child: Text('Contact details go here.')),
-                  ],
-                ),
-              ),
-              Container(
-                key: _aboutKey,
-                margin: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'About',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: widget.school['description'].toString().isEmpty
-                          ? const Text('No description provided.')
-                          : Text(widget.school['description']),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              child: Text('Add Review', style: GoogleFonts.lato()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Locations Tab.
+  Widget _buildLocationsTab() {
+    final locations = widget.school['locations'] as List<dynamic>? ?? [];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: locations.isEmpty
+          ? Center(child: Text('No locations provided.', style: GoogleFonts.lato()))
+          : Column(
+              children: locations
+                  .map((loc) => ListTile(
+                        leading: Icon(Icons.location_on, color: Colors.orange),
+                        title: Text(loc.toString(), style: GoogleFonts.lato()),
+                      ))
+                  .toList(),
+            ),
+    );
+  }
+
+  /// Contacts Tab.
+  Widget _buildContactsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Center(child: Text('Contact details go here.', style: GoogleFonts.lato())),
+    );
+  }
+
+  /// About Tab.
+  Widget _buildAboutTab() {
+    final description = widget.school['description']?.toString() ?? '';
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: description.isEmpty
+            ? Text('No description provided.', style: GoogleFonts.lato())
+            : Text(description, style: GoogleFonts.lato()),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine tabs dynamically.
+    final lastPurchases = widget.school['lastPurchases'] as List<dynamic>? ?? [];
+    final List<Widget> tabs = [];
+    final List<Widget> tabViews = [];
+    if (lastPurchases.isNotEmpty) {
+      tabs.add(const Tab(text: 'Purchases'));
+      tabViews.add(_buildLastPurchasesTab());
+    }
+    tabs.add(const Tab(text: 'Services'));
+    tabViews.add(_buildServicesTab());
+    tabs.add(const Tab(text: 'Reviews'));
+    tabViews.add(_buildReviewsTab());
+    tabs.add(const Tab(text: 'Locations'));
+    tabViews.add(_buildLocationsTab());
+    tabs.add(const Tab(text: 'Contacts'));
+    tabViews.add(_buildContactsTab());
+    tabs.add(const Tab(text: 'About'));
+    tabViews.add(_buildAboutTab());
+
+    return DefaultTabController(
+      length: tabs.length,
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.orange),
+          bottom: TabBar(
+            isScrollable: true,
+            labelColor: Colors.orange,
+            unselectedLabelColor: Colors.black54,
+            indicatorColor: Colors.orange,
+            tabs: tabs,
           ),
         ),
-        Positioned(
-          right: 8,
-          top: MediaQuery.of(context).size.height / 4,
-          child: Column(
-            children: [
-              FloatingActionButton.small(
-                heroTag: 'services',
-                onPressed: () => _scrollToSection(_servicesKey),
-                tooltip: 'Services',
-                child: const Icon(Icons.shopping_cart),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton.small(
-                heroTag: 'reviews',
-                onPressed: () => _scrollToSection(_reviewsKey),
-                tooltip: 'Reviews',
-                child: const Icon(Icons.rate_review),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton.small(
-                heroTag: 'locations',
-                onPressed: () => _scrollToSection(_locationsKey),
-                tooltip: 'Locations',
-                child: const Icon(Icons.location_on),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton.small(
-                heroTag: 'contacts',
-                onPressed: () => _scrollToSection(_contactsKey),
-                tooltip: 'Contacts',
-                child: const Icon(Icons.contact_phone),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton.small(
-                heroTag: 'about',
-                onPressed: () => _scrollToSection(_aboutKey),
-                tooltip: 'About',
-                child: const Icon(Icons.info),
-              ),
-            ],
-          ),
+        body: TabBarView(
+          children: tabViews,
         ),
-      ],
+      ),
     );
   }
 }

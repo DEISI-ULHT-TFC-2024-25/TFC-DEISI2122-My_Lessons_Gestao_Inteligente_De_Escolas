@@ -27,6 +27,34 @@ from django.http import JsonResponse
 logger = logging.getLogger(__name__)
 
 @permission_classes([IsAuthenticated])
+@api_view(['POST'])
+def get_school_time_limit(request):
+    """
+    Expects a POST with JSON data containing "school_name".
+    Returns the schedule_time_limit for the given school.
+    """
+    school_name = request.data.get('school_name')
+    if not school_name:
+        return Response(
+            {'error': "Missing 'school_name' parameter."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        school = School.objects.get(name=school_name)
+    except School.DoesNotExist:
+        logger.debug("School not found for school name %s", school_name)
+        return Response(
+            {'error': "School not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    return Response(
+        {'time_limit': school.schedule_time_limit},
+        status=status.HTTP_200_OK
+    )
+
+@permission_classes([IsAuthenticated])
 @api_view(['GET'])
 def get_services(request, school_id):
     """
@@ -44,21 +72,33 @@ def add_edit_service(request, school_id):
     POST /api/schools/<school_id>/services/add_edit/
     
     Request Body (JSON):
+    [
     {
-      "id": "optional-service-id",  // Omit or provide to update an existing service.
-      "name": "Private Lessons",
-      "photos": ["https://link1", "https://link2"],
-      "benefits": ["One-on-one coaching", "Customized curriculum"],
-      "description": "Intensive private lessons for faster skill development.",
-      "sports": ["tennis", "soccer"],
-      "locations": ["Court 1", "Room 101"],
-      "type": {
-        // Provide EITHER "pack" OR "activity", not both.
+        "id": "cc6ab39c-b01a-46f8-938b-41753ec62036",
+        "name": "Private Lessons",
+        "type": {
         "pack": "private"
-        // OR
-        // "activity": "birthday party"
-      }
+        },
+        "photos": [],
+        "sports": [],
+        "details": {
+        "pricing_options": [
+            {
+            "price": 200.0,
+            "people": 1,
+            "classes": 8,
+            "duration": 60,
+            "time_limit": 90
+            }
+        ]
+        },
+        "benefits": [],
+        "currency": "EUR",
+        "locations": [],
+        "description": ""
     }
+    ]
+
 
     If a service with the given 'id' exists, it will be updated.
     Otherwise, a new service is appended.

@@ -14,7 +14,10 @@ import '../widgets/staff_widgets.dart';
 
 class SchoolSetupPage extends StatefulWidget {
   final bool isCreatingSchool;
-  const SchoolSetupPage({super.key, this.isCreatingSchool = false});
+  final Future<void> Function()
+      fetchProfileData; // Callback to refresh the whole home page
+  const SchoolSetupPage({super.key, this.isCreatingSchool = false, required this.fetchProfileData});
+  
 
   @override
   _SchoolSetupPageState createState() => _SchoolSetupPageState();
@@ -89,6 +92,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       setState(() {
         _isCreated = true;
       });
+      await widget.fetchProfileData();
+      await fetchAndDisplaySchoolDetails();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to create school: $e")),

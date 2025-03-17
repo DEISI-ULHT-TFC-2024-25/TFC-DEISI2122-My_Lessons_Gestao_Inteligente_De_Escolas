@@ -11,11 +11,18 @@ class ScheduleMultipleLessonsModal extends StatefulWidget {
   final List<dynamic> lessons;
   /// Callback to refresh the home page after scheduling is confirmed.
   final VoidCallback onScheduleConfirmed;
+  final String currentRole;
+  final int schoolScheduleTimeLimit;
+  /// The expiration date as a string (yyyy-mm-dd) for parents - calendar will only allow dates until this date.
+  final String expirationDate;
 
   const ScheduleMultipleLessonsModal({
     super.key,
     required this.lessons,
     required this.onScheduleConfirmed,
+    required this.currentRole,
+    required this.schoolScheduleTimeLimit,
+    required this.expirationDate,
   });
 
   @override
@@ -42,9 +49,15 @@ class _ScheduleMultipleLessonsModalState
   //   'options': List<Map<String, String>>
   List<Map<String, dynamic>> schedulingBlocks = [];
 
+  // Parsed expiration date from widget.expirationDate (yyyy-mm-dd)
+  late DateTime parsedExpirationDate;
+
   @override
   void initState() {
     super.initState();
+    // Parse expiration date string into DateTime
+    parsedExpirationDate = DateTime.parse(widget.expirationDate);
+
     selectedLessons = List.generate(widget.lessons.length, (_) => false);
 
     // Initialize with one default block for multiple lessons
@@ -196,8 +209,19 @@ class _ScheduleMultipleLessonsModalState
         throw Exception("Error scheduling lessons: ${response.statusCode}");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+      // Show a warning popup if scheduling fails
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Warning"),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            )
+          ],
+        ),
       );
     }
   }
@@ -259,8 +283,19 @@ class _ScheduleMultipleLessonsModalState
         throw Exception("Error scheduling lesson: ${response.statusCode}");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+      // Show a warning popup if scheduling fails
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Warning"),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            )
+          ],
+        ),
       );
     }
   }
@@ -276,6 +311,19 @@ class _ScheduleMultipleLessonsModalState
         SizedBox(
           height: 300,
           child: SfDateRangePicker(
+            initialDisplayDate: widget.currentRole == "Parent"
+                ? DateTime.now().add(
+                    Duration(hours: widget.schoolScheduleTimeLimit),
+                  )
+                : null,
+            minDate: widget.currentRole == "Parent"
+                ? DateTime.now().add(
+                    Duration(hours: widget.schoolScheduleTimeLimit),
+                  )
+                : null,
+            maxDate: widget.currentRole == "Parent"
+                ? parsedExpirationDate
+                : null,
             view: DateRangePickerView.month,
             selectionMode: DateRangePickerSelectionMode.single,
             onSelectionChanged: (args) {
@@ -355,7 +403,7 @@ class _ScheduleMultipleLessonsModalState
                 return InkWell(
                   onTap: () {
                     // For single lessons, we show a small confirm alert,
-                    // then do the schedule and skip any second popup.
+                    // then schedule and skip any final confirm button.
                     showDialog(
                       context: context,
                       builder: (BuildContext context) {
@@ -405,7 +453,6 @@ class _ScheduleMultipleLessonsModalState
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final selectedCount = selectedLessons.where((e) => e).length;
@@ -420,14 +467,16 @@ class _ScheduleMultipleLessonsModalState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Schedule Multiple Lessons',
-                  style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold)),
+                  style: GoogleFonts.lato(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               // Lesson selection
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Select Lessons',
-                      style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold)),
+                      style: GoogleFonts.lato(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   Row(
                     children: [
                       const Text("Select All"),
@@ -453,7 +502,8 @@ class _ScheduleMultipleLessonsModalState
                 _buildSingleLessonUI()
               else if (selectedCount > 1) ...[
                 Text('Select Time Periods',
-                    style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: GoogleFonts.lato(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 ListView.builder(
                   shrinkWrap: true,
@@ -481,7 +531,9 @@ class _ScheduleMultipleLessonsModalState
                                         context: context,
                                         initialDate: DateTime.now(),
                                         firstDate: DateTime.now(),
-                                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                                        lastDate: widget.currentRole == "Parent"
+                                            ? parsedExpirationDate
+                                            : DateTime.now().add(const Duration(days: 365)),
                                       );
                                       if (picked != null) {
                                         setState(() {
@@ -492,7 +544,8 @@ class _ScheduleMultipleLessonsModalState
                                     child: Text(
                                       block['from_date'] == null
                                           ? 'From Date'
-                                          : DateFormat('yyyy-MM-dd').format(block['from_date']),
+                                          : DateFormat('yyyy-MM-dd')
+                                              .format(block['from_date']),
                                     ),
                                   ),
                                 ),
@@ -505,7 +558,9 @@ class _ScheduleMultipleLessonsModalState
                                         context: context,
                                         initialDate: initial,
                                         firstDate: initial,
-                                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                                        lastDate: widget.currentRole == "Parent"
+                                            ? parsedExpirationDate
+                                            : DateTime.now().add(const Duration(days: 365)),
                                       );
                                       if (picked != null) {
                                         setState(() {
@@ -516,7 +571,8 @@ class _ScheduleMultipleLessonsModalState
                                     child: Text(
                                       block['to_date'] == null
                                           ? 'To Date'
-                                          : DateFormat('yyyy-MM-dd').format(block['to_date']),
+                                          : DateFormat('yyyy-MM-dd')
+                                              .format(block['to_date']),
                                     ),
                                   ),
                                 ),
@@ -544,8 +600,10 @@ class _ScheduleMultipleLessonsModalState
                                           'Friday',
                                           'Saturday',
                                           'Sunday'
-                                        ].map((day) => DropdownMenuItem(
-                                            value: day, child: Text(day))).toList(),
+                                        ]
+                                            .map((day) => DropdownMenuItem(
+                                                value: day, child: Text(day)))
+                                            .toList(),
                                         onChanged: (value) {
                                           setState(() {
                                             option['weekday'] = value!;
@@ -568,8 +626,10 @@ class _ScheduleMultipleLessonsModalState
                                           '15:00',
                                           '16:00',
                                           '17:00'
-                                        ].map((time) => DropdownMenuItem(
-                                            value: time, child: Text(time))).toList(),
+                                        ]
+                                            .map((time) => DropdownMenuItem(
+                                                value: time, child: Text(time)))
+                                            .toList(),
                                         onChanged: (value) {
                                           setState(() {
                                             option['time'] = value!;
@@ -580,7 +640,8 @@ class _ScheduleMultipleLessonsModalState
                                     if ((block['options'] as List).length > 1)
                                       IconButton(
                                         icon: const Icon(Icons.remove_circle_outline),
-                                        onPressed: () => removeSchedulingOption(blockIndex, optionIndex),
+                                        onPressed: () =>
+                                            removeSchedulingOption(blockIndex, optionIndex),
                                       ),
                                   ],
                                 );
@@ -608,25 +669,32 @@ class _ScheduleMultipleLessonsModalState
                 ),
               ],
               const SizedBox(height: 16),
-              // For single lesson, no final "Confirm" popup is shown.
-              // For multiple lessons, we show a final confirmation popup after we do the POST.
-              Center(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final selectedCount = selectedLessons.where((e) => e).length;
-                    if (selectedCount == 1) {
-                      await _submitSingleSchedule();
-                    } else if (selectedCount > 1) {
+              // Only show final Confirm button if more than one lesson is selected.
+              if (selectedCount > 1)
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (selectedLessons.where((e) => e).isEmpty) {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text("Warning"),
+                            content: const Text("No lessons selected."),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text("OK"),
+                              )
+                            ],
+                          ),
+                        );
+                        return;
+                      }
                       await _submitMultipleSchedule();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("No lessons selected.")),
-                      );
-                    }
-                  },
-                  child: const Text('Confirm'),
+                    },
+                    child: const Text('Confirm'),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

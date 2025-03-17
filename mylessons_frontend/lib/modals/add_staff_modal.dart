@@ -148,8 +148,7 @@ class _AddStaffModalState extends State<AddStaffModal> {
                     children: [
                       Text("${foundUser!['email']}"),
                       const SizedBox(height: 8),
-                      Text(
-                          "${foundUser!['first_name']} ${foundUser!['last_name']}"),
+                      Text("${foundUser!['first_name']} ${foundUser!['last_name']}"),
                     ],
                   ),
                 ),
@@ -195,8 +194,7 @@ class _AddStaffModalState extends State<AddStaffModal> {
                 style: ElevatedButton.styleFrom(
                   shape: const StadiumBorder(),
                   backgroundColor: Colors.orange,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
                 ),
                 child: const Text("Add Staff",
                     style: TextStyle(color: Colors.black, fontSize: 16)),
@@ -217,7 +215,37 @@ Future<dynamic> showAddStaffModal(BuildContext context) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (BuildContext context) {
-      return const AddStaffModal();
+      return DraggableScrollableSheet(
+        // The modal will start at 50% of screen height,
+        // can shrink to 30% and expand to a maximum of 90%.
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return SingleChildScrollView(
+            controller: scrollController,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The little draggable handle, now in orange.
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const AddStaffModal(),
+              ],
+            ),
+          );
+        },
+      );
     },
   );
 }

@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/services/api_service.dart';
@@ -18,6 +19,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _isSigningInWithGoogle = false;
+  bool _isSigningInWithApple = false;
 
   // Navigate to the email login screen.
   void _continueWithEmail() {
@@ -75,14 +77,68 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // Placeholder for Facebook sign-in.
-  void _signInWithFacebook() {
-    debugPrint('Facebook sign-in clicked');
-  }
+  Future<void> _signInWithApple() async {
+    setState(() => _isSigningInWithApple = true);
+    try {
+      // 1. Request Apple credentials
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
 
-  // Placeholder for Apple sign-in.
-  void _signInWithApple() {
-    debugPrint('Apple sign-in clicked');
+      // 2. Convert the Apple credential to a Firebase OAuth credential
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      // 3. Sign in with Firebase
+      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+
+      // 4. Get the current Firebase user and their ID token
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+
+      // 5. Send the ID token to your Django backend
+      if (idToken != null) {
+        final response = await http.post(
+          Uri.parse('$baseUrl/api/users/firebase_login/'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'firebase_token': idToken}),
+        );
+
+        final data = jsonDecode(response.body);
+
+        if (response.statusCode == 200) {
+          if (data.containsKey('token')) {
+            // Store the token securely
+            const storage = FlutterSecureStorage();
+            await storage.write(key: 'auth_token', value: data['token']);
+
+            // Navigate to the main screen
+            Navigator.pushNamedAndRemoveUntil(
+                context, '/main', (route) => false);
+          } else {
+            throw Exception("Unexpected error: Token not received.");
+          }
+        } else {
+          debugPrint('Backend error: ${response.body}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Error logging in. Please try again.')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error signing in with Apple: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error signing in with Apple.')),
+      );
+    } finally {
+      setState(() => _isSigningInWithApple = false);
+    }
   }
 
   // Extracted widget for the buttons area.
@@ -145,33 +201,21 @@ class _LoginPageState extends State<LoginPage> {
           onPressed: _isSigningInWithGoogle ? null : _signInWithGoogle,
         ),
         const SizedBox(height: 16),
-        // Continue with Facebook.
-        OutlinedButton.icon(
-          icon: const FaIcon(
-            FontAwesomeIcons.facebook,
-            color: Color(0xFF1877F2),
-          ),
-          label: const Text(
-            'Continue with Facebook',
-            style: TextStyle(fontSize: 18),
-          ),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 45),
-            side: const BorderSide(color: Colors.orange),
-            foregroundColor: Colors.orange,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(32),
-            ),
-          ),
-          onPressed: _signInWithFacebook,
-        ),
-        const SizedBox(height: 16),
         // Continue with Apple.
         OutlinedButton.icon(
-          icon: const FaIcon(
-            FontAwesomeIcons.apple,
-            color: Colors.black,
-          ),
+          icon: _isSigningInWithApple
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.orange,
+                  ),
+                )
+              : const FaIcon(
+                  FontAwesomeIcons.apple,
+                  color: Colors.black,
+                ),
           label: const Text(
             'Continue with Apple',
             style: TextStyle(fontSize: 18),
@@ -184,7 +228,7 @@ class _LoginPageState extends State<LoginPage> {
               borderRadius: BorderRadius.circular(32),
             ),
           ),
-          onPressed: _signInWithApple,
+          onPressed: _isSigningInWithApple ? null : _signInWithApple,
         ),
         const SizedBox(height: 32),
         // Bottom text.

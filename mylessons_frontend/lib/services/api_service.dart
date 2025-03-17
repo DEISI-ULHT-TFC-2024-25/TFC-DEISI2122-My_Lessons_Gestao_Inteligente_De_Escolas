@@ -4,8 +4,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-const String baseUrl = 'https://mylessons.pythonanywhere.com';
-//const String baseUrl = 'http://127.0.0.1:8000';
+//const String baseUrl = 'https://mylessons.pythonanywhere.com';
+const String baseUrl = 'http://127.0.0.1:8000';
 //const String baseUrl = 'http://192.168.1.66:8000';
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
@@ -182,7 +182,8 @@ Future<bool> canStillReschedule(int lessonId) async {
   }
 }
 
-Future<String?> schedulePrivateLesson(int lessonId, DateTime newDate, String newTime) async {
+Future<String?> schedulePrivateLesson(
+    int lessonId, DateTime newDate, String newTime) async {
   final headers = await getAuthHeaders();
   final newDateStr = DateFormat('yyyy-MM-dd').format(newDate);
   final payload = {
@@ -208,7 +209,6 @@ Future<String?> schedulePrivateLesson(int lessonId, DateTime newDate, String new
   }
 }
 
-
 Future<void> markNotificationsAsRead(List<int> notificationIds) async {
   if (notificationIds.isEmpty) return;
   final headers = await getAuthHeaders();
@@ -219,5 +219,23 @@ Future<void> markNotificationsAsRead(List<int> notificationIds) async {
   );
   if (response.statusCode != 200) {
     print("Error marking notifications as read: ${response.body}");
+  }
+}
+
+/// Fetches the school's scheduling time limit (in hours) from the API.
+/// Expects the API to return JSON with a "time_limit" key (e.g., 24).
+Future<int> fetchSchoolScheduleTimeLimit(schoolName) async {
+  final url = Uri.parse('$baseUrl/api/schools/get_school_time_limit/');
+  final response = await http.post(
+    url,
+    headers: await getAuthHeaders(),
+    body: jsonEncode({"school_name": schoolName}),
+  );
+  if (response.statusCode == 200) {
+    final Map<String, dynamic> data = json.decode(response.body);
+    return data['time_limit'] as int;
+  } else {
+    // If an error occurs, default to 0 hours.
+    return 0;
   }
 }

@@ -162,79 +162,122 @@ class _InstructorsModalState extends State<InstructorsModal> {
       return name.contains(searchQuery);
     }).toList();
 
-    // Calculate modal height as 2/3 of the screen.
-    final modalHeight = MediaQuery.of(context).size.height * 2 / 3;
-
-    return Container(
-      height: modalHeight,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 16.0,
-          right: 16.0,
-          top: 16.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min, // Wrap content height.
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Modal Header.
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Select Instructor",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Search Bar.
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: TextField(
-                decoration: InputDecoration(
-                  labelText: "Search Instructor",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  prefixIcon: const Icon(Icons.search),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    searchQuery = value.toLowerCase();
-                  });
-                },
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16.0,
+        right: 16.0,
+        top: 16.0,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // Wraps content height.
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Modal Header.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Select Instructor",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Search Bar.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: TextField(
+              decoration: InputDecoration(
+                labelText: "Search Instructor",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                prefixIcon: const Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value.toLowerCase();
+                });
+              },
             ),
-            const SizedBox(height: 8),
-            // List of Instructors.
-            Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView(
-                      children: filteredInstructors.map((instructor) {
-                        String fullName = instructor["name"] ?? "";
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                          child: ListTile(
-                            title: Text(fullName),
-                            trailing: instructor["selected"] == true
-                                ? const Icon(Icons.check_circle, color: Colors.orange)
-                                : const Icon(Icons.arrow_forward, color: Colors.orange),
-                            onTap: () => _toggleInstructorSelection(instructor),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          // List of Instructors.
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: filteredInstructors.map((instructor) {
+                    String fullName = instructor["name"] ?? "";
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: ListTile(
+                        title: Text(fullName),
+                        trailing: instructor["selected"] == true
+                            ? const Icon(Icons.check_circle, color: Colors.orange)
+                            : const Icon(Icons.arrow_forward, color: Colors.orange),
+                        onTap: () => _toggleInstructorSelection(instructor),
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ],
       ),
     );
   }
+}
+
+// Show modal function that wraps InstructorsModal with draggable behavior.
+Future<dynamic> showInstructorsModal(BuildContext context,
+    {int? lessonId, int? packId, int? schoolId}) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (BuildContext context) {
+      return DraggableScrollableSheet(
+        // The modal starts at 50% of screen height,
+        // can shrink to 30% and expand to a maximum of 90%.
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return SingleChildScrollView(
+            controller: scrollController,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The draggable handle (in orange).
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                InstructorsModal(
+                  lessonId: lessonId,
+                  packId: packId,
+                  schoolId: schoolId,
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
 }
