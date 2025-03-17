@@ -17,6 +17,7 @@ import logging
 from datetime import datetime, timedelta
 from django.utils.timezone import now
 from django.db import transaction
+from django.http import HttpResponse
 
 
 logger = logging.getLogger(__name__)
@@ -171,44 +172,27 @@ def payment_failed(request):
 
 @csrf_exempt
 def stripe_webhook(request):
-    """
-    Handles Stripe webhook for successful payments.
-    """
-    print(">>> Webhook endpoint was hit!")
-    logger.info("Webhook endpoint hit.")
     payload = request.body
-    logger.info("Webhook received with payload: %s", payload)
-    event = None
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    endpoint_secret = settings.STRIPE_WEBHOOK_SECRET  # Provided by Stripe
 
     try:
-        event = json.loads(payload)
-    except json.JSONDecodeError as e:
-        logger.error("JSON decode error: %s", e)
-        return JsonResponse({'error': str(e)}, status=400)
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError:
+        # Invalid payload
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError:
+        # Invalid signature
+        return HttpResponse(status=400)
 
-    if event.get("type") == "checkout.session.completed":
-        logger.info("Checkout session completed event received")
-        session = event["data"]["object"]
-        user_id = session["metadata"]["user_id"]
-        cart = json.loads(session["metadata"]["cart"])
-        discount = float(session["metadata"]["discount"])
-        student_ids_list = list(session["metadata"]["student_ids_list"])
-        user = UserAccount.objects.get(id=user_id)
-        students_list = []
+    # Handle the event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        # Fulfill the purchase, mark payment complete in DB, etc.
+        print("Payment was successful! Session ID:", session["id"])
 
-        for id in student_ids_list:
-            student = Student.objects.get(id = id)
-            if student:
-                students_list.append(student)
+    # ... handle other event types if needed
 
-        for item in cart:
-            pack_type = item["type"]  # "group_pack" or "private_pack"
-            school = School.objects.get(name=item["school_name"])
-            instructor = item['instructor']
-
-            # TODO check book structure (is something is missing here)
-
-            #pack = Pack.book_new_pack(students=students_list, school=school, number_of_classes=item["number_of_classes"], duration_in_minutes=item["duration_in_minutes"], instructors=[instructor], price=item["price"], discount_id=discount)
-            #if not pack:
-            #    JsonResponse({"status": "cancel"}, status=200)
-    return JsonResponse({"status": "success"}, status=200)
+    return HttpResponse(status=200)
