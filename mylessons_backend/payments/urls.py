@@ -7,5 +7,5 @@ urlpatterns = [
     path('create_checkout_session/', create_checkout_session_view, name='create_checkout_session'),
     path("test-payment/", test_payment, name="test_payment"),
     path("new_payment/", new_payment, name="new_payment"),
-     path('stripe_webhook/', my_webhook_view, name='stripe_webhook'),
+    path('stripe_webhook/', my_webhook_view, name='stripe_webhook'),
 ]
