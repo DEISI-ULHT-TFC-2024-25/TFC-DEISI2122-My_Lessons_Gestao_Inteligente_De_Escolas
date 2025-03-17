@@ -230,12 +230,9 @@ def verify_payment(request):
         return JsonResponse({"error": str(e)}, status=500)
     
 def deeplink_payment_success(request):
-    # Get the session_id from the query parameters.
     session_id = request.GET.get("session_id", "")
-    # Optionally, you can add extra logic or verification here.
-    # Redirect to the custom deep link URL.
-    return HttpResponseRedirect(f"myapp://payment-success?session_id={session_id}")
+    return redirect(f"myapp://payment-success?session_id={session_id}")
 
 def deeplink_payment_fail(request):
     session_id = request.GET.get("session_id", "")
-    return HttpResponseRedirect(f"myapp://payment-fail?session_id={session_id}")
+    return redirect(f"myapp://payment-fail?session_id={session_id}")
