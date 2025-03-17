@@ -201,7 +201,7 @@ def stripe_webhook(request):
 
             # TODO check book structure (is something is missing here)
 
-            pack = Pack.book_new_pack(students=students_list, school=school, number_of_classes=item["number_of_classes"], duration_in_minutes=item["duration_in_minutes"], instructors=[instructor], price=item["price"], discount_id=discount)
-            if not pack:
-                JsonResponse({"status": "cancel"}, status=200)
+            #pack = Pack.book_new_pack(students=students_list, school=school, number_of_classes=item["number_of_classes"], duration_in_minutes=item["duration_in_minutes"], instructors=[instructor], price=item["price"], discount_id=discount)
+            #if not pack:
+            #    JsonResponse({"status": "cancel"}, status=200)
     return JsonResponse({"status": "success"}, status=200)

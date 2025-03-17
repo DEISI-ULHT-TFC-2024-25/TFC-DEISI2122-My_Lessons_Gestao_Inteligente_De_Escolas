@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/cart_service.dart';
-import 'package:http/http.dart' as http;
 
 /// Helper function to get the currency symbol.
 String getCurrencySymbol(String currencyCode) {
@@ -21,7 +22,6 @@ class CheckoutPage extends StatefulWidget {
 
 class _CheckoutPageState extends State<CheckoutPage> {
   List<Map<String, dynamic>> get cartItems => CartService().items;
-
 
   // Derives the currency symbol from the first cart item.
   String get cartCurrencySymbol {
@@ -54,7 +54,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       CartService().removeAt(index);
     });
   }
-
 
   Future<void> _handleConfirmBooking() async {
     final cartItems = CartService().items;
@@ -117,6 +116,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final body = jsonEncode({"packs": bookings});
     final url = Uri.parse('$baseUrl/api/users/book_pack/');
     final headers = await getAuthHeaders();
+    headers['Content-Type'] = 'application/json';
 
     try {
       final response = await http.post(
@@ -190,7 +190,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     // Fetch the school's schedule time limit (in hours) from the API.
     int schoolScheduleTimeLimit = await fetchSchoolScheduleTimeLimit(lesson["school"]);
-    debugPrint( "school schedule limit: $schoolScheduleTimeLimit");
+    debugPrint("school schedule limit: $schoolScheduleTimeLimit");
 
     return await showModalBottomSheet(
       context: context,
@@ -415,15 +415,60 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _isLoading = false;
 
   /// Initiates Stripe Checkout.
-  /// This function should call your backend to create a Stripe Checkout session.
+  /// This function calls your backend to create a Stripe Checkout session using your cart data.
   Future<void> _initiateStripeCheckout() async {
     try {
-      // TODO: Replace with your actual Stripe integration.
-      final sessionUrl = 'https://checkout.stripe.com/pay/cs_test_1234567890';
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Redirecting to Stripe Checkout...")),
+      // Transform your cart items into the expected payload structure.
+      List<Map<String, dynamic>> stripeCart = CartService().items.map((item) {
+        final checkoutDetails =
+            item['service']['checkout_details'] as Map<String, dynamic>? ?? {};
+        return {
+          "type": checkoutDetails['type'] is Map
+              ? checkoutDetails['type']['pack']
+              : checkoutDetails['type'] ?? "private",
+          "number_of_classes": checkoutDetails['classes'],
+          "duration_in_minutes": checkoutDetails['duration'],
+          "price": checkoutDetails['price'],
+          "student_ids_list": item['students'] ?? [],
+          "school_name": checkoutDetails['school_name'] ?? "",
+        };
+      }).toList();
+
+      // Build the JSON payload. Adjust discount value if needed.
+      final body = jsonEncode({
+        "cart": stripeCart,
+        "discount": 0,
+      });
+
+      // Use $baseUrl for your backend endpoint.
+      final url = Uri.parse('$baseUrl/api/payments/create_checkout_session/');
+      // Await the auth headers.
+      final headers = await getAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: body,
       );
-      // Use url_launcher or similar package to open the session URL.
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final checkoutUrl = jsonResponse['url'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Redirecting to Stripe Checkout...")),
+        );
+        final uri = Uri.parse(checkoutUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        } else {
+          throw 'Could not launch checkout session URL';
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error initiating Stripe Checkout: ${response.body}")),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Stripe checkout error: $e")),
