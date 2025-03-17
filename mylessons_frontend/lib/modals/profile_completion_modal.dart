@@ -86,167 +86,177 @@ class _ProfileCompletionModalState extends State<ProfileCompletionModal> {
 
   @override
   Widget build(BuildContext context) {
-    // Use a Container that sizes to its content.
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min, // size to content
-        children: [
-          // Orange handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.orange,
-              borderRadius: BorderRadius.circular(2),
+    final screenHeight = MediaQuery.of(context).size.height;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    // When keyboard is visible, use 90% of screen height; otherwise, 50%.
+    final modalHeight =
+        keyboardHeight > 0 ? screenHeight * 0.9 : screenHeight * 0.5;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      height: modalHeight,
+      // This padding prevents content from being overlapped by the keyboard.
+      padding: EdgeInsets.only(bottom: keyboardHeight),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Orange handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.orange,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 300, // fixed height for the modal content
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                // STEP 1: First Name & Last Name
-                SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Step 1 of 2",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+            const SizedBox(height: 16),
+            // Use Flexible to let the PageView expand within available space.
+            Flexible(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  // STEP 1: First Name & Last Name
+                  SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Step 1 of 2",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _firstNameController,
-                        decoration: const InputDecoration(
-                          labelText: "First Name",
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _firstNameController,
+                          decoration: const InputDecoration(
+                            labelText: "First Name",
+                            border: OutlineInputBorder(),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _lastNameController,
-                        decoration: const InputDecoration(
-                          labelText: "Last Name",
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _lastNameController,
+                          decoration: const InputDecoration(
+                            labelText: "Last Name",
+                            border: OutlineInputBorder(),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: ElevatedButton(
-                          onPressed: _isStep1Valid ? _nextPage : null,
-                          child: const Text("Next"),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: _isStep1Valid ? _nextPage : null,
+                            child: const Text("Next"),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                // STEP 2: Country Picker (ID) & Phone
-                SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: _previousPage,
-                            icon: const Icon(Icons.arrow_back),
-                          ),
-                          const Spacer(),
-                          const Text(
-                            "Step 2 of 2",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                  // STEP 2: Country Picker (ID) & Phone
+                  SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: _previousPage,
+                              icon: const Icon(Icons.arrow_back),
                             ),
-                          ),
-                          const Spacer(),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Country picker on the left, similar to register_page.dart
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              showCountryPicker(
-                                context: context,
-                                onSelect: (Country country) {
-                                  setState(() {
-                                    _selectedCountry = country;
-                                  });
-                                },
-                                countryListTheme: CountryListThemeData(
-                                  flagSize: 25,
-                                  backgroundColor: Colors.white,
-                                  textStyle: const TextStyle(
-                                      fontSize: 16, color: Colors.black),
-                                  bottomSheetHeight: 500,
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(20.0),
-                                    topRight: Radius.circular(20.0),
+                            const Spacer(),
+                            const Text(
+                              "Step 2 of 2",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Spacer(),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                showCountryPicker(
+                                  context: context,
+                                  onSelect: (Country country) {
+                                    setState(() {
+                                      _selectedCountry = country;
+                                    });
+                                  },
+                                  countryListTheme: CountryListThemeData(
+                                    flagSize: 25,
+                                    backgroundColor: Colors.white,
+                                    textStyle: const TextStyle(
+                                        fontSize: 16, color: Colors.black),
+                                    bottomSheetHeight: 500,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(20.0),
+                                      topRight: Radius.circular(20.0),
+                                    ),
                                   ),
+                                );
+                              },
+                              child: Container(
+                                height: 56,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                              );
-                            },
-                            child: Container(
-                              height: 56,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "${_selectedCountry.flagEmoji} +${_selectedCountry.phoneCode}",
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.arrow_drop_down,
-                                      color: Colors.grey),
-                                ],
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      "${_selectedCountry.flagEmoji} +${_selectedCountry.phoneCode}",
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.arrow_drop_down,
+                                        color: Colors.grey),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Phone input field
-                          Expanded(
-                            child: TextField(
-                              controller: _phoneController,
-                              decoration: const InputDecoration(
-                                labelText: "Phone",
-                                border: OutlineInputBorder(),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _phoneController,
+                                decoration: const InputDecoration(
+                                  labelText: "Phone",
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.phone,
                               ),
-                              keyboardType: TextInputType.phone,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: ElevatedButton(
-                          onPressed: _isStep2Valid ? _nextPage : null,
-                          child: const Text("Submit"),
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: _isStep2Valid ? _nextPage : null,
+                            child: const Text("Submit"),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
