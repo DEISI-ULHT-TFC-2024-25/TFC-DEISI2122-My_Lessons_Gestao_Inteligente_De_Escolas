@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
+import 'payment_fail_page.dart';
+import 'payment_success_page.dart';
 
 class PaymentsPage extends StatefulWidget {
   const PaymentsPage({Key? key}) : super(key: key);
@@ -224,6 +227,93 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
+  bool _isLoading = false;
+
+  ///////////////// Stripe Payment Integration ///////////////////
+
+  bool _stripeLoading = false;
+  String? _stripeClientSecret;
+  String? _stripeError;
+  double _discount = 0.0;
+
+  Future<void> _createDebtPaymentIntentStripe() async {
+    setState(() {
+      _stripeLoading = true;
+      _stripeError = null;
+    });
+    try {
+      // Extract a list of pack IDs from the _unpaid items.
+      // (Adjust the key 'id' if your pack ID is stored under a different field.)
+      List<dynamic> packIds = _unpaid.map((item) => item['id']).toList();
+      final Map<String, dynamic> payload = {
+        "pack_ids":
+            packIds, // Pass the pack IDs so the backend can later remove the debt.
+      };
+
+      final url =
+          Uri.parse('$baseUrl/api/payments/create_debt_payment_intent/');
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _stripeClientSecret = data["clientSecret"];
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: _stripeClientSecret!,
+            merchantDisplayName: 'My Lessons',
+          ),
+        );
+      } else {
+        setState(() {
+          _stripeError = "Error creating PaymentIntent: ${response.body}";
+        });
+        debugPrint("Error creating PaymentIntent: ${response.body}");
+      }
+    } catch (e) {
+      setState(() {
+        _stripeError = "Exception in _createDebtPaymentIntentStripe: $e";
+      });
+      debugPrint("Exception in _createDebtPaymentIntentStripe: $e");
+    }
+    setState(() {
+      _stripeLoading = false;
+    });
+  }
+
+  Future<void> _presentPaymentSheetStripe() async {
+    try {
+      await Stripe.instance.presentPaymentSheet();
+      // Payment succeeded: clear the cart and navigate to PaymentSuccessPage.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PaymentSuccessPage()),
+      );
+    } catch (e) {
+      debugPrint("PaymentSheet error: $e");
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PaymentFailPage()),
+      );
+    }
+  }
+
+  Future<void> _handleDebtStripePayment() async {
+    await _createDebtPaymentIntentStripe();
+    if (_stripeClientSecret != null) {
+      await _presentPaymentSheetStripe();
+    } else if (_stripeError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_stripeError!)),
+      );
+    }
+  }
+
   Widget _buildDetailsModalContent({
     required String formattedDate,
     required String formattedTime,
@@ -336,7 +426,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  // ---------------- Parent Tabs ----------------
   Widget _buildParentUnpaidTab() {
     return RefreshIndicator(
       onRefresh: _fetchData,
@@ -361,16 +450,19 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: () {
-                    // Implement payment flow.
-                  },
+                  onPressed: _handleDebtStripePayment,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(32)),
                   ),
-                  child: const Text("Pay Debt",
-                      style: TextStyle(color: Colors.white)),
+                  child: _stripeLoading
+                      ? const CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        )
+                      : const Text("Pay Debt",
+                          style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -379,8 +471,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 ? Text("No unpaid items",
                     style: GoogleFonts.lato(color: Colors.black54))
                 : Column(
-                    children:
-                        _unpaid.map((item) => _buildHistoryRow(item)).toList(),
+                    children: _unpaid.map((item) => _buildCard(item)).toList(),
                   ),
           ],
         ),
@@ -446,8 +537,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
               )
             else
               Column(
-                children:
-                    filtered.map((item) => _buildHistoryRow(item)).toList(),
+                children: filtered.map((item) => _buildCard(item)).toList(),
               ),
           ],
         ),
@@ -456,7 +546,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   }
 
   // Shared history row for Parent/Instructor.
-  Widget _buildHistoryRow(Map<String, dynamic> item) {
+  Widget _buildCard(Map<String, dynamic> item) {
     final dateStr = item['date'] ?? "2025-01-15";
     final timeStr = item['time'] ?? "09:00";
     final dateTimeStr = "$dateStr $timeStr";
@@ -628,9 +718,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 ? Text("No unpaid items",
                     style: GoogleFonts.lato(color: Colors.black54))
                 : Column(
-                    children: _userDebt
-                        .map((item) => _buildHistoryRow(item))
-                        .toList(),
+                    children:
+                        _userDebt.map((item) => _buildCard(item)).toList(),
                   ),
           );
   }
@@ -709,9 +798,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _adminHistory
-                        .map((item) => _buildHistoryRow(item))
-                        .toList(),
+                    children:
+                        _adminHistory.map((item) => _buildCard(item)).toList(),
                   ),
           );
   }

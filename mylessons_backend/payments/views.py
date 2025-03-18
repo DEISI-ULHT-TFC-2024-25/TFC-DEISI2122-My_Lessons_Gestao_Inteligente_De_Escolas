@@ -173,6 +173,55 @@ def create_payment_intent_view(request):
     
     return JsonResponse({"error": "Method not allowed"}, status=405)
 
+@csrf_exempt
+def create_debt_payment_intent_view(request):
+    """
+    Creates a Stripe PaymentIntent for the unpaid packs.
+    
+    Expected JSON payload:
+      {
+         "pack_ids": [1, 2, 3, ...]
+      }
+    
+    It calculates the total amount due based on the price of each Pack,
+    converts the total amount to cents (assuming prices are in euros),
+    and creates a PaymentIntent using Stripe.
+    
+    The response returns the client secret of the PaymentIntent.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            pack_ids = data.get("pack_ids", [])
+            if not pack_ids:
+                return JsonResponse({"error": "No pack_ids provided"}, status=400)
+            
+            # Retrieve all Pack objects with IDs in pack_ids.
+            packs = Pack.objects.filter(id__in=pack_ids)
+            if not packs.exists():
+                return JsonResponse({"error": "No valid packs found for provided IDs"}, status=400)
+            
+            # Calculate the total price (assuming each pack has a 'price' field)
+            total_price = sum(pack.price for pack in packs)
+            
+            # Convert the total price to cents (assuming the price is in euros)
+            amount_in_cents = int(total_price * 100)
+            
+            # Create a PaymentIntent with Stripe
+            intent = stripe.PaymentIntent.create(
+                amount=amount_in_cents,
+                currency="eur",
+                payment_method_types=["card"],
+                metadata={
+                    "user_id": str(request.user.id) if request.user.is_authenticated else "anonymous",
+                    "pack_ids": json.dumps(pack_ids),
+                }
+            )
+            return JsonResponse({"clientSecret": intent.client_secret}, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+    
+    return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @csrf_exempt
 def create_checkout_session_view(request):
@@ -311,6 +360,7 @@ def unpaid_items_view(request):
     items = []
     for pack in unpaid_packs:
         items.append({
+            "pack_id": str(pack.id),
             "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
             "time": pack.date_time.strftime("%H:%M") if pack.date_time else "09:00",
             "description": str(pack),  # Adjust as needed.
@@ -421,7 +471,7 @@ def school_unpaid_items_view(request):
     data = []
     for pack in packs:
         data.append({
-            "id": str(pack.id),
+            "pack_id": str(pack.id),
             "students_name": pack.get_students_name(),  # Call the method to get students' names.
             "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
             "time": pack.date_time.strftime("%H:%M") if pack.date_time else "09:00",
