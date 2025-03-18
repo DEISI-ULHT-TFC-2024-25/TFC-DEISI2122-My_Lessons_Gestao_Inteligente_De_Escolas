@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from django.utils.timezone import now
 from django.db import transaction
 from django.http import HttpResponse
+from django.db.models import Q
 
 
 logger = logging.getLogger(__name__)
@@ -321,8 +322,14 @@ def unpaid_items_view(request):
 @permission_classes([IsAuthenticated])
 def payment_history_view(request):
     """
-    Returns the payment history for the current user.
-    For Parent users, for each Payment, returns the date, description (which is a JSON field), and the payment amount.
+    Returns the full payment history for the current user.
+    For Parent users, for each Payment, returns:
+      - date (formatted as "YYYY-MM-DD")
+      - time (formatted as "HH:mm")
+      - school (the school name, if available)
+      - description (which is a JSON field or string)
+      - amount
+    Filtering is done on the front end.
     """
     user = request.user
     if getattr(user, 'current_role', None) != "Parent":
@@ -333,9 +340,12 @@ def payment_history_view(request):
     for pay in payments:
         history.append({
             "date": pay.date.strftime("%Y-%m-%d"),
-            "description": pay.description,  # Adjust as needed.
+            "time": pay.time.strftime("%H:%M"),
+            "school": pay.school.name if pay.school else "",
+            "description": pay.description,
             "amount": str(pay.value),
         })
+    
     return Response(history, status=status.HTTP_200_OK)
 
 
@@ -354,3 +364,33 @@ def redulate_debt_view(request):
     total_debt = sum([pack.debt for pack in unpaid_packs]) if unpaid_packs.exists() else Decimal('0.00')
     # Optionally perform additional logic (such as updating model values) here.
     return Response({"message": "Debt recalculated", "current_debt": str(total_debt)}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def instructor_payment_history(request):
+    """
+    Returns the full payment history for the current user.
+    For Parent users, for each Payment, returns:
+      - date (formatted as "YYYY-MM-DD")
+      - time (formatted as "HH:mm")
+      - school (the school name, if available)
+      - description (which is a JSON field or string)
+      - amount
+    Filtering is done on the front end.
+    """
+    user = request.user
+    if getattr(user, 'current_role', None) != "Instructor":
+        return Response({"detail": "This endpoint is not available for your role."}, status=status.HTTP_200_OK)
+    
+    payments = Payment.objects.filter(instructor=user.instructor_profile).order_by('-date', '-time')
+    history = []
+    for pay in payments:
+        history.append({
+            "date": pay.date.strftime("%Y-%m-%d"),
+            "time": pay.time.strftime("%H:%M"),
+            "school": pay.school.name if pay.school else "",
+            "description": pay.description,
+            "amount": str(pay.value),
+        })
+    
+    return Response(history, status=status.HTTP_200_OK)

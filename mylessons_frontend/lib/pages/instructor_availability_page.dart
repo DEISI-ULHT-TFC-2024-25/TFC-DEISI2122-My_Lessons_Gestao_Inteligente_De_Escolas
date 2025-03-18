@@ -832,7 +832,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             onPressed: () => _submitDefinition(false),
-            child: Text("Save As Available",
+            child: Text("Available",
                 style: GoogleFonts.lato(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -841,7 +841,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => _submitDefinition(true),
-            child: Text("Save As Unavailability",
+            child: Text("Unavailable",
                 style: GoogleFonts.lato(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
