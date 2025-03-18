@@ -1,8 +1,10 @@
+from decimal import Decimal
 from events.models import Activity, BirthdayParty, CampOrder
 from payments.models import Payment
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -275,3 +277,80 @@ def verify_payment(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def payments_debt_view(request):
+    """
+    Returns the current outstanding debt for the authenticated user.
+    For Parent users, sums the debt of every pack where the user is in pack.parents.all() and the pack's debt is > 0.
+    """
+    user = request.user
+    if getattr(user, 'current_role', None) != "Parent":
+        return Response({"detail": "This endpoint is not available for your role."}, status=status.HTTP_200_OK)
+    
+    unpaid_packs = Pack.objects.filter(parents=user, debt__gt=0)
+    total_debt = sum([pack.debt for pack in unpaid_packs]) if unpaid_packs.exists() else Decimal('0.00')
+    return Response({"current_debt": str(total_debt)}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unpaid_items_view(request):
+    """
+    Returns a list of unpaid items for the current user.
+    For Parent users, an unpaid item is defined as a pack where the user is among pack.parents and the debt is > 0.
+    Each item returns its date, a description, and the remaining amount (debt).
+    """
+    user = request.user
+    if getattr(user, 'current_role', None) != "Parent":
+        return Response({"detail": "This endpoint is not available for your role."}, status=status.HTTP_200_OK)
+    
+    unpaid_packs = Pack.objects.filter(parents=user, debt__gt=0)
+    items = []
+    for pack in unpaid_packs:
+        items.append({
+            "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
+            "description": pack.get_students_name(),  # Adjust as needed.
+            "amount": str(pack.debt) if pack.debt else "0.00",
+        })
+    return Response(items, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def payment_history_view(request):
+    """
+    Returns the payment history for the current user.
+    For Parent users, for each Payment, returns the date, description (which is a JSON field), and the payment amount.
+    """
+    user = request.user
+    if getattr(user, 'current_role', None) != "Parent":
+        return Response({"detail": "This endpoint is not available for your role."}, status=status.HTTP_200_OK)
+    
+    payments = Payment.objects.filter(user=user).order_by('-date', '-time')
+    history = []
+    for pay in payments:
+        history.append({
+            "date": pay.date.strftime("%Y-%m-%d"),
+            "description": pay.description,  # Adjust as needed.
+            "amount": str(pay.value),
+        })
+    return Response(history, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def redulate_debt_view(request):
+    """
+    "Redulate Debt" recalculates the current outstanding debt for the user.
+    For Parent users, it sums the debt on all packs where the user is among pack.parents and debt > 0.
+    """
+    user = request.user
+    if getattr(user, 'current_role', None) != "Parent":
+        return Response({"detail": "This endpoint is not available for your role."}, status=status.HTTP_200_OK)
+    
+    unpaid_packs = Pack.objects.filter(parents=user, debt__gt=0)
+    total_debt = sum([pack.debt for pack in unpaid_packs]) if unpaid_packs.exists() else Decimal('0.00')
+    # Optionally perform additional logic (such as updating model values) here.
+    return Response({"message": "Debt recalculated", "current_debt": str(total_debt)}, status=status.HTTP_200_OK)

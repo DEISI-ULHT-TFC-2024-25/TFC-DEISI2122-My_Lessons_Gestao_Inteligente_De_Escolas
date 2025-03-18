@@ -59,12 +59,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     setInitialDate();
-    fetchData().then((_) {
-      // After fetching data, if there are new booked packs, open the modals.
-      if (widget.newBookedPacks.isNotEmpty) {
-        _openScheduleModalsSequentially(widget.newBookedPacks);
-      }
-    });
+    fetchData();
   }
 
   void setInitialDate() {
@@ -286,37 +281,37 @@ class _HomePageState extends State<HomePage> {
       markNotificationsAsRead(notificationIds);
 
   Future<void> _promptProfileCompletion() async {
-    final result = await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      isDismissible: false,
-      isScrollControlled: true,
-      builder: (context) => const ProfileCompletionModal(),
-    );
+  final result = await showModalBottomSheet<Map<String, String>>(
+    context: context,
+    isDismissible: false,
+    isScrollControlled: true,
+    builder: (context) => const ProfileCompletionModal(),
+  );
 
-    if (result != null) {
-      // Build the payload using the modal result for first/last name, country code, and phone.
-      final payload = {
-        'first_name': result['firstName']!,
-        'last_name': result['lastName']!,
-        // Use existing values from your profile page controllers (or other stored values)
-        'country_code':
-            result['id']!, // In our modal, 'id' holds the country code.
-        'phone': result['phone']!,
-      };
+  if (result != null) {
+    // Build the payload using the modal result for first/last name, country code, and phone.
+    final payload = {
+      'first_name': result['firstName']!,
+      'last_name': result['lastName']!,
+      // Use existing values from your profile page controllers (or other stored values)
+      'country_code': result['id']!, // In our modal, 'id' holds the country code.
+      'phone': result['phone']!,
+    };
 
-      try {
-        final message = await ProfileService.updateProfileData(payload);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-        await fetchData();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error updating profile: $e")),
-        );
-      }
+    try {
+      final message = await ProfileService.updateProfileData(payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      await fetchData();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error updating profile: $e")),
+      );
     }
   }
+}
+
 
   _showLessonDetailsModal(lesson) {
     showModalBottomSheet(
@@ -348,23 +343,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _openScheduleModalsSequentially(
-      List<dynamic> bookedPacks) async {
-    // For each booked pack, show the schedule_multiple_lessons modal.
-    // It is assumed that each pack object has a "lessons" list and an "expiration_date".
-    for (var pack in bookedPacks) {
-      // Await the modal to close before moving on to the next one.
-      await _showScheduleMultipleLessonsModal(
-          pack['lessons'], pack["expiration_date"]);
-      // Optionally, you could add a short delay or check if the user canceled.
-    }
-  }
-
   Future<void> _showScheduleMultipleLessonsModal(
       List<dynamic> lessons, String expirationDate) async {
     int schoolScheduleTimeLimit =
         await fetchSchoolScheduleTimeLimit(lessons.first["school"]);
-    await showModalBottomSheet(
+    showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) => ScheduleMultipleLessonsModal(
@@ -833,6 +816,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+
+    final initialTabIndex = widget.newBookedPacks.isNotEmpty ? 2 : 0;
+
     final tabs = const [
       Tab(text: "Next Lessons"),
       Tab(text: "Last Lessons"),
@@ -1065,6 +1051,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: DefaultTabController(
                   length: tabs.length,
+                  initialIndex: initialTabIndex,
                   child: Column(
                     children: [
                       TabBar(

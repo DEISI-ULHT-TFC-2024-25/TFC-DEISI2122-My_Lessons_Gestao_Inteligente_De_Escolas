@@ -21,9 +21,10 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
-   WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
   // Initialize Stripe with your publishable key
-  Stripe.publishableKey = 'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
+  Stripe.publishableKey =
+      'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
   // ... Initialize Firebase if needed, etc.
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -47,9 +48,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
   }
-
-  
-
 
   @override
   void dispose() {
@@ -95,25 +93,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           headerBackgroundColor: Colors.orange,
           headerForegroundColor: Colors.white,
           todayBorder: const BorderSide(color: Colors.orange, width: 1.5),
-          dayForegroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
+          dayForegroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
               return Colors.white;
             }
             return null;
           }),
-          dayBackgroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
+          dayBackgroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
               return Colors.orange;
             }
             return null;
           }),
-          todayForegroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
+          todayForegroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
               return Colors.white;
             }
             return Colors.orange;
           }),
-          todayBackgroundColor: MaterialStateProperty.resolveWith<Color?>((states) {
+          todayBackgroundColor:
+              MaterialStateProperty.resolveWith<Color?>((states) {
             if (states.contains(MaterialState.selected)) {
               return Colors.orange;
             }
@@ -177,7 +179,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       initialRoute: '/',
       routes: {
         '/': (context) => LandingPage(),
-        '/main': (context) => const MainScreen(),
+        '/main': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>? ??
+              {};
+          return MainScreen(newBookedPacks: args['newBookedPacks'] ?? []);
+        },
         '/login': (context) => const LoginPage(),
         '/register_landing_page': (context) => const RegisterLandingPage(),
         '/register_page': (context) => const RegisterPage(),
