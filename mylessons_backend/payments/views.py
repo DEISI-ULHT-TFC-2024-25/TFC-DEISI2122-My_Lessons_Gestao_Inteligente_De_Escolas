@@ -421,7 +421,7 @@ def school_unpaid_items_view(request):
     for pack in packs:
         data.append({
             "id": str(pack.id),
-            "students_name": pack.getStudentsName(),  # Call the method to get students' names.
+            "students_name": pack.get_students_name(),  # Call the method to get students' names.
             "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
             "debt": str(pack.debt),
         })

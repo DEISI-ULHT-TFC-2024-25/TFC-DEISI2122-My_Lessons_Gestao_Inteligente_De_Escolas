@@ -104,9 +104,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Future<void> _fetchAdminData() async {
     final headers = await getAuthHeaders();
     try {
-      final debtRes = await http.get(Uri.parse('$baseUrl/api/payments/unpaid_items/'), headers: headers);
-      final upcomingRes = await http.get(Uri.parse('$baseUrl/api/admin/payments/upcoming_payouts/'), headers: headers);
-      final historyRes = await http.get(Uri.parse('$baseUrl/api/admin/payments/school_payment_history/'), headers: headers);
+      final debtRes = await http.get(Uri.parse('$baseUrl/api/payments/school_unpaid_items/'), headers: headers);
+      final upcomingRes = await http.get(Uri.parse('$baseUrl/api/payments/upcoming_payouts/'), headers: headers);
+      final historyRes = await http.get(Uri.parse('$baseUrl/api/payments/school_payment_history/'), headers: headers);
 
       // Check for iterable type or a dictionary wrapping the list.
       final decodedDebt = json.decode(debtRes.body);
