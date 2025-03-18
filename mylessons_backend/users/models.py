@@ -3,6 +3,8 @@ from decimal import Decimal
 import logging
 from django.contrib.auth.models import AbstractUser,  Group, Permission
 from django.db import models
+
+from payments.models import Payment
 from .utils import get_phone
 from django.utils import timezone
 
@@ -37,6 +39,58 @@ class UserAccount(AbstractUser):
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+    
+    def get_balance_history_since_last_payout(self):
+        """
+        Returns a filtered list of balance_history transactions that occurred
+        after the last payment that qualifies as a payout.
+        
+        A payment qualifies as a payout if:
+        - payment.instructor matches self.instructor_profile, or
+        - payment.monitor matches self.monitor_profile, or
+        - if neither instructor nor monitor is set, payment.user == self.
+        
+        Note: differences in date, time, school, and description are ignored.
+        """
+        # Get Payment objects for this user in reverse chronological order.
+        payments = Payment.objects.filter(user=self).order_by('-date', '-time')
+        last_payout_payment = None
+
+        for payment in payments:
+            # Check if the payment has an instructor that matches the user's profile.
+            if payment.instructor and getattr(self, 'instructor_profile', None):
+                if payment.instructor.id == self.instructor_profile.id:
+                    last_payout_payment = payment
+                    break
+            # Otherwise, check if the payment has a monitor that matches the user's profile.
+            if payment.monitor and getattr(self, 'monitor_profile', None):
+                if payment.monitor.id == self.monitor_profile.id:
+                    last_payout_payment = payment
+                    break
+            # If there is no instructor/monitor, use the payment if it belongs to the user.
+            if payment.user.id == self.id:
+                last_payout_payment = payment
+                break
+
+        # If no payout is found, return the entire balance_history.
+        if not last_payout_payment:
+            return self.balance_history
+
+        # Combine the payment date and time to form a datetime.
+        last_payout_dt = datetime.combine(last_payout_payment.date, last_payout_payment.time)
+
+        # Filter balance_history transactions that have a timestamp later than last_payout_dt.
+        filtered_history = []
+        for entry in self.balance_history:
+            try:
+                entry_dt = datetime.fromisoformat(entry["timestamp"])
+                if entry_dt > last_payout_dt:
+                    filtered_history.append(entry)
+            except Exception:
+                # Skip entries with invalid timestamps.
+                continue
+
+        return filtered_history
     
     def update_balance(self, amount, message):
         """
@@ -75,6 +129,7 @@ class UserAccount(AbstractUser):
         
         # Save changes to the instance
         self.save(update_fields=["balance", "balance_history"])
+        
 
 
 class Student(models.Model):

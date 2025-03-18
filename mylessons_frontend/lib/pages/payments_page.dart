@@ -61,9 +61,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Future<void> _fetchParentData() async {
     final headers = await getAuthHeaders();
     try {
-      final debtRes = await http.get(Uri.parse('$baseUrl/api/payments/debt/'), headers: headers);
-      final unpaidRes = await http.get(Uri.parse('$baseUrl/api/payments/unpaid_items/'), headers: headers);
-      final historyRes = await http.get(Uri.parse('$baseUrl/api/payments/history/'), headers: headers);
+      final debtRes = await http.get(Uri.parse('$baseUrl/api/payments/debt/'),
+          headers: headers);
+      final unpaidRes = await http.get(
+          Uri.parse('$baseUrl/api/payments/unpaid_items/'),
+          headers: headers);
+      final historyRes = await http
+          .get(Uri.parse('$baseUrl/api/payments/history/'), headers: headers);
 
       if (debtRes.statusCode == 200) {
         final decoded = json.decode(debtRes.body);
@@ -73,7 +77,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
         _unpaid = List<Map<String, dynamic>>.from(json.decode(unpaidRes.body));
       }
       if (historyRes.statusCode == 200) {
-        _parentHistory = List<Map<String, dynamic>>.from(json.decode(historyRes.body));
+        _parentHistory =
+            List<Map<String, dynamic>>.from(json.decode(historyRes.body));
       }
     } catch (e) {
       debugPrint("Error fetching Parent data: $e");
@@ -84,11 +89,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Future<void> _fetchInstructorData() async {
     final headers = await getAuthHeaders();
     try {
-      final historyRes = await http.get(Uri.parse('$baseUrl/api/payments/instructor_payment_history/'), headers: headers);
+      final historyRes = await http.get(
+          Uri.parse('$baseUrl/api/payments/instructor_payment_history/'),
+          headers: headers);
       if (historyRes.statusCode == 200) {
-        _instructorHistory = List<Map<String, dynamic>>.from(json.decode(historyRes.body));
+        _instructorHistory =
+            List<Map<String, dynamic>>.from(json.decode(historyRes.body));
       }
-      final balanceResponse = await http.get(Uri.parse('$baseUrl/api/users/current_balance/'), headers: headers);
+      final balanceResponse = await http.get(
+          Uri.parse('$baseUrl/api/users/current_balance/'),
+          headers: headers);
       if (balanceResponse.statusCode == 200) {
         final b = json.decode(balanceResponse.body)['current_balance'];
         _balance = double.tryParse(b.toString()) ?? 0.0;
@@ -104,9 +114,15 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Future<void> _fetchAdminData() async {
     final headers = await getAuthHeaders();
     try {
-      final debtRes = await http.get(Uri.parse('$baseUrl/api/payments/school_unpaid_items/'), headers: headers);
-      final upcomingRes = await http.get(Uri.parse('$baseUrl/api/payments/upcoming_payouts/'), headers: headers);
-      final historyRes = await http.get(Uri.parse('$baseUrl/api/payments/school_payment_history/'), headers: headers);
+      final debtRes = await http.get(
+          Uri.parse('$baseUrl/api/payments/school_unpaid_items/'),
+          headers: headers);
+      final upcomingRes = await http.get(
+          Uri.parse('$baseUrl/api/payments/upcoming_payouts/'),
+          headers: headers);
+      final historyRes = await http.get(
+          Uri.parse('$baseUrl/api/payments/school_payment_history/'),
+          headers: headers);
 
       // Check for iterable type or a dictionary wrapping the list.
       final decodedDebt = json.decode(debtRes.body);
@@ -121,8 +137,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
       final decodedUpcoming = json.decode(upcomingRes.body);
       if (decodedUpcoming is List) {
         _upcomingPayouts = List<Map<String, dynamic>>.from(decodedUpcoming);
-      } else if (decodedUpcoming is Map && decodedUpcoming.containsKey("data")) {
-        _upcomingPayouts = List<Map<String, dynamic>>.from(decodedUpcoming["data"]);
+      } else if (decodedUpcoming is Map &&
+          decodedUpcoming.containsKey("data")) {
+        _upcomingPayouts =
+            List<Map<String, dynamic>>.from(decodedUpcoming["data"]);
       } else {
         _upcomingPayouts = [];
       }
@@ -143,7 +161,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Future<void> _redulateDebt() async {
     try {
       final headers = await getAuthHeaders();
-      final response = await http.post(Uri.parse('$baseUrl/api/payments/redulate_debt/'), headers: headers);
+      final response = await http.post(
+          Uri.parse('$baseUrl/api/payments/redulate_debt/'),
+          headers: headers);
       if (response.statusCode == 200) {
         await _fetchData();
       } else {
@@ -163,7 +183,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
     final formattedDate = DateFormat("d MMM yyyy").format(parsedDate);
     final formattedTime = DateFormat("HH:mm").format(parsedDate);
     final school = (item['school'] ?? "").toString();
-    final amount = double.tryParse(item['amount']?.toString() ?? "0")?.toStringAsFixed(2) ?? "0.00";
+    final amount = double.tryParse(item['amount']?.toString() ?? "0")
+            ?.toStringAsFixed(2) ??
+        "0.00";
     final desc = item['description'];
     String detailsStr;
     if (desc is String) {
@@ -178,7 +200,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (BuildContext context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -211,13 +234,18 @@ class _PaymentsPageState extends State<PaymentsPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text("Payment Details", style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text("Payment Details",
+            style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildInfoCard(Icons.calendar_today, "DATE", formattedDate)),
+            Expanded(
+                child: _buildInfoCard(
+                    Icons.calendar_today, "DATE", formattedDate)),
             const SizedBox(width: 8),
-            Expanded(child: _buildInfoCard(Icons.access_time, "TIME", formattedTime)),
+            Expanded(
+                child:
+                    _buildInfoCard(Icons.access_time, "TIME", formattedTime)),
           ],
         ),
         const SizedBox(height: 8),
@@ -225,7 +253,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
           children: [
             Expanded(child: _buildInfoCard(Icons.school, "SCHOOL", school)),
             const SizedBox(width: 8),
-            Expanded(child: _buildInfoCard(Icons.attach_money, "AMOUNT", "$amount€")),
+            Expanded(
+                child:
+                    _buildInfoCard(Icons.attach_money, "AMOUNT", "$amount€")),
           ],
         ),
         const SizedBox(height: 8),
@@ -235,7 +265,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
           onPressed: () => Navigator.pop(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.orange,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
           ),
           child: const Text("Close", style: TextStyle(color: Colors.white)),
         ),
@@ -259,9 +290,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: GoogleFonts.lato(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                  Text(label,
+                      style: GoogleFonts.lato(
+                          fontSize: 12, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
-                  Text(value, style: GoogleFonts.lato(fontSize: 12), overflow: TextOverflow.ellipsis),
+                  Text(value,
+                      style: GoogleFonts.lato(fontSize: 12),
+                      overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -286,7 +322,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: GoogleFonts.lato(fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(label,
+                      style: GoogleFonts.lato(
+                          fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(value, style: GoogleFonts.lato(fontSize: 12)),
                 ],
@@ -314,7 +352,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 Flexible(
                   child: Text(
                     "${_debt.toStringAsFixed(2)}€",
-                    style: GoogleFonts.lato(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+                    style: GoogleFonts.lato(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -325,17 +366,21 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32)),
                   ),
-                  child: const Text("Pay Debt", style: TextStyle(color: Colors.white)),
+                  child: const Text("Pay Debt",
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
             const Divider(height: 32),
             _unpaid.isEmpty
-                ? Text("No unpaid items", style: GoogleFonts.lato(color: Colors.black54))
+                ? Text("No unpaid items",
+                    style: GoogleFonts.lato(color: Colors.black54))
                 : Column(
-                    children: _unpaid.map((item) => _buildHistoryRow(item)).toList(),
+                    children:
+                        _unpaid.map((item) => _buildHistoryRow(item)).toList(),
                   ),
           ],
         ),
@@ -348,11 +393,18 @@ class _PaymentsPageState extends State<PaymentsPage> {
       final dateStr = (item['date'] ?? "2025-01-15").toString();
       final timeStr = (item['time'] ?? "09:00").toString();
       final dtParsed = DateTime.tryParse("$dateStr $timeStr") ?? DateTime.now();
-      final dtFormatted = DateFormat("d MMM yyyy 'at' HH:mm").format(dtParsed).toLowerCase();
+      final dtFormatted =
+          DateFormat("d MMM yyyy 'at' HH:mm").format(dtParsed).toLowerCase();
       final school = (item['school'] ?? "").toString().toLowerCase();
-      final amountStr = (double.tryParse(item['amount']?.toString() ?? "0")?.toStringAsFixed(2) ?? "0.00").toLowerCase();
+      final amountStr = (double.tryParse(item['amount']?.toString() ?? "0")
+                  ?.toStringAsFixed(2) ??
+              "0.00")
+          .toLowerCase();
       final query = _historySearchQuery.toLowerCase();
-      return query.isEmpty || dtFormatted.contains(query) || school.contains(query) || amountStr.contains(query);
+      return query.isEmpty ||
+          dtFormatted.contains(query) ||
+          school.contains(query) ||
+          amountStr.contains(query);
     }).toList();
 
     return RefreshIndicator(
@@ -383,16 +435,19 @@ class _PaymentsPageState extends State<PaymentsPage> {
             ),
             if (filtered.isEmpty)
               Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 color: Colors.grey[50],
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text('No payment history', style: GoogleFonts.lato(color: Colors.black54)),
+                  child: Text('No payment history',
+                      style: GoogleFonts.lato(color: Colors.black54)),
                 ),
               )
             else
               Column(
-                children: filtered.map((item) => _buildHistoryRow(item)).toList(),
+                children:
+                    filtered.map((item) => _buildHistoryRow(item)).toList(),
               ),
           ],
         ),
@@ -406,8 +461,11 @@ class _PaymentsPageState extends State<PaymentsPage> {
     final timeStr = item['time'] ?? "09:00";
     final dateTimeStr = "$dateStr $timeStr";
     final parsedDate = DateTime.tryParse(dateTimeStr) ?? DateTime.now();
-    final formattedDate = DateFormat("d MMM yyyy 'at' HH:mm").format(parsedDate);
-    final amount = double.tryParse(item['amount']?.toString() ?? "0")?.toStringAsFixed(2) ?? "0.00";
+    final formattedDate =
+        DateFormat("d MMM yyyy 'at' HH:mm").format(parsedDate);
+    final amount = double.tryParse(item['amount']?.toString() ?? "0")
+            ?.toStringAsFixed(2) ??
+        "0.00";
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -430,7 +488,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
               child: Center(
                 child: Text(
                   "$amount€",
-                  style: GoogleFonts.lato(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: GoogleFonts.lato(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -460,16 +521,23 @@ class _PaymentsPageState extends State<PaymentsPage> {
               children: [
                 Expanded(
                   child: Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     color: Colors.grey[50],
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Your Balance", style: GoogleFonts.lato(fontSize: 16, color: Colors.grey)),
+                          Text("Your Balance",
+                              style: GoogleFonts.lato(
+                                  fontSize: 16, color: Colors.grey)),
                           const SizedBox(height: 4),
-                          Text("${_balance.toStringAsFixed(2)}€", style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
+                          Text("${_balance.toStringAsFixed(2)}€",
+                              style: GoogleFonts.lato(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black)),
                         ],
                       ),
                     ),
@@ -478,16 +546,21 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     color: Colors.grey[50],
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Next Payout", style: GoogleFonts.lato(fontSize: 16, color: Colors.grey)),
+                          Text("Next Payout",
+                              style: GoogleFonts.lato(
+                                  fontSize: 16, color: Colors.grey)),
                           const SizedBox(height: 4),
-                          Text(_nextPayoutDate, style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold)),
+                          Text(_nextPayoutDate,
+                              style: GoogleFonts.lato(
+                                  fontSize: 20, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -497,14 +570,17 @@ class _PaymentsPageState extends State<PaymentsPage> {
             ),
             const SizedBox(height: 16),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               color: Colors.grey[50],
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Statistics", style: GoogleFonts.lato(fontSize: 16, color: Colors.grey)),
+                    Text("Statistics",
+                        style:
+                            GoogleFonts.lato(fontSize: 16, color: Colors.grey)),
                     const SizedBox(height: 8),
                     _buildBarChartPlaceholder(),
                   ],
@@ -549,41 +625,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
         : SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: _userDebt.isEmpty
-                ? Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    color: Colors.grey[50],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text('No unpaid items', style: GoogleFonts.lato(color: Colors.black54)),
-                    ),
-                  )
+                ? Text("No unpaid items",
+                    style: GoogleFonts.lato(color: Colors.black54))
                 : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _userDebt.map((item) {
-                      final studentsName = item['students_name'] ?? "";
-                      final packDate = item['date'] ?? "";
-                      return Card(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        color: Colors.grey[50],
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, color: Colors.grey),
-                              const SizedBox(width: 12),
-                              Expanded(child: Text(studentsName, style: GoogleFonts.lato())),
-                              Text(packDate, style: GoogleFonts.lato(color: Colors.black54)),
-                              const SizedBox(width: 12),
-                              IconButton(
-                                icon: const Icon(Icons.more_vert, color: Colors.orange),
-                                onPressed: () => _showPaymentDetailsModal(item),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                    children: _userDebt
+                        .map((item) => _buildHistoryRow(item))
+                        .toList(),
                   ),
           );
   }
@@ -595,33 +642,44 @@ class _PaymentsPageState extends State<PaymentsPage> {
             padding: const EdgeInsets.all(16),
             child: _upcomingPayouts.isEmpty
                 ? Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     color: Colors.grey[50],
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('No upcoming payouts', style: GoogleFonts.lato(color: Colors.black54)),
+                      child: Text('No upcoming payouts',
+                          style: GoogleFonts.lato(color: Colors.black54)),
                     ),
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: _upcomingPayouts.map((item) {
                       final name = item['name'] ?? "";
-                      final balance = double.tryParse(item['current_balance']?.toString() ?? "0")?.toStringAsFixed(2) ?? "0.00";
+                      final balance = double.tryParse(
+                                  item['current_balance']?.toString() ?? "0")
+                              ?.toStringAsFixed(2) ??
+                          "0.00";
                       return Card(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         color: Colors.grey[50],
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           child: Row(
                             children: [
                               Icon(Icons.person, color: Colors.grey),
                               const SizedBox(width: 12),
-                              Expanded(child: Text(name, style: GoogleFonts.lato())),
-                              Text("$balance€", style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+                              Expanded(
+                                  child: Text(name, style: GoogleFonts.lato())),
+                              Text("$balance€",
+                                  style: GoogleFonts.lato(
+                                      fontWeight: FontWeight.bold)),
                               const SizedBox(width: 12),
                               IconButton(
-                                icon: const Icon(Icons.more_vert, color: Colors.orange),
+                                icon: const Icon(Icons.more_vert,
+                                    color: Colors.orange),
                                 onPressed: () => _showPaymentDetailsModal(item),
                               ),
                             ],
@@ -640,16 +698,20 @@ class _PaymentsPageState extends State<PaymentsPage> {
             padding: const EdgeInsets.all(16),
             child: _adminHistory.isEmpty
                 ? Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     color: Colors.grey[50],
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('No payment history', style: GoogleFonts.lato(color: Colors.black54)),
+                      child: Text('No payment history',
+                          style: GoogleFonts.lato(color: Colors.black54)),
                     ),
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _adminHistory.map((item) => _buildAdminHistoryRow(item)).toList(),
+                    children: _adminHistory
+                        .map((item) => _buildAdminHistoryRow(item))
+                        .toList(),
                   ),
           );
   }
@@ -658,7 +720,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
     final dateStr = item['date'] ?? "2025-01-15";
     final parsed = DateTime.tryParse(dateStr) ?? DateTime.now();
     final formatted = DateFormat("d MMM yyyy").format(parsed);
-    final amount = double.tryParse(item['amount']?.toString() ?? "0")?.toStringAsFixed(2) ?? "0.00";
+    final amount = double.tryParse(item['amount']?.toString() ?? "0")
+            ?.toStringAsFixed(2) ??
+        "0.00";
     final user = item['user_name'] ?? "";
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -671,7 +735,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
             Icon(Icons.person, color: Colors.grey),
             const SizedBox(width: 12),
             Expanded(child: Text(user, style: GoogleFonts.lato())),
-            Text("$amount€", style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+            Text("$amount€",
+                style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
             const SizedBox(width: 12),
             Text(formatted, style: GoogleFonts.lato(color: Colors.black54)),
             const SizedBox(width: 12),
@@ -690,31 +755,42 @@ class _PaymentsPageState extends State<PaymentsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) {
         final dateStr = item['date'] ?? "2025-01-15";
         final parsed = DateTime.tryParse(dateStr) ?? DateTime.now();
         final formatted = DateFormat("d MMM yyyy 'at' HH:mm").format(parsed);
         final user = item['user_name'] ?? "Unknown User";
-        final amt = double.tryParse(item['amount']?.toString() ?? "0")?.toStringAsFixed(2) ?? "0.00";
+        final amt = double.tryParse(item['amount']?.toString() ?? "0")
+                ?.toStringAsFixed(2) ??
+            "0.00";
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                Text("Details", style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text("Details",
+                    style: GoogleFonts.lato(
+                        fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 _infoCard("User", user),
                 _infoCard("Amount", "$amt€"),
                 _infoCard("Date", formatted),
                 _infoCard("School", item['school_name'] ?? ""),
-                _buildFullWidthCard(Icons.description, "Notes", item['notes'] ?? ""),
+                _buildFullWidthCard(
+                    Icons.description, "Notes", item['notes'] ?? ""),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32))),
-                  child: const Text("Close", style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32))),
+                  child: const Text("Close",
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -738,7 +814,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: GoogleFonts.lato(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(label,
+                    style: GoogleFonts.lato(
+                        fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(value, style: GoogleFonts.lato(fontSize: 14)),
               ],
@@ -754,7 +832,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text("Payments")),
-        body: const Center(child: CircularProgressIndicator(color: Colors.orange)),
+        body: const Center(
+            child: CircularProgressIndicator(color: Colors.orange)),
       );
     }
     if (_currentRole == "Admin") {
