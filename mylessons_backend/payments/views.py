@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse, HttpResponseRedirect
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 import stripe
 import json
@@ -394,3 +394,105 @@ def instructor_payment_history(request):
         })
     
     return Response(history, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def school_unpaid_items_view(request):
+    """
+    Returns a list of unpaid items (packs with debt > 0) for the Admin's school.
+    For each pack, returns:
+      - the pack's ID,
+      - the result of pack.getStudentsName(),
+      - the pack's date (formatted as "YYYY-MM-DD"),
+      - the pack's debt.
+    Accessible only if request.user.current_role == "Admin".
+    """
+    if getattr(request.user, 'current_role', None) != "Admin":
+        return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+    
+    school_id = getattr(request.user, 'current_school_id', None)
+    if not school_id:
+        return Response({"error": "School not found for user."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    school = get_object_or_404(School, id=school_id)
+    packs = Pack.objects.filter(school=school, debt__gt=0)
+    
+    data = []
+    for pack in packs:
+        data.append({
+            "id": str(pack.id),
+            "students_name": pack.getStudentsName(),  # Call the method to get students' names.
+            "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
+            "debt": str(pack.debt),
+        })
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def upcoming_payouts_view(request):
+    """
+    Returns a list of unique users from the Admin's school who are in any of:
+      - school.admins,
+      - school.instructors,
+      - school.monitors.
+    For each user, returns their id and name (using str(user)).
+    Accessible only if request.user.current_role == "Admin".
+    """
+    if getattr(request.user, 'current_role', None) != "Admin":
+        return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+    
+    school_id = getattr(request.user, 'current_school_id', None)
+    if not school_id:
+        return Response({"error": "School not found for user."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    school = get_object_or_404(School, id=school_id)
+    
+    # Assuming school.admins, school.instructors, and school.monitors are ManyToMany fields.
+    admins = set(school.admins.all())
+    instructors = set(school.instructors.all())
+    monitors = set(school.monitors.all())
+    all_users = admins.union(instructors).union(monitors)
+    
+    data = []
+    for user in all_users:
+        data.append({
+            "id": str(user.id),
+            "name": str(user),  # Uses the user's __str__ representation.
+        })
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def school_payment_history_view(request):
+    """
+    Returns a list of all Payment objects for the Admin's school.
+    Each Payment includes:
+      - id,
+      - date (formatted as "YYYY-MM-DD"),
+      - time (formatted as "HH:MM"),
+      - value,
+      - description.
+    Accessible only if request.user.current_role == "Admin".
+    """
+    if getattr(request.user, 'current_role', None) != "Admin":
+        return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+    
+    school_id = getattr(request.user, 'current_school_id', None)
+    if not school_id:
+        return Response({"error": "School not found for user."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    school = get_object_or_404(School, id=school_id)
+    payments = Payment.objects.filter(school=school).order_by('-date', '-time')
+    
+    data = []
+    for pay in payments:
+        data.append({
+            "id": str(pay.id),
+            "date": pay.date.strftime("%Y-%m-%d") if pay.date else "",
+            "time": pay.time.strftime("%H:%M") if pay.time else "",
+            "value": str(pay.value),
+            "description": pay.description,
+        })
+    return Response(data, status=status.HTTP_200_OK)
