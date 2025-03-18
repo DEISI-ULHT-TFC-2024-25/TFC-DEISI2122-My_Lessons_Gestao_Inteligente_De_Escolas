@@ -15,6 +15,7 @@ class PaymentSuccessPage extends StatefulWidget {
 
 class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   final CartService _cartService = CartService();
+  List<dynamic> bookedPacks = [];
 
   @override
   void initState() {
@@ -26,7 +27,8 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
     // Build payload only for items that represent a pack.
     List<Map<String, dynamic>> packsPayload = _cartService.items.where((item) {
       // Check if the cart item has a 'service' with a 'type' map containing the key 'pack'.
-      if (item.containsKey('service') && item['service'] is Map<String, dynamic>) {
+      if (item.containsKey('service') &&
+          item['service'] is Map<String, dynamic>) {
         final service = item['service'];
         if (service.containsKey('type') &&
             service['type'] is Map<String, dynamic> &&
@@ -37,17 +39,21 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
       return false;
     }).map((item) {
       final service = item['service'] as Map<String, dynamic>;
-      final checkoutDetails =
-          service.containsKey('checkout_details') && service['checkout_details'] is Map<String, dynamic>
-              ? service['checkout_details'] as Map<String, dynamic>
-              : {};
+      final checkoutDetails = service.containsKey('checkout_details') &&
+              service['checkout_details'] is Map<String, dynamic>
+          ? service['checkout_details'] as Map<String, dynamic>
+          : {};
 
       return {
         "students": item['students'],
-        // Use the service's school_name (or a fallback)
+        // Use the service's school_name or fallback to "Test School"
         "school": service['school_name'] ?? "Test School",
-        // For demo purposes, set expiration_date 30 days from now.
-        "expiration_date": DateTime.now().add(const Duration(days: 30)).toIso8601String().split('T').first,
+        // For demo, set expiration_date 30 days from now (YYYY-MM-DD format)
+        "expiration_date": DateTime.now()
+            .add(const Duration(days: 30))
+            .toIso8601String()
+            .split('T')
+            .first,
         "number_of_classes": checkoutDetails['classes'] ?? 0,
         "duration_in_minutes": checkoutDetails['duration'] ?? 0,
         "instructors": [],
@@ -55,7 +61,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         "payment": item['price'],
         "discount_id": null,
         "type": service['type'],
-        // New flag to indicate that the booking comes from the success page.
+        // Flag to indicate this booking comes from the success page.
         "user_paid": true,
       };
     }).toList();
@@ -76,17 +82,12 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         _cartService.clear();
         debugPrint("Pack booking successful: ${response.body}");
         final decodedResponse = json.decode(response.body);
-        final List<dynamic> bookedPacks = decodedResponse["booked_packs"];
-
-        // Navigate to HomePage and pass the booked packs as an argument.
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => HomePage(newBookedPacks: bookedPacks),
-          ),
-        );
+        setState(() {
+          bookedPacks = decodedResponse["booked_packs"];
+        });
       } else {
-        debugPrint("Failed to book packs. Status: ${response.statusCode}, Body: ${response.body}");
+        debugPrint(
+            "Failed to book packs. Status: ${response.statusCode}, Body: ${response.body}");
       }
     } catch (e) {
       debugPrint("Error booking packs: $e");
@@ -106,15 +107,13 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
               style: TextStyle(fontSize: 20),
             ),
             const SizedBox(height: 20),
-            // The "Continue" button is now optional since we navigate automatically after booking.
             ElevatedButton(
               onPressed: () {
-                // If needed, you can also trigger the navigation manually.
-                Navigator.pushReplacement(
+                Navigator.pushNamedAndRemoveUntil(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => HomePage(newBookedPacks: []),
-                  ),
+                  '/main',
+                  (route) => false,
+                  arguments: {'newBookedPacks': bookedPacks},
                 );
               },
               child: const Text("Continue"),

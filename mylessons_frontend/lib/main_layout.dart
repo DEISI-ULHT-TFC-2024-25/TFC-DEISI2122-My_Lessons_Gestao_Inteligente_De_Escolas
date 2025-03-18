@@ -12,7 +12,8 @@ import 'services/cart_service.dart';
 import 'services/api_service.dart'; // for getAuthHeaders() and baseUrl
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final List<dynamic> newBookedPacks;
+  const MainScreen({Key? key, this.newBookedPacks = const []}) : super(key: key);
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -60,7 +61,7 @@ class _MainScreenState extends State<MainScreen> {
   void _buildPagesAndNavItems() {
     if (_currentRole == "Instructor") {
       _pages = [
-        const HomePage(),
+        HomePage(newBookedPacks: widget.newBookedPacks),
         const AvailabilityPage(),
         const PaymentsPage(),
         const ProfilePage(),
@@ -73,7 +74,7 @@ class _MainScreenState extends State<MainScreen> {
       ];
     } else {
       _pages = [
-        const HomePage(),
+        HomePage(newBookedPacks: widget.newBookedPacks),
         const SchoolsPage(),
         const PaymentsPage(),
         const ProfilePage(),
