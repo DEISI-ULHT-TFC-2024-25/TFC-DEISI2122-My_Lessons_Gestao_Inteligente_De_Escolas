@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import create_checkout_session_view, create_debt_payment_intent_view, create_payment_intent_view, instructor_payment_history, payment_history_view, payment_success, payment_failed, my_webhook_view, payments_debt_view, redulate_debt_view, school_payment_history_view, school_unpaid_items_view, test_payment, new_payment, unpaid_items_view, upcoming_payouts_view, verify_payment
+from .views import create_checkout_session_view, create_debt_payment_intent_view, create_debt_payment_record_view, create_payment_intent_view, instructor_payment_history, payment_history_view, payment_success, payment_failed, my_webhook_view, payments_debt_view, redulate_debt_view, school_payment_history_view, school_unpaid_items_view, test_payment, new_payment, unpaid_items_view, upcoming_payouts_view, verify_payment
 
 urlpatterns = [
     path("payment-success/", payment_success, name="payment_success"),
@@ -19,4 +19,5 @@ urlpatterns = [
     path('upcoming_payouts/', upcoming_payouts_view, name='upcoming_payouts'),
     path('school_payment_history/', school_payment_history_view, name='school_payment_history'),
     path('create_debt_payment_intent/', create_debt_payment_intent_view, name='school_payment_history'),
+    path('create_debt_payment_record/', create_debt_payment_record_view, name='create_debt_payment_record'),
 ]

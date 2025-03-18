@@ -20,9 +20,57 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   @override
   void initState() {
     super.initState();
-    _bookPacks();
+    _processSuccess();
   }
 
+  /// Process the successful payment by creating a Payment record for debt
+  /// and then booking the packs.
+  Future<void> _processSuccess() async {
+    await _createDebtPaymentRecord();
+    await _bookPacks();
+  }
+
+  /// Creates a Payment record for debt.
+  /// It extracts the pack IDs from the cart items (for pack services),
+  /// sends them to your backend endpoint so that a Payment object can be
+  /// created with payment.user = request.user and the related packs.
+  Future<void> _createDebtPaymentRecord() async {
+    // Filter cart items that represent pack services.
+    List<dynamic> packIds = _cartService.items.where((item) {
+      if (item.containsKey('service') &&
+          item['service'] is Map<String, dynamic>) {
+        final service = item['service'];
+        if (service.containsKey('type') &&
+            service['type'] is Map<String, dynamic> &&
+            service['type'].containsKey('pack')) {
+          return true;
+        }
+      }
+      return false;
+    }).map((item) => item['id']).toList();
+
+    Map<String, dynamic> payload = {
+      "pack_ids": packIds,
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/api/payments/create_debt_payment_record/"),
+        headers: await getAuthHeaders(),
+        body: json.encode(payload),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint("Debt Payment record created successfully: ${response.body}");
+      } else {
+        debugPrint(
+            "Failed to create debt payment record: ${response.statusCode}, ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("Error creating debt payment record: $e");
+    }
+  }
+
+  /// Books the packs using your existing booking endpoint.
   Future<void> _bookPacks() async {
     // Build payload only for items that represent a pack.
     List<Map<String, dynamic>> packsPayload = _cartService.items.where((item) {
@@ -46,9 +94,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
 
       return {
         "students": item['students'],
-        // Use the service's school_name or fallback to "Test School"
         "school": service['school_name'] ?? "Test School",
-        // For demo, set expiration_date 30 days from now (YYYY-MM-DD format)
         "expiration_date": DateTime.now()
             .add(const Duration(days: 30))
             .toIso8601String()
@@ -61,7 +107,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         "payment": item['price'],
         "discount_id": null,
         "type": service['type'],
-        // Flag to indicate this booking comes from the success page.
+        // Flag to indicate that this booking comes from the success page.
         "user_paid": true,
       };
     }).toList();
@@ -69,8 +115,8 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
     Map<String, dynamic> payload = {"packs": packsPayload};
 
     try {
-      debugPrint("Cart service total payload:\n${_cartService.items}\n");
-      debugPrint("Entering Book Pack with payload:\n$payload\n");
+      debugPrint("Cart service items:\n${_cartService.items}\n");
+      debugPrint("Booking packs with payload:\n$payload\n");
 
       final response = await http.post(
         Uri.parse("$baseUrl/api/users/book_pack/"),
