@@ -312,7 +312,8 @@ def unpaid_items_view(request):
     for pack in unpaid_packs:
         items.append({
             "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
-            "description": pack.get_students_name(),  # Adjust as needed.
+            "time": pack.date_time.strftime("%H:%M") if pack.date_time else "09:00",
+            "description": str(pack),  # Adjust as needed.
             "amount": str(pack.debt) if pack.debt else "0.00",
         })
     return Response(items, status=status.HTTP_200_OK)
@@ -423,7 +424,9 @@ def school_unpaid_items_view(request):
             "id": str(pack.id),
             "students_name": pack.get_students_name(),  # Call the method to get students' names.
             "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
+            "time": pack.date_time.strftime("%HH:%MM") if pack.date_time else "09:00",
             "debt": str(pack.debt),
+            "description": str(pack),
         })
     return Response(data, status=status.HTTP_200_OK)
 
@@ -452,13 +455,15 @@ def upcoming_payouts_view(request):
     admins = set(school.admins.all())
     instructors = set(school.instructors.all())
     monitors = set(school.monitors.all())
-    all_users = admins.union(instructors).union(monitors)
+    all_users = set(admins.union(instructors).union(monitors))
     
     data = []
     for user in all_users:
         data.append({
             "id": str(user.id),
             "name": str(user),  # Uses the user's __str__ representation.
+            "current_balance" : str(user.current_balance),
+            "description": user.get_balance_history_since_last_payout(),
         })
     return Response(data, status=status.HTTP_200_OK)
 
