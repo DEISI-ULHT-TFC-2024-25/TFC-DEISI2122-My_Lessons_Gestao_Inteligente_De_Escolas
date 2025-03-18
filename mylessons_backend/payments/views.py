@@ -424,8 +424,8 @@ def school_unpaid_items_view(request):
             "id": str(pack.id),
             "students_name": pack.get_students_name(),  # Call the method to get students' names.
             "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
-            "time": pack.date_time.strftime("%HH:%MM") if pack.date_time else "09:00",
-            "debt": str(pack.debt),
+            "time": pack.date_time.strftime("%H:%M") if pack.date_time else "09:00",
+            "amount": str(pack.debt) if pack.debt else "0.00",
             "description": str(pack),
         })
     return Response(data, status=status.HTTP_200_OK)
