@@ -126,6 +126,44 @@ def test_payment(request):
     return render(request, 'payments/test-payment.html')
 
 @csrf_exempt
+def create_payment_intent_view(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            cart = data.get('cart', [])
+            discount = data.get('discount', 0)
+            
+            total_price = 0
+            student_ids_list = []  # Example: you might aggregate these if needed.
+            for item in cart:
+                price = item.get("price", 0)
+                total_price += price
+                # For this example, we'll use the student_ids_list from the last item.
+                student_ids_list = item.get("student_ids_list", [])
+            
+            # Apply discount to total price.
+            final_price = max(0, total_price - discount)
+            # Convert to cents (assuming price is in Euros)
+            amount_in_cents = int(final_price * 100)
+            
+            intent = stripe.PaymentIntent.create(
+                amount=amount_in_cents,
+                currency="eur",
+                payment_method_types=["card"],
+                metadata={
+                    "user_id": str(request.user.id) if request.user.is_authenticated else "anonymous",
+                    "cart": json.dumps(cart),
+                    "discount": str(discount),
+                    "student_ids_list": json.dumps(student_ids_list),
+                }
+            )
+            return JsonResponse({"clientSecret": intent.client_secret}, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+    
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@csrf_exempt
 def create_checkout_session_view(request):
     if request.method == 'POST':
         try:
