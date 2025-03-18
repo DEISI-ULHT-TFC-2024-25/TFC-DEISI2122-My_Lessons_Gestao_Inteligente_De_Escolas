@@ -15,7 +15,7 @@ urlpatterns = [
     path('history/', payment_history_view, name='payment_history'),
     path('redulate_debt/', redulate_debt_view, name='redulate_debt'),
     path('instructor_payment_history/', instructor_payment_history, name='instructor_payment_history'),
-    path('unpaid_items/', school_unpaid_items_view, name='school_unpaid_items'),
+    path('school_unpaid_items/', school_unpaid_items_view, name='school_unpaid_items'),
     path('upcoming_payouts/', upcoming_payouts_view, name='upcoming_payouts'),
     path('school_payment_history/', school_payment_history_view, name='school_payment_history'),
 ]

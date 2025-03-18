@@ -108,14 +108,32 @@ class _PaymentsPageState extends State<PaymentsPage> {
       final upcomingRes = await http.get(Uri.parse('$baseUrl/api/admin/payments/upcoming_payouts/'), headers: headers);
       final historyRes = await http.get(Uri.parse('$baseUrl/api/admin/payments/school_payment_history/'), headers: headers);
 
-      if (debtRes.statusCode == 200) {
-        _userDebt = List<Map<String, dynamic>>.from(json.decode(debtRes.body));
+      // Check for iterable type or a dictionary wrapping the list.
+      final decodedDebt = json.decode(debtRes.body);
+      if (decodedDebt is List) {
+        _userDebt = List<Map<String, dynamic>>.from(decodedDebt);
+      } else if (decodedDebt is Map && decodedDebt.containsKey("data")) {
+        _userDebt = List<Map<String, dynamic>>.from(decodedDebt["data"]);
+      } else {
+        _userDebt = [];
       }
-      if (upcomingRes.statusCode == 200) {
-        _upcomingPayouts = List<Map<String, dynamic>>.from(json.decode(upcomingRes.body));
+
+      final decodedUpcoming = json.decode(upcomingRes.body);
+      if (decodedUpcoming is List) {
+        _upcomingPayouts = List<Map<String, dynamic>>.from(decodedUpcoming);
+      } else if (decodedUpcoming is Map && decodedUpcoming.containsKey("data")) {
+        _upcomingPayouts = List<Map<String, dynamic>>.from(decodedUpcoming["data"]);
+      } else {
+        _upcomingPayouts = [];
       }
-      if (historyRes.statusCode == 200) {
-        _adminHistory = List<Map<String, dynamic>>.from(json.decode(historyRes.body));
+
+      final decodedHistory = json.decode(historyRes.body);
+      if (decodedHistory is List) {
+        _adminHistory = List<Map<String, dynamic>>.from(decodedHistory);
+      } else if (decodedHistory is Map && decodedHistory.containsKey("data")) {
+        _adminHistory = List<Map<String, dynamic>>.from(decodedHistory["data"]);
+      } else {
+        _adminHistory = [];
       }
     } catch (e) {
       debugPrint("Error fetching Admin data: $e");
@@ -226,7 +244,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  // _buildInfoCard used for Parent/Instructor details modal.
+  // _buildInfoCard used in the Parent/Instructor details modal.
   Widget _buildInfoCard(IconData icon, String label, String value) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -253,7 +271,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  // _buildFullWidthCard used for details modal.
+  // _buildFullWidthCard used in the details modal.
   Widget _buildFullWidthCard(IconData icon, String label, String value) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -695,9 +713,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32))),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32))),
                   child: const Text("Close", style: TextStyle(color: Colors.white)),
                 ),
               ],
@@ -741,7 +757,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
         body: const Center(child: CircularProgressIndicator(color: Colors.orange)),
       );
     }
-
     if (_currentRole == "Admin") {
       return DefaultTabController(
         length: 3,
