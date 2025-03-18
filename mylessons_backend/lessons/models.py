@@ -32,7 +32,7 @@ class Pack(models.Model):
     sport = models.ForeignKey('sports.Sport', related_name='packs', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.type} pack for {self.get_students_name()}, {self.number_of_classes_left}/{self.number_of_classes} lessons left, {self.get_number_of_unscheduled_lessons} number of unscheduled lessons"
+        return f"{self.type} pack for {self.get_students_name()}, {self.number_of_classes_left}/{self.number_of_classes} lessons left, {self.get_number_of_unscheduled_lessons()} number of unscheduled lessons"
     
     def update_pack_status(self):
 
