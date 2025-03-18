@@ -572,6 +572,7 @@ def book_pack_view(request):
       - payment (if "cash", will be converted to 0)
       - discount_id (optional)
       - type (e.g. either a string like "private" or a dict with a key "pack")
+      - user_paid (optional boolean flag)
     """
     data = request.data
     logger.debug("Received payload: %s", data)
@@ -581,8 +582,7 @@ def book_pack_view(request):
     if packs_data is None or not isinstance(packs_data, list):
         error_msg = "Invalid payload. Expected a 'packs' list."
         logger.error(error_msg)
-        return Response({"error": error_msg},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     booked_packs = []
     errors = []
@@ -590,6 +590,9 @@ def book_pack_view(request):
     for pack_req in packs_data:
         logger.debug("Processing pack request: %s", pack_req)
         try:
+            # Determine if this booking was initiated from a paid context.
+            user_who_paid = request.user if pack_req.get('user_paid', False) else None
+
             # Convert student dicts to Student model instances.
             raw_students = pack_req.get('students', [])
             students = []
@@ -611,11 +614,11 @@ def book_pack_view(request):
                 # Assume school_identifier is the name.
                 school_obj = get_object_or_404(School, name=school_identifier)
             
-            # Convert the expiration_date if needed.
-            # (Assuming it's already in YYYY-MM-DD format from the payload.)
+            # Convert expiration_date.
             expiration_date = pack_req.get('expiration_date')
             if not expiration_date:
                 expiration_date = now().date().strftime("%Y-%m-%d")
+            expiration_date = datetime.strptime(expiration_date, "%Y-%m-%d").date()
             
             # Convert payment: if payment is "cash", use 0.
             payment_value = pack_req.get('payment')
@@ -630,14 +633,10 @@ def book_pack_view(request):
             elif isinstance(raw_type, str):
                 final_type = raw_type
 
-            raw_expiration_date = pack_req.get('expiration_date')
-            if raw_expiration_date:
-                expiration_date = datetime.strptime(raw_expiration_date, "%Y-%m-%d").date()
-
             new_pack = Pack.book_new_pack(
                 students=students,
                 school=school_obj,
-                date=expiration_date,  # using expiration_date if that is what you want as the booking date
+                date=expiration_date,  # using expiration_date as booking date
                 number_of_classes=pack_req.get('number_of_classes'),
                 duration_in_minutes=pack_req.get('duration_in_minutes'),
                 instructors=pack_req.get('instructors'),
@@ -645,27 +644,26 @@ def book_pack_view(request):
                 payment=payment_value,
                 discount_id=pack_req.get('discount_id'),
                 type=final_type,
-                expiration_date=expiration_date if expiration_date else None
+                expiration_date=expiration_date if expiration_date else None,
+                user_who_paid=user_who_paid,
             )
-            booked_packs.append(
-                {
-                    "pack_id": new_pack.id,
-                    "lessons": [
-                                    {
-                                        "lesson_id" : lesson.id,
-                                        "lesson_str": str(lesson),
-                                        "school": str(lesson.school) if lesson.school else "",
-                                        "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
-                                    }
-                                    for lesson in new_pack.lessons.all()
-                                ],
-                    "lessons_remaining": str(new_pack.number_of_classes_left),
-                    "unscheduled_lessons": str(new_pack.get_number_of_unscheduled_lessons()),
-                    "days_until_expiration": str((new_pack.expiration_date - today).days) if new_pack.expiration_date else None,
-                    "students_name": new_pack.get_students_name(),
-                    "type": new_pack.type
-                }
-            )
+            booked_packs.append({
+                "pack_id": new_pack.id,
+                "lessons": [
+                    {
+                        "lesson_id": lesson.id,
+                        "lesson_str": str(lesson),
+                        "school": str(lesson.school) if lesson.school else "",
+                        "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
+                    }
+                    for lesson in new_pack.lessons.all()
+                ],
+                "lessons_remaining": str(new_pack.number_of_classes_left),
+                "unscheduled_lessons": str(new_pack.get_number_of_unscheduled_lessons()),
+                "days_until_expiration": str((new_pack.expiration_date - today).days) if new_pack.expiration_date else None,
+                "students_name": new_pack.get_students_name(),
+                "type": new_pack.type
+            })
             logger.debug("Successfully booked pack with ID: %s", new_pack.id)
         except Exception as e:
             error_str = f"Error processing pack request {pack_req}: {str(e)}"
@@ -678,7 +676,7 @@ def book_pack_view(request):
     
     logger.debug("Booked packs successfully: %s", booked_packs)
     return Response({"booked_packs": booked_packs}, status=status.HTTP_201_CREATED)
-    
+
     
 # Helper to map weekday names to Python's date.weekday() indices
 DAY_NAME_TO_INDEX = {

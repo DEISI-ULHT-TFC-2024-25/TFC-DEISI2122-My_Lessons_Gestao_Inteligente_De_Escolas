@@ -7,6 +7,7 @@ from users.models import Discount, Unavailability, UserAccount, Student, Instruc
 from users.utils import get_users_name, get_students_ids, get_instructors_name, get_instructors_ids
 from django.db.models import Q
 from django.utils.timezone import now, make_aware
+from payments.models import Payment
 
 # TODO not here but everywhere make_aware problem (convert to datetime and then make the operation with now())
 
@@ -88,7 +89,7 @@ class Pack(models.Model):
         return get_instructors_ids(self.instructors.all())
     
     @classmethod
-    def book_new_pack(cls, students, school, date, number_of_classes, duration_in_minutes, instructors, price, payment, discount_id = None, type = None, expiration_date=None):
+    def book_new_pack(cls, students, school, date, number_of_classes, duration_in_minutes, instructors, price, payment, discount_id = None, type = None, expiration_date=None, user_who_paid = None):
         """
         Books a new private pack, creates the necessary associations, and sends notifications.
         """
@@ -129,7 +130,7 @@ class Pack(models.Model):
             pack.create_private_classes()
 
         if payment:
-            pack.update_debt(payment=payment)
+            pack.update_debt(payment=payment, user=user_who_paid)
         
         # Notify parents
         for parent in parents:
@@ -211,11 +212,22 @@ class Pack(models.Model):
             self.lessons.add(private_class)
         self.save()
 
-    def update_debt(self, payment):
+    def update_debt(self, payment, user):
         self.debt -= payment
         if self.debt <= 0:
             self.is_paid = True
         self.save(update_fields=["debt", "is_paid"])
+        
+        # Create a Payment record for this pack payment.
+        payment_obj = Payment.objects.create(
+            value=payment,
+            user=user,
+            school=self.school,  # Assuming the pack has a school attribute; adjust if needed.
+            description={"pack_id": str(self.id), "update": "debt updated via update_debt"},
+        )
+        # Associate this pack with the created payment.
+        payment_obj.packs.add(self)
+        return payment_obj
 
     def suspend(self):
         self.is_suspended = True

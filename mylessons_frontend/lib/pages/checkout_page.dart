@@ -4,9 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 import '../services/api_service.dart';
 import '../services/cart_service.dart';
-import 'payment_screen.dart'; // New payment screen using flutter_stripe
+import 'payment_success_page.dart';
+import 'payment_fail_page.dart';
 
 /// Helper function to get the currency symbol.
 String getCurrencySymbol(String currencyCode) {
@@ -436,6 +438,89 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   bool _isLoading = false;
 
+  ///////////////// Stripe Payment Integration ///////////////////
+
+  bool _stripeLoading = false;
+  String? _stripeClientSecret;
+  String? _stripeError;
+  double _discount = 0.0;
+
+  Future<void> _createPaymentIntentStripe() async {
+    setState(() {
+      _stripeLoading = true;
+      _stripeError = null;
+    });
+    try {
+      final cartItems = CartService().items;
+      final Map<String, dynamic> payload = {
+        "cart": cartItems,
+        "discount": _discount,
+      };
+
+      final url = Uri.parse('$baseUrl/api/payments/create_payment_intent/');
+      final headers = await getAuthHeaders();
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _stripeClientSecret = data["clientSecret"];
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: _stripeClientSecret!,
+            merchantDisplayName: 'My Lessons',
+          ),
+        );
+      } else {
+        setState(() {
+          _stripeError = "Error creating PaymentIntent: ${response.body}";
+        });
+        debugPrint("Error creating PaymentIntent: ${response.body}");
+      }
+    } catch (e) {
+      setState(() {
+        _stripeError = "Exception in _createPaymentIntent: $e";
+      });
+      debugPrint("Exception in _createPaymentIntent: $e");
+    }
+    setState(() {
+      _stripeLoading = false;
+    });
+  }
+
+  Future<void> _presentPaymentSheetStripe() async {
+    try {
+      await Stripe.instance.presentPaymentSheet();
+      // Payment succeeded: clear the cart and navigate to PaymentSuccessPage.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PaymentSuccessPage()),
+      );
+    } catch (e) {
+      debugPrint("PaymentSheet error: $e");
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PaymentFailPage()),
+      );
+    }
+  }
+
+  Future<void> _handleStripePayment() async {
+    await _createPaymentIntentStripe();
+    if (_stripeClientSecret != null) {
+      await _presentPaymentSheetStripe();
+    } else if (_stripeError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_stripeError!)),
+      );
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////
+
   /// (Old function to initiate Stripe Checkout - now unused.)
   Future<void> _initiateStripeCheckout() async {
     try {
@@ -632,17 +717,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       onPressed: _handleConfirmBooking,
                       child: const Text("Pay by Cash"),
                     ),
-                    // Stripe Payment Button navigates to PaymentScreen.
+                    // Stripe Payment Button now calls the integrated Stripe payment flow.
                     ElevatedButton(
-                      onPressed: () {
-                        // Navigate to the PaymentScreen that uses Payment Sheet.
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const PaymentScreen()),
-                        );
-                      },
-                      child: const Text("Pay Now"),
+                      onPressed: _handleStripePayment,
+                      child: _stripeLoading
+                          ? const CircularProgressIndicator()
+                          : const Text("Pay Now"),
                     ),
                   ],
                 ),
