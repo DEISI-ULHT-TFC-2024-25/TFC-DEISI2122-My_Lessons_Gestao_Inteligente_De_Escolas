@@ -435,37 +435,52 @@ def school_unpaid_items_view(request):
 @permission_classes([IsAuthenticated])
 def upcoming_payouts_view(request):
     """
-    Returns a list of unique users from the Admin's school who are in any of:
+    Returns a list of unique UserAccount objects from the Admin's school who are in any of:
       - school.admins,
-      - school.instructors,
-      - school.monitors.
-    For each user, returns their id and name (using str(user)).
+      - school.instructors (converted via Instructor.user),
+      - school.monitors (converted via Monitor.user).
+    For each user, returns their id, name, current_balance, and the output of
+    get_balance_history_since_last_payout().
     Accessible only if request.user.current_role == "Admin".
     """
     if getattr(request.user, 'current_role', None) != "Admin":
         return Response({"error": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
-    
+
     school_id = getattr(request.user, 'current_school_id', None)
     if not school_id:
         return Response({"error": "School not found for user."}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     school = get_object_or_404(School, id=school_id)
-    
-    # Assuming school.admins, school.instructors, and school.monitors are ManyToMany fields.
+
+    # Get UserAccount objects from admins directly
     admins = set(school.admins.all())
-    instructors = set(school.instructors.all())
-    monitors = set(school.monitors.all())
-    all_users = set(admins.union(instructors).union(monitors))
-    
+
+    # Convert instructors to UserAccount objects via Instructor.user
+    instructors = set()
+    for instructor in school.instructors.all():
+        if hasattr(instructor, 'user') and instructor.user:
+            instructors.add(instructor.user)
+
+    # Convert monitors to UserAccount objects via Monitor.user
+    monitors = set()
+    for monitor in school.monitors.all():
+        if hasattr(monitor, 'user') and monitor.user:
+            monitors.add(monitor.user)
+
+    # Union all user objects together
+    all_users = admins.union(instructors).union(monitors)
+
     data = []
     for user in all_users:
         data.append({
             "id": str(user.id),
-            "name": str(user),  # Uses the user's __str__ representation.
-            "current_balance" : str(user.balance),
+            "name": str(user),
+            "current_balance": str(user.balance),
             "description": user.get_balance_history_since_last_payout(),
         })
+
     return Response(data, status=status.HTTP_200_OK)
+
 
 
 @api_view(['GET'])
