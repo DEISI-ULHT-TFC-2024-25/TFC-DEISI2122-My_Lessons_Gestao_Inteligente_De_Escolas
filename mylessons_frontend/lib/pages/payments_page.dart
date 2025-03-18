@@ -244,7 +244,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     try {
       // Extract a list of pack IDs from the _unpaid items.
       // (Adjust the key 'id' if your pack ID is stored under a different field.)
-      List<dynamic> packIds = _unpaid.map((item) => item['id']).toList();
+      List<dynamic> packIds = _unpaid.map((item) => item['pack_id']).toList();
       final Map<String, dynamic> payload = {
         "pack_ids":
             packIds, // Pass the pack IDs so the backend can later remove the debt.

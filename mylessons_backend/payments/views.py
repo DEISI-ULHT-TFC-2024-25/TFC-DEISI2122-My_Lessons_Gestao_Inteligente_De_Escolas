@@ -251,6 +251,69 @@ def create_checkout_session_view(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_debt_payment_record_view(request):
+    """
+    Creates a Payment record for debt update.
+
+    Expected JSON payload:
+      {
+         "pack_ids": [1, 2, 3, ...]
+      }
+
+    The view does the following:
+      - Retrieves all Pack objects with IDs in pack_ids.
+      - Calculates the total price (assuming each Pack has a Decimal 'price' field).
+      - Retrieves the school from the first pack (assumes all packs are from the same school).
+      - Creates a Payment object with:
+            payment.user = request.user,
+            payment.value set to the sum of pack prices,
+            payment.school set to the school from the pack,
+            and a description containing metadata (including the pack_ids).
+      - Associates the retrieved packs with the Payment via the many-to-many field.
+    
+    Returns a JSON response with a success message and the new payment's ID.
+    """
+    data = request.data
+    pack_ids = data.get("pack_ids", [])
+    
+    if not pack_ids:
+        return Response({"error": "No pack_ids provided."}, status=400)
+    
+    # Retrieve all packs whose ID is in pack_ids.
+    packs = Pack.objects.filter(id__in=pack_ids)
+    if not packs.exists():
+        return Response({"error": "No valid packs found for provided IDs."}, status=400)
+    
+    # Calculate the total value. (Assuming pack.price is a Decimal.)
+    total_value = sum(pack.price for pack in packs)
+    
+    # Retrieve the school from the first pack (assuming all packs are from the same school)
+    school = packs.first().school if packs.exists() else None
+    
+    # Create the Payment record.
+    payment = Payment.objects.create(
+        value=total_value,
+        user=request.user,
+        school=school,
+        description={
+            "debt_payment": "Payment record for debt update",
+            "pack_ids": pack_ids,
+        }
+    )
+    
+    # Associate the packs with the Payment.
+    payment.packs.set(packs)
+    
+    return Response(
+        {
+            "message": "Debt payment record created successfully.",
+            "payment_id": payment.id,
+        },
+        status=201
+    )
+
 def payment_success(request):
     session_id = request.GET.get("session_id")
     session = None
