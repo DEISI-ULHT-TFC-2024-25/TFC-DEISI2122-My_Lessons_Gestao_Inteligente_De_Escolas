@@ -512,7 +512,7 @@ def school_payment_history_view(request):
             "id": str(pay.id),
             "date": pay.date.strftime("%Y-%m-%d") if pay.date else "",
             "time": pay.time.strftime("%H:%M") if pay.time else "",
-            "value": str(pay.value),
+            "amount": str(pay.value),
             "description": pay.description,
         })
     return Response(data, status=status.HTTP_200_OK)
