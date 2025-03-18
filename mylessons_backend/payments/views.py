@@ -462,7 +462,7 @@ def upcoming_payouts_view(request):
         data.append({
             "id": str(user.id),
             "name": str(user),  # Uses the user's __str__ representation.
-            "current_balance" : str(user.current_balance),
+            "current_balance" : str(user.balance),
             "description": user.get_balance_history_since_last_payout(),
         })
     return Response(data, status=status.HTTP_200_OK)
