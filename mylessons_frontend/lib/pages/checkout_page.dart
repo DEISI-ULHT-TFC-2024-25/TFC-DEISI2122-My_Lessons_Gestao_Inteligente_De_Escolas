@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/cart_service.dart';
+import 'payment_screen.dart'; // New payment screen using flutter_stripe
 
 /// Helper function to get the currency symbol.
 String getCurrencySymbol(String currencyCode) {
@@ -435,8 +436,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   bool _isLoading = false;
 
-  /// Initiates Stripe Checkout.
-  /// This function calls your backend to create a Stripe Checkout session using your cart data.
+  /// (Old function to initiate Stripe Checkout - now unused.)
   Future<void> _initiateStripeCheckout() async {
     try {
       // Transform your cart items into the expected payload structure.
@@ -632,9 +632,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       onPressed: _handleConfirmBooking,
                       child: const Text("Pay by Cash"),
                     ),
-                    // Stripe Checkout Button.
+                    // Stripe Payment Button navigates to PaymentScreen.
                     ElevatedButton(
-                      onPressed: _initiateStripeCheckout,
+                      onPressed: () {
+                        // Navigate to the PaymentScreen that uses Payment Sheet.
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const PaymentScreen()),
+                        );
+                      },
                       child: const Text("Pay Now"),
                     ),
                   ],

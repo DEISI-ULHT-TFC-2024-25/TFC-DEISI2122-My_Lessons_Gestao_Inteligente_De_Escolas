@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:intl/intl.dart';
+import '../main.dart';
 import '../services/cart_service.dart';
 import '../pages/checkout_page.dart';
 
@@ -204,14 +205,16 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
         return "$firstName $lastName";
       }).toList(),
       'price': currentPrice,
-      'formatted_price': (currentPrice != null && currency != null && currency!.isNotEmpty)
+      'formatted_price': (currentPrice != null &&
+              currency != null &&
+              currency!.isNotEmpty)
           ? "${getCurrencySymbol(currency!)}${currentPrice!.toStringAsFixed(2)}"
           : 'N/A',
       'currency': currency ?? 'N/A',
       'type': widget.service['type'],
-      'duration' : widget.selectedDuration,
-      'classes' : widget.selectedClasses,
-      'time_limit' : widget.currentTimeLimit,
+      'duration': widget.selectedDuration,
+      'classes': widget.selectedClasses,
+      'time_limit': widget.currentTimeLimit,
     };
   }
 
@@ -497,11 +500,13 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                       final serviceWithCheckout =
                           Map<String, dynamic>.from(widget.service)
                             ..['checkout_details'] = checkoutDetails;
-                      CartService().addToCart(serviceWithCheckout, _selectedStudents, currentPrice);
+                      CartService().addToCart(
+                          serviceWithCheckout, _selectedStudents, currentPrice);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Added to cart")),
                       );
-                      Navigator.pop(context);
+                      // Pop using the root navigator
+                      Navigator.of(context, rootNavigator: true).pop();
                     },
                     child: const Text("Add to Cart"),
                   ),
@@ -511,16 +516,22 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                       final serviceWithCheckout =
                           Map<String, dynamic>.from(widget.service)
                             ..['checkout_details'] = checkoutDetails;
-                      CartService().addToCart(serviceWithCheckout, _selectedStudents, currentPrice);
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CheckoutPage(
-                            onBack: () => Navigator.pop(context),
+                      CartService().addToCart(
+                          serviceWithCheckout, _selectedStudents, currentPrice);
+
+                      // Pop the modal using the global navigator.
+                      navigatorKey.currentState!.pop();
+
+                      // Delay to ensure the modal is completely dismissed.
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        navigatorKey.currentState!.push(
+                          MaterialPageRoute(
+                            builder: (_) => CheckoutPage(
+                              onBack: () => navigatorKey.currentState!.pop(),
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      });
                     },
                     child: const Text("Buy Now"),
                   ),
