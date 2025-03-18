@@ -60,15 +60,6 @@
                 <string>com.googleusercontent.apps.368273500882-813i1dn6kojsob4dmlbd3i26lgrsmh0a</string>
             </array>
         </dict>
-        <!-- Custom URL scheme for deep linking -->
-        <dict>
-            <key>CFBundleTypeRole</key>
-            <string>Editor</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>myapp</string>
-            </array>
-        </dict>
     </array>
 </dict>
 </plist>
