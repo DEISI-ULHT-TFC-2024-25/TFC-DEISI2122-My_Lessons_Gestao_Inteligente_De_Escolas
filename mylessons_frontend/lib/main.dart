@@ -40,74 +40,16 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  late final AppLinks _appLinks;
   StreamSubscription<Uri?>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _appLinks = AppLinks();
-    _initAppLinkListener();
-    _checkInitialLink();
   }
 
-  /// Check if the app was launched via a deep link.
-  Future<void> _checkInitialLink() async {
-    try {
-      final Uri? initialUri = await _appLinks.getInitialLink();
-      if (initialUri != null) {
-        _handleDeepLink(initialUri);
-      }
-    } catch (err) {
-      debugPrint("Error in getInitialLink: $err");
-    }
-  }
+  
 
-  /// Listen for deep link changes while the app is running.
-  void _initAppLinkListener() {
-    _linkSubscription = _appLinks.uriLinkStream.listen((Uri? uri) {
-      if (uri != null) {
-        _handleDeepLink(uri);
-      }
-    }, onError: (err) {
-      debugPrint("Error receiving deep link: $err");
-    });
-  }
-
-  /// Called when the app lifecycle state changes.
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) async {
-    if (state == AppLifecycleState.resumed) {
-      // When the app resumes, check for the latest deep link.
-      try {
-        final Uri? latestUri = await _appLinks.getLatestLink();
-        if (latestUri != null) {
-          _handleDeepLink(latestUri);
-        }
-      } catch (err) {
-        debugPrint("Error in getLatestLink: $err");
-      }
-    }
-  }
-
-  /// Process a deep link, e.g. "myapp://payment-success?session_id=..."
-  void _handleDeepLink(Uri uri) {
-    debugPrint("Received deep link: $uri");
-    final sessionId = uri.queryParameters['session_id'];
-    if (uri.host == 'payment-success') {
-      // Replace all routes with PaymentSuccessPage.
-      navigatorKey.currentState?.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => PaymentSuccessPage(sessionId: sessionId)),
-        (Route<dynamic> route) => false,
-      );
-    } else if (uri.host == 'payment-fail') {
-      navigatorKey.currentState?.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => PaymentFailPage(sessionId: sessionId)),
-        (Route<dynamic> route) => false,
-      );
-    }
-  }
 
   @override
   void dispose() {

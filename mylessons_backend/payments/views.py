@@ -134,17 +134,24 @@ def create_payment_intent_view(request):
             discount = data.get('discount', 0)
             
             total_price = 0
-            student_ids_list = []  # Example: you might aggregate these if needed.
+            # Calculate the total price from the cart.
             for item in cart:
                 price = item.get("price", 0)
                 total_price += price
-                # For this example, we'll use the student_ids_list from the last item.
-                student_ids_list = item.get("student_ids_list", [])
             
             # Apply discount to total price.
             final_price = max(0, total_price - discount)
             # Convert to cents (assuming price is in Euros)
             amount_in_cents = int(final_price * 100)
+            
+            # Create a summary of the cart.
+            cart_summary = {
+                "item_count": len(cart),
+                "total_price": total_price,
+            }
+            
+            # Calculate total student count (aggregated across all cart items).
+            student_count = sum(len(item.get("student_ids_list", [])) for item in cart)
             
             intent = stripe.PaymentIntent.create(
                 amount=amount_in_cents,
@@ -152,9 +159,9 @@ def create_payment_intent_view(request):
                 payment_method_types=["card"],
                 metadata={
                     "user_id": str(request.user.id) if request.user.is_authenticated else "anonymous",
-                    "cart": json.dumps(cart),
+                    "cart_summary": json.dumps(cart_summary),
                     "discount": str(discount),
-                    "student_ids_list": json.dumps(student_ids_list),
+                    "student_count": str(student_count),
                 }
             )
             return JsonResponse({"clientSecret": intent.client_secret}, status=200)
@@ -162,6 +169,7 @@ def create_payment_intent_view(request):
             return JsonResponse({"error": str(e)}, status=400)
     
     return JsonResponse({"error": "Method not allowed"}, status=405)
+
 
 @csrf_exempt
 def create_checkout_session_view(request):

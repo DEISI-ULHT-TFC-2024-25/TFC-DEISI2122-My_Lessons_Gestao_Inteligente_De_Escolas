@@ -7,6 +7,7 @@ import '../services/cart_service.dart';
 import 'payment_success_page.dart';
 import 'payment_fail_page.dart';
 
+
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({Key? key}) : super(key: key);
 
@@ -19,26 +20,33 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String? _clientSecret;
   double totalPrice = 0.0;
   double discount = 0.0; // Adjust if needed
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    // Get real cart data from CartService.
-    final cartItems = CartService().items;
-    totalPrice = 0.0;
-    for (var item in cartItems) {
-      final price = item['price'];
-      if (price != null) {
-        totalPrice += (price is double ? price : double.tryParse(price.toString()) ?? 0.0);
-      }
-    }
+    _calculateTotal();
     _createPaymentIntent();
   }
 
-  /// Calls the backend to create a PaymentIntent.
+  /// Calculate the total price from the items in the cart.
+  void _calculateTotal() {
+    final cartItems = CartService().items;
+    double total = 0.0;
+    for (var item in cartItems) {
+      final price = item['price'];
+      if (price != null) {
+        total += price is double ? price : double.tryParse(price.toString()) ?? 0.0;
+      }
+    }
+    totalPrice = total;
+  }
+
+  /// Calls your backend to create a PaymentIntent using the cart data.
   Future<void> _createPaymentIntent() async {
     setState(() {
       _loading = true;
+      _error = null;
     });
     try {
       final cartItems = CartService().items;
@@ -50,7 +58,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final url = Uri.parse('$baseUrl/api/payments/create_payment_intent/');
       final response = await http.post(
         url,
-        headers: {"Content-Type": "application/json"},
+        headers: await getAuthHeaders(),
         body: jsonEncode(payload),
       );
 
@@ -61,13 +69,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
         await Stripe.instance.initPaymentSheet(
           paymentSheetParameters: SetupPaymentSheetParameters(
             paymentIntentClientSecret: _clientSecret!,
-            merchantDisplayName: 'MyLessons',
+            merchantDisplayName: 'My Lessons',
           ),
         );
       } else {
+        setState(() {
+          _error = "Error creating PaymentIntent: ${response.body}";
+        });
         debugPrint("Error creating PaymentIntent: ${response.body}");
       }
     } catch (e) {
+      setState(() {
+        _error = "Exception in _createPaymentIntent: $e";
+      });
       debugPrint("Exception in _createPaymentIntent: $e");
     }
     setState(() {
@@ -75,7 +89,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
   }
 
-  /// Presents the PaymentSheet to the user.
+  /// Presents the Payment Sheet to the user.
   Future<void> _presentPaymentSheet() async {
     try {
       await Stripe.instance.presentPaymentSheet();
@@ -103,20 +117,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
       body: Center(
         child: _loading
             ? const CircularProgressIndicator()
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Total: €${totalPrice.toStringAsFixed(2)}",
-                    style: const TextStyle(fontSize: 20),
+            : _error != null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _createPaymentIntent,
+                        child: const Text("Retry"),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Total: €${totalPrice.toStringAsFixed(2)}",
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _clientSecret != null ? _presentPaymentSheet : null,
+                        child: const Text("Pay Now"),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _clientSecret != null ? _presentPaymentSheet : null,
-                    child: const Text("Pay Now"),
-                  ),
-                ],
-              ),
       ),
     );
   }
