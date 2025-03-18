@@ -590,7 +590,7 @@ def book_pack_view(request):
     for pack_req in packs_data:
         logger.debug("Processing pack request: %s", pack_req)
         try:
-            # Determine if this booking was initiated from a paid context.
+            # If the payload has the 'user_paid' flag set, assign the request user.
             user_who_paid = request.user if pack_req.get('user_paid', False) else None
 
             # Convert student dicts to Student model instances.
@@ -636,7 +636,7 @@ def book_pack_view(request):
             new_pack = Pack.book_new_pack(
                 students=students,
                 school=school_obj,
-                date=expiration_date,  # using expiration_date as booking date
+                date=now().date(), 
                 number_of_classes=pack_req.get('number_of_classes'),
                 duration_in_minutes=pack_req.get('duration_in_minutes'),
                 instructors=pack_req.get('instructors'),

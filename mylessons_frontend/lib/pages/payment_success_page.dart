@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../services/api_service.dart';
 import '../services/cart_service.dart';
-
+import 'home_page.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
   const PaymentSuccessPage({Key? key}) : super(key: key);
@@ -23,39 +23,49 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   }
 
   Future<void> _bookPacks() async {
-    // Filter only cart items that represent a pack.
+    // Build payload only for items that represent a pack.
     List<Map<String, dynamic>> packsPayload = _cartService.items.where((item) {
-      // Check that the "type" is either a map with a "pack" key
-      if (item.containsKey('type')) {
-        if (item['type'] is Map<String, dynamic> && item['type'].containsKey('pack')) {
+      // Check if the cart item has a 'service' with a 'type' map containing the key 'pack'.
+      if (item.containsKey('service') && item['service'] is Map<String, dynamic>) {
+        final service = item['service'];
+        if (service.containsKey('type') &&
+            service['type'] is Map<String, dynamic> &&
+            service['type'].containsKey('pack')) {
           return true;
         }
       }
       return false;
     }).map((item) {
-      // Build the payload using the actual cart structure
+      final service = item['service'] as Map<String, dynamic>;
+      final checkoutDetails =
+          service.containsKey('checkout_details') && service['checkout_details'] is Map<String, dynamic>
+              ? service['checkout_details'] as Map<String, dynamic>
+              : {};
+
       return {
         "students": item['students'],
-        "school": item['school'],
-        "expiration_date": item['expiration_date'], // in YYYY-MM-DD format
-        "number_of_classes": item['number_of_classes'],
-        "duration_in_minutes": item['duration_in_minutes'],
-        "instructors": item['instructors'],
+        // Use the service's school_name (or a fallback)
+        "school": service['school_name'] ?? "Test School",
+        // For demo purposes, set expiration_date 30 days from now.
+        "expiration_date": DateTime.now().add(const Duration(days: 30)).toIso8601String().split('T').first,
+        "number_of_classes": checkoutDetails['classes'] ?? 0,
+        "duration_in_minutes": checkoutDetails['duration'] ?? 0,
+        "instructors": [],
         "price": item['price'],
-        // Payment is the pack's price.
         "payment": item['price'],
-        "discount_id": item['discount_id'],
-        // Directly use the type from the cart.
-        "type": item['type'],
-        // New flag to indicate the user paid from the success page.
+        "discount_id": null,
+        "type": service['type'],
+        // New flag to indicate that the booking comes from the success page.
         "user_paid": true,
       };
     }).toList();
 
-    // Build the final payload.
     Map<String, dynamic> payload = {"packs": packsPayload};
 
     try {
+      debugPrint("Cart service total payload:\n${_cartService.items}\n");
+      debugPrint("Entering Book Pack with payload:\n$payload\n");
+
       final response = await http.post(
         Uri.parse("$baseUrl/api/users/book_pack/"),
         headers: await getAuthHeaders(),
@@ -63,9 +73,18 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
       );
 
       if (response.statusCode == 201) {
-        // On success, clear the cart.
         _cartService.clear();
         debugPrint("Pack booking successful: ${response.body}");
+        final decodedResponse = json.decode(response.body);
+        final List<dynamic> bookedPacks = decodedResponse["booked_packs"];
+
+        // Navigate to HomePage and pass the booked packs as an argument.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomePage(newBookedPacks: bookedPacks),
+          ),
+        );
       } else {
         debugPrint("Failed to book packs. Status: ${response.statusCode}, Body: ${response.body}");
       }
@@ -87,9 +106,16 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
               style: TextStyle(fontSize: 20),
             ),
             const SizedBox(height: 20),
+            // The "Continue" button is now optional since we navigate automatically after booking.
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+                // If needed, you can also trigger the navigation manually.
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HomePage(newBookedPacks: []),
+                  ),
+                );
               },
               child: const Text("Continue"),
             ),
