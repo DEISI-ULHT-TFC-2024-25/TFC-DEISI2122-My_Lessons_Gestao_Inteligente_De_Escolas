@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, time
 import json
 from django.contrib.auth import authenticate, get_user_model
 from events.models import Activity
+from payments.models import Payment
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -27,6 +28,8 @@ import secrets
 import string
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from decimal import Decimal
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -563,7 +566,8 @@ def book_pack_view(request):
     Expects a JSON payload with a key "packs" that is a list of booking requests.
     Each booking request should include:
       - students (list of dicts with at least an "id" key)
-      - school (School id or a valid identifier; if 'default_school_id' or 'Test School' is provided, use a fallback)
+      - school (School id or a valid identifier; if 'default_school_id' or 'Test School'
+                is provided, use a fallback)
       - expiration_date (in YYYY-MM-DD format)
       - number_of_classes
       - duration_in_minutes
@@ -573,6 +577,11 @@ def book_pack_view(request):
       - discount_id (optional)
       - type (e.g. either a string like "private" or a dict with a key "pack")
       - user_paid (optional boolean flag)
+    
+    For every pack request with user_paid==True, the view groups the newly booked packs
+    by their school. After booking all packs, it creates one Payment object per unique school,
+    setting payment.user=request.user, payment.school to that school, and associates all
+    the corresponding packs (via payment.packs.set(...)).
     """
     data = request.data
     logger.debug("Received payload: %s", data)
@@ -586,11 +595,14 @@ def book_pack_view(request):
 
     booked_packs = []
     errors = []
-
+    
+    # Group packs by school for those with user_paid true.
+    payment_data_by_school = defaultdict(lambda: {"packs": [], "total_price": Decimal("0.00")})
+    
     for pack_req in packs_data:
         logger.debug("Processing pack request: %s", pack_req)
         try:
-            # If the payload has the 'user_paid' flag set, assign the request user.
+            # If the payload has the 'user_paid' flag set, mark this booking as paid.
             user_who_paid = request.user if pack_req.get('user_paid', False) else None
 
             # Convert student dicts to Student model instances.
@@ -633,6 +645,7 @@ def book_pack_view(request):
             elif isinstance(raw_type, str):
                 final_type = raw_type
 
+            # Book the pack using your Pack model's custom method.
             new_pack = Pack.book_new_pack(
                 students=students,
                 school=school_obj,
@@ -645,7 +658,6 @@ def book_pack_view(request):
                 discount_id=pack_req.get('discount_id'),
                 type=final_type,
                 expiration_date=expiration_date if expiration_date else None,
-                user_who_paid=user_who_paid,
             )
             booked_packs.append({
                 "pack_id": new_pack.id,
@@ -665,6 +677,14 @@ def book_pack_view(request):
                 "type": new_pack.type
             })
             logger.debug("Successfully booked pack with ID: %s", new_pack.id)
+            
+            # If user_paid is True, add the pack to the group for its school.
+            if user_who_paid:
+                # Ensure the price is a Decimal.
+                pack_price = Decimal(str(new_pack.price or "0.00"))
+                payment_data_by_school[school_obj]["packs"].append(new_pack)
+                payment_data_by_school[school_obj]["total_price"] += pack_price
+
         except Exception as e:
             error_str = f"Error processing pack request {pack_req}: {str(e)}"
             errors.append(error_str)
@@ -674,9 +694,26 @@ def book_pack_view(request):
         logger.error("Booking errors: %s", errors)
         return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
     
+    # Now create a Payment object for each school that has packs with user_paid True.
+    for school_obj, info in payment_data_by_school.items():
+        packs_list = info["packs"]
+        total_value = info["total_price"]
+        if packs_list:
+            payment = Payment.objects.create(
+                value=total_value,
+                user=request.user,
+                school=school_obj,
+                description={
+                    "book_pack": "Payment record from book_pack_view",
+                    "pack_ids": [p.id for p in packs_list],
+                }
+            )
+            payment.packs.set(packs_list)
+            logger.debug("Created Payment (ID %s) for School '%s' with packs: %s",
+                         payment.id, school_obj.name, [p.id for p in packs_list])
+    
     logger.debug("Booked packs successfully: %s", booked_packs)
     return Response({"booked_packs": booked_packs}, status=status.HTTP_201_CREATED)
-
     
 # Helper to map weekday names to Python's date.weekday() indices
 DAY_NAME_TO_INDEX = {
