@@ -331,12 +331,11 @@ def create_debt_payment_record_view(request):
     # Associate the packs with the Payment.
     payment.packs.set(packs)
 
-    # Update each pack's debt.
     for pack in packs:
         if pack_amounts:
-            # Use the provided amount (defaulting to pack.debt if missing).
             try:
-                amount = float(pack_amounts.get(str(pack.id), pack.debt))
+                # Convert the provided value to a Decimal.
+                amount = Decimal(str(pack_amounts.get(str(pack.id), pack.debt)))
             except Exception:
                 amount = pack.debt
             pack.update_debt(amount)
