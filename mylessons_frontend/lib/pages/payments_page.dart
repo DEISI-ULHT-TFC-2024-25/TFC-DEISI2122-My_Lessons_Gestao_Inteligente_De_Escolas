@@ -38,6 +38,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
   // Common search query for Payment History.
   String _historySearchQuery = "";
 
+  // State to track selected items and split amounts for Parent unpaid items.
+  Map<dynamic, bool> _selectedItems = {};
+  Map<dynamic, double> _splitAmounts = {};
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +82,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
       }
       if (unpaidRes.statusCode == 200) {
         _unpaid = List<Map<String, dynamic>>.from(json.decode(unpaidRes.body));
+        // Initialize each item's selection state and split amount.
+        for (var item in _unpaid) {
+          var packId = item['pack_id'];
+          if (!_selectedItems.containsKey(packId)) {
+            _selectedItems[packId] = true;
+            double fullAmount =
+                double.tryParse(item['amount']?.toString() ?? "0") ?? 0;
+            _splitAmounts[packId] = fullAmount;
+          }
+        }
       }
       if (historyRes.statusCode == 200) {
         _parentHistory =
@@ -127,7 +141,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
           Uri.parse('$baseUrl/api/payments/school_payment_history/'),
           headers: headers);
 
-      // Check for iterable type or a dictionary wrapping the list.
       final decodedDebt = json.decode(debtRes.body);
       if (decodedDebt is List) {
         _userDebt = List<Map<String, dynamic>>.from(decodedDebt);
@@ -230,7 +243,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
   bool _isLoading = false;
 
   ///////////////// Stripe Payment Integration ///////////////////
-
   bool _stripeLoading = false;
   String? _stripeClientSecret;
   String? _stripeError;
@@ -243,11 +255,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
     });
     try {
       // Extract a list of pack IDs from the _unpaid items.
-      // (Adjust the key 'id' if your pack ID is stored under a different field.)
       List<dynamic> packIds = _unpaid.map((item) => item['pack_id']).toList();
       final Map<String, dynamic> payload = {
-        "pack_ids":
-            packIds, // Pass the pack IDs so the backend can later remove the debt.
+        "pack_ids": packIds,
       };
 
       final url =
@@ -287,15 +297,26 @@ class _PaymentsPageState extends State<PaymentsPage> {
   }
 
   Future<void> _presentPaymentSheetStripe() async {
-    List<dynamic> packIds = _unpaid.map((item) => item['pack_id']).toList();
+    // Build a map of selected pack IDs to their respective split amounts.
+    Map<dynamic, double> selectedAmounts = {};
+    for (var item in _unpaid) {
+      var packId = item['pack_id'];
+      if (_selectedItems[packId] ?? true) {
+        double fullAmount =
+            double.tryParse(item['amount']?.toString() ?? "0") ?? 0;
+        double amountToPay = _splitAmounts[packId] ?? fullAmount;
+        selectedAmounts[packId] = amountToPay;
+      }
+    }
+
     try {
       await Stripe.instance.presentPaymentSheet();
-      // Payment succeeded: clear the cart and navigate to PaymentSuccessPage.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => PaymentSuccessPage(
-            packIds: packIds,
+            packAmounts:
+                selectedAmounts, // Pass the mapping to the success page.
           ),
         ),
       );
@@ -308,15 +329,74 @@ class _PaymentsPageState extends State<PaymentsPage> {
     }
   }
 
+  // Updated payment handler to use selected items and their split amounts.
   Future<void> _handleDebtStripePayment() async {
-    await _createDebtPaymentIntentStripe();
-    if (_stripeClientSecret != null) {
-      await _presentPaymentSheetStripe();
-    } else if (_stripeError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_stripeError!)),
-      );
+    // Filter the unpaid items to only those that are selected.
+    List<dynamic> selectedPackIds = _unpaid
+        .where((item) {
+          var packId = item['pack_id'];
+          return _selectedItems[packId] ?? true;
+        })
+        .map((item) => item['pack_id'])
+        .toList();
+
+    // Build a mapping for the split amounts of the selected items.
+    Map<dynamic, double> selectedSplitAmounts = {};
+    for (var item in _unpaid) {
+      var packId = item['pack_id'];
+      if (_selectedItems[packId] ?? true) {
+        double fullAmount =
+            double.tryParse(item['amount']?.toString() ?? "0") ?? 0;
+        double amountToPay = _splitAmounts[packId] ?? fullAmount;
+        selectedSplitAmounts[packId] = amountToPay;
+      }
     }
+
+    setState(() {
+      _stripeLoading = true;
+      _stripeError = null;
+    });
+    try {
+      debugPrint("Payload amounts: $selectedSplitAmounts");
+      debugPrint("Payload pack_ids: $selectedPackIds");
+
+      final headers = await getAuthHeaders();
+      final payload = {
+        "pack_ids": selectedPackIds,
+        "amounts": selectedSplitAmounts,
+      };
+      final url =
+          Uri.parse('$baseUrl/api/payments/create_debt_payment_intent/');
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _stripeClientSecret = data["clientSecret"];
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: _stripeClientSecret!,
+            merchantDisplayName: 'My Lessons',
+          ),
+        );
+        await _presentPaymentSheetStripe();
+      } else {
+        setState(() {
+          _stripeError = "Error creating PaymentIntent: ${response.body}";
+        });
+        debugPrint("Error creating PaymentIntent: ${response.body}");
+      }
+    } catch (e) {
+      setState(() {
+        _stripeError = "Exception in _handleDebtStripePayment: $e";
+      });
+      debugPrint("Exception in _handleDebtStripePayment: $e");
+    }
+    setState(() {
+      _stripeLoading = false;
+    });
   }
 
   Widget _buildDetailsModalContent({
@@ -370,7 +450,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  // _buildInfoCard used in the Parent/Instructor details modal.
   Widget _buildInfoCard(IconData icon, String label, String value) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -402,7 +481,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  // _buildFullWidthCard used in the details modal.
   Widget _buildFullWidthCard(IconData icon, String label, String value) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -431,56 +509,286 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
+  // ---------------- Parent Tabs ----------------
   Widget _buildParentUnpaidTab() {
-    return RefreshIndicator(
-      onRefresh: _fetchData,
-      color: Colors.orange,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // Compute the sum of selected items' amounts.
+    double selectedDebt = 0;
+    for (var item in _unpaid) {
+      var packId = item['pack_id'];
+      double fullAmount =
+          double.tryParse(item['amount']?.toString() ?? "0") ?? 0;
+      double currentSplit = _splitAmounts[packId] ?? fullAmount;
+      if (_selectedItems[packId] ?? true) {
+        selectedDebt += currentSplit;
+      }
+    }
+
+    // Using a Stack so the Pay Debt button can float fixed at the bottom.
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: _fetchData,
+          color: Colors.orange,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
               children: [
-                Flexible(
-                  child: Text(
-                    "${_debt.toStringAsFixed(2)}€",
-                    style: GoogleFonts.lato(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
-                    overflow: TextOverflow.ellipsis,
+                // Card showing Total Debt and, if different, Selected Debt.
+                Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  color: Colors.grey[50],
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("Total Debt",
+                                style: GoogleFonts.lato(
+                                    fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text("${_debt.toStringAsFixed(2)}€",
+                                style: GoogleFonts.lato(
+                                    fontSize: 20, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        if (selectedDebt != _debt)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text("Selected Debt",
+                                    style: GoogleFonts.lato(fontSize: 16)),
+                                Text("${selectedDebt.toStringAsFixed(2)}€",
+                                    style: GoogleFonts.lato(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _handleDebtStripePayment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32)),
-                  ),
-                  child: _stripeLoading
-                      ? const CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        )
-                      : const Text("Pay Debt",
-                          style: TextStyle(color: Colors.white)),
-                ),
+                const SizedBox(height: 16),
+                _unpaid.isEmpty
+                    ? Text("No unpaid items",
+                        style: GoogleFonts.lato(color: Colors.black54))
+                    : Column(
+                        children: _unpaid
+                            .map((item) => _buildUnpaidItemCard(item))
+                            .toList(),
+                      ),
               ],
             ),
-            const Divider(height: 32),
-            _unpaid.isEmpty
-                ? Text("No unpaid items",
-                    style: GoogleFonts.lato(color: Colors.black54))
-                : Column(
-                    children: _unpaid.map((item) => _buildCard(item)).toList(),
+          ),
+        ),
+        // Fixed Pay Debt button at the bottom.
+        Positioned(
+          bottom: 16,
+          left: 16,
+          right: 16,
+          child: ElevatedButton(
+            onPressed: (_debt == 0 || selectedDebt == 0 || _stripeLoading)
+                ? null
+                : _handleDebtStripePayment,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(32)),
+            ),
+            child: _stripeLoading
+                ? const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  )
+                : const Text(
+                    "Pay Debt",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
                   ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Build a card for each unpaid item with a checkbox and a split button.
+  Widget _buildUnpaidItemCard(Map<String, dynamic> item) {
+    final packId = item['pack_id'];
+    double fullAmount = double.tryParse(item['amount']?.toString() ?? "0") ?? 0;
+    double currentSplit = _splitAmounts[packId] ?? fullAmount;
+    bool isSelected = _selectedItems[packId] ?? true;
+    final dateStr = item['date'] ?? "2025-01-15";
+    final timeStr = item['time'] ?? "09:00";
+    final dateTimeStr = "$dateStr $timeStr";
+    final parsedDate = DateTime.tryParse(dateTimeStr) ?? DateTime.now();
+    final formattedDate =
+        DateFormat("d MMM yyyy 'at' HH:mm").format(parsedDate);
+
+    // If the user split the amount (i.e. currentSplit differs from fullAmount),
+    // show "X€ of Y€", otherwise just show the full amount.
+    final amountDisplay = (currentSplit != fullAmount)
+        ? "${currentSplit.toStringAsFixed(2)}€ of ${fullAmount.toStringAsFixed(2)}€"
+        : "${fullAmount.toStringAsFixed(2)}€";
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.grey[50],
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            // Checkbox (default checked).
+            Checkbox(
+              value: isSelected,
+              onChanged: (val) {
+                setState(() {
+                  _selectedItems[packId] = val ?? false;
+                });
+              },
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(formattedDate,
+                      style: GoogleFonts.lato(
+                          fontSize: 14, color: Colors.black87)),
+                  // Display the split amount as "X€ of Y€" if applicable.
+                  Text(
+                    amountDisplay,
+                    style: GoogleFonts.lato(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
+                  ),
+                ],
+              ),
+            ),
+            // Split button to adjust the payable amount.
+            TextButton(
+              onPressed: () async {
+                double? result =
+                    await _showSplitDialog(currentSplit, fullAmount);
+                if (result != null) {
+                  setState(() {
+                    _splitAmounts[packId] = result;
+                  });
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.orange),
+              child: const Text("Split"),
+            ),
+            // More details button.
+            IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.orange),
+              onPressed: () => _showPaymentDetailsModal(item),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  // Dialog for adjusting the split amount with a dynamic fraction input.
+  Future<double?> _showSplitDialog(double currentValue, double maxValue) async {
+    // Main amount controller for direct input.
+    TextEditingController amountController =
+        TextEditingController(text: currentValue.toString());
+    // Controllers for numerator and denominator.
+    TextEditingController numeratorController = TextEditingController();
+    TextEditingController denominatorController = TextEditingController();
+    return showDialog<double>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Split Payment"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Direct input field.
+              TextField(
+                controller: amountController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  hintText: "Enter amount (max ${maxValue.toStringAsFixed(2)})",
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text("Or enter a fraction:"),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: numeratorController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Numerator",
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text("/"),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: denominatorController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Denom.",
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                onPressed: () {
+                  double? numerator = double.tryParse(numeratorController.text);
+                  double? denominator =
+                      double.tryParse(denominatorController.text);
+                  if (numerator != null &&
+                      denominator != null &&
+                      denominator != 0) {
+                    double computedValue = (numerator / denominator) * maxValue;
+                    if (computedValue > maxValue) computedValue = maxValue;
+                    amountController.text = computedValue.toStringAsFixed(2);
+                  }
+                },
+                child: const Text("Apply Fraction"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                double? entered = double.tryParse(amountController.text);
+                if (entered != null && entered <= maxValue && entered > 0) {
+                  Navigator.of(context).pop(entered);
+                } else {
+                  // Optionally handle invalid input.
+                }
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -550,7 +858,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  // Shared history row for Parent/Instructor.
   Widget _buildCard(Map<String, dynamic> item) {
     final dateStr = item['date'] ?? "2025-01-15";
     final timeStr = item['time'] ?? "09:00";
@@ -866,7 +1173,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ),
       );
     }
-    // Parent
+    // Parent Role
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -875,7 +1182,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
           bottom: const TabBar(
             indicatorColor: Colors.orange,
             tabs: [
-              Tab(text: "Unpaid Items"),
+              Tab(text: "Debt"),
               Tab(text: "History"),
             ],
           ),

@@ -177,17 +177,19 @@ def create_payment_intent_view(request):
 def create_debt_payment_intent_view(request):
     """
     Creates a Stripe PaymentIntent for the unpaid packs.
-    
-    Expected JSON payload:
+
+    Expected JSON payload can now be either:
       {
          "pack_ids": [1, 2, 3, ...]
       }
-    
-    It calculates the total amount due based on the price of each Pack,
-    converts the total amount to cents (assuming prices are in euros),
-    and creates a PaymentIntent using Stripe.
-    
-    The response returns the client secret of the PaymentIntent.
+    or, for split payments:
+      {
+         "pack_ids": [1, 2, 3, ...],
+         "amounts": {"1": 50.0, "2": 75.0, "3": 25.0}   # values in euros
+      }
+
+    If the "amounts" field is provided, it sums the amounts from that dictionary.
+    Otherwise, it calculates the total price based on the pack prices.
     """
     if request.method == 'POST':
         try:
@@ -195,19 +197,23 @@ def create_debt_payment_intent_view(request):
             pack_ids = data.get("pack_ids", [])
             if not pack_ids:
                 return JsonResponse({"error": "No pack_ids provided"}, status=400)
+
+            # If "amounts" is provided in the payload, use those values.
+            if "amounts" in data:
+                amounts_dict = data["amounts"]
+                # Sum the provided amounts (assumed to be in euros)
+                total_price = sum(float(v) for v in amounts_dict.values())
+            else:
+                # Retrieve all Pack objects with IDs in pack_ids.
+                packs = Pack.objects.filter(id__in=pack_ids)
+                if not packs.exists():
+                    return JsonResponse({"error": "No valid packs found for provided IDs"}, status=400)
+                total_price = sum(pack.price for pack in packs)
             
-            # Retrieve all Pack objects with IDs in pack_ids.
-            packs = Pack.objects.filter(id__in=pack_ids)
-            if not packs.exists():
-                return JsonResponse({"error": "No valid packs found for provided IDs"}, status=400)
-            
-            # Calculate the total price (assuming each pack has a 'price' field)
-            total_price = sum(pack.price for pack in packs)
-            
-            # Convert the total price to cents (assuming the price is in euros)
+            # Convert the total price to cents (assuming price is in euros)
             amount_in_cents = int(total_price * 100)
             
-            # Create a PaymentIntent with Stripe
+            # Create a PaymentIntent with Stripe.
             intent = stripe.PaymentIntent.create(
                 amount=amount_in_cents,
                 currency="eur",
@@ -222,6 +228,7 @@ def create_debt_payment_intent_view(request):
             return JsonResponse({"error": str(e)}, status=400)
     
     return JsonResponse({"error": "Method not allowed"}, status=405)
+
 
 @csrf_exempt
 def create_checkout_session_view(request):
@@ -257,41 +264,58 @@ def create_debt_payment_record_view(request):
     """
     Creates a Payment record for debt update.
 
-    Expected JSON payload:
-      {
-         "pack_ids": [1, 2, 3, ...]
-      }
+    Expected JSON payload can be one of the following:
 
-    The view does the following:
-      - Retrieves all Pack objects with IDs in pack_ids.
-      - Calculates the total price (assuming each Pack has a Decimal 'price' field).
-      - Retrieves the school from the first pack (assumes all packs are from the same school).
-      - Creates a Payment object with:
-            payment.user = request.user,
-            payment.value set to the sum of pack prices,
-            payment.school set to the school from the pack,
-            and a description containing metadata (including the pack_ids).
-      - Associates the retrieved packs with the Payment via the many-to-many field.
-    
+    1. For full payment:
+       {
+         "pack_ids": [1, 2, 3, ...]
+       }
+
+    2. For split payments:
+       {
+         "pack_amounts": {"1": 50.0, "2": 75.0, "3": 25.0}
+       }
+       
+    In the second case, the total value is the sum of the provided amounts,
+    and each pack’s debt is updated with its corresponding amount.
+    Otherwise, the total is calculated based on each pack’s full price.
+
     Returns a JSON response with a success message and the new payment's ID.
     """
     data = request.data
-    pack_ids = data.get("pack_ids", [])
-    
+    pack_amounts = data.get("pack_amounts", None)
+
+    if pack_amounts:
+        # Expecting pack_amounts to be a mapping (keys as pack IDs, values as amounts).
+        try:
+            # Convert keys to integers.
+            pack_ids = [int(k) for k in pack_amounts.keys()]
+        except Exception as e:
+            return Response({"error": "Invalid format for pack_amounts."}, status=400)
+    else:
+        pack_ids = data.get("pack_ids", [])
+
     if not pack_ids:
         return Response({"error": "No pack_ids provided."}, status=400)
-    
-    # Retrieve all packs whose ID is in pack_ids.
+
+    # Retrieve all packs with the provided IDs.
     packs = Pack.objects.filter(id__in=pack_ids)
     if not packs.exists():
         return Response({"error": "No valid packs found for provided IDs."}, status=400)
-    
-    # Calculate the total value. (Assuming pack.price is a Decimal.)
-    total_value = sum(pack.price for pack in packs)
-    
-    # Retrieve the school from the first pack (assuming all packs are from the same school)
+
+    if pack_amounts:
+        # Calculate total value using the provided amounts.
+        try:
+            total_value = sum(float(pack_amounts.get(str(pack.id), 0)) for pack in packs)
+        except Exception as e:
+            return Response({"error": "Error processing pack_amounts: " + str(e)}, status=400)
+    else:
+        # Calculate total value based on the full price of each pack.
+        total_value = sum(pack.price for pack in packs)
+
+    # Retrieve the school from the first pack (assuming all packs are from the same school).
     school = packs.first().school if packs.exists() else None
-    
+
     # Create the Payment record.
     payment = Payment.objects.create(
         value=total_value,
@@ -300,15 +324,25 @@ def create_debt_payment_record_view(request):
         description={
             "debt_payment": "Payment record for debt update",
             "pack_ids": pack_ids,
+            "pack_amounts": pack_amounts if pack_amounts else None,
         }
     )
-    
+
     # Associate the packs with the Payment.
     payment.packs.set(packs)
-    
+
+    # Update each pack's debt.
     for pack in packs:
-        pack.update_debt(pack.debt)
-    
+        if pack_amounts:
+            # Use the provided amount (defaulting to pack.debt if missing).
+            try:
+                amount = float(pack_amounts.get(str(pack.id), pack.debt))
+            except Exception:
+                amount = pack.debt
+            pack.update_debt(amount)
+        else:
+            pack.update_debt(pack.debt)
+
     return Response(
         {
             "message": "Debt payment record created successfully.",

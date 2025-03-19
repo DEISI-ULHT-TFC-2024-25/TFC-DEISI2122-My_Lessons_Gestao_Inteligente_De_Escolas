@@ -12,8 +12,12 @@ import 'services/cart_service.dart';
 import 'services/api_service.dart'; // for getAuthHeaders() and baseUrl
 
 class MainScreen extends StatefulWidget {
+  final int initialIndex;
   final List<dynamic> newBookedPacks;
-  const MainScreen({Key? key, this.newBookedPacks = const []}) : super(key: key);
+  
+  // initialIndex is optional (defaults to 0)
+  const MainScreen({Key? key, this.newBookedPacks = const [], this.initialIndex = 0})
+      : super(key: key);
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -31,6 +35,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex; // use initial index if provided
     _fetchUserRole();
   }
 
@@ -91,7 +96,7 @@ class _MainScreenState extends State<MainScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _currentIndex = index;
-      _isCheckout = false; // leave checkout mode when a nav item is tapped
+      _isCheckout = false; // exit checkout mode when a nav item is tapped
     });
   }
 
@@ -118,7 +123,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Persistent Cart Button is shown only when NOT in checkout mode.
+          // Persistent Cart Button (shown only when not in checkout)
           if (!_isCheckout)
             ValueListenableBuilder<int>(
               valueListenable: CartService().cartCount,

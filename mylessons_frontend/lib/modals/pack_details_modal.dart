@@ -79,7 +79,8 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
               children: [
                 Text(
                   "Pack Details",
-                  style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.lato(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 const Text("Could not fetch pack details."),
@@ -113,13 +114,17 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
             {'label': 'Date', 'value': details['date'] ?? ''},
             {
               'label': 'Lessons Remaining',
-              'value': "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
+              'value':
+                  "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
             },
             {'label': 'Debt', 'value': details['debt']?.toString() ?? ''},
             {'label': 'Students', 'value': details['students_name'] ?? ''},
             {'label': 'Type', 'value': details['type'] ?? ''},
             {'label': 'School', 'value': details['school_name'] ?? ''},
-            {'label': 'Instructors', 'value': details['instructors_name'] ?? ''},
+            {
+              'label': 'Instructors',
+              'value': details['instructors_name'] ?? ''
+            },
             {'label': 'Subject', 'value': details['subject'] ?? ''},
           ];
 
@@ -134,7 +139,8 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
             'Instructors': Icons.person_outline,
           };
 
-          final double debtValue = double.tryParse(details['debt']?.toString() ?? '0') ?? 0;
+          final double debtValue =
+              double.tryParse(details['debt']?.toString() ?? '0') ?? 0;
           labelsWithAction = [];
           if (debtValue > 0) {
             labelsWithAction.add('Debt');
@@ -150,18 +156,23 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
             'School': 'Contact school',
             'Instructors': 'Contact instructors',
           };
-        } else if (widget.currentRole == "Instructor" || widget.currentRole == "Admin") {
+        } else if (widget.currentRole == "Instructor" ||
+            widget.currentRole == "Admin") {
           gridItems = [
             {'label': 'Date', 'value': details['date'] ?? ''},
             {
               'label': 'Lessons Remaining',
-              'value': "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
+              'value':
+                  "${details['lessons_remaining'] ?? ''}/${details['number_of_classes'] ?? ''}"
             },
             {'label': 'Debt', 'value': details['debt']?.toString() ?? ''},
             {'label': 'Students', 'value': details['students_name'] ?? ''},
             {'label': 'Type', 'value': details['type'] ?? ''},
             {'label': 'School', 'value': details['school_name'] ?? ''},
-            {'label': 'Instructors', 'value': details['instructors_name'] ?? ''},
+            {
+              'label': 'Instructors',
+              'value': details['instructors_name'] ?? ''
+            },
             {'label': 'Subject', 'value': details['subject'] ?? ''},
           ];
 
@@ -176,7 +187,13 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
             'Instructors': Icons.edit,
           };
 
-          labelsWithAction = ['Debt', 'School', 'Instructors', 'Students', 'Subject'];
+          labelsWithAction = [
+            'Debt',
+            'School',
+            'Instructors',
+            'Students',
+            'Subject'
+          ];
           actionIconMapping = {
             'Debt': Icons.payment,
             'Students': Icons.edit,
@@ -193,8 +210,12 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
           };
         }
 
-        final nonActionItems = gridItems.where((item) => !labelsWithAction.contains(item['label'])).toList();
-        final actionItems = gridItems.where((item) => labelsWithAction.contains(item['label'])).toList();
+        final nonActionItems = gridItems
+            .where((item) => !labelsWithAction.contains(item['label']))
+            .toList();
+        final actionItems = gridItems
+            .where((item) => labelsWithAction.contains(item['label']))
+            .toList();
         final combinedItems = [...nonActionItems, ...actionItems];
 
         return Container(
@@ -205,14 +226,16 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
               children: [
                 Text(
                   "Pack Details",
-                  style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.lato(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     double spacing = 8.0;
                     double itemWidth = (constraints.maxWidth - spacing) / 2;
-                    Widget buildCard(Map<String, dynamic> item, {bool withAction = false}) {
+                    Widget buildCard(Map<String, dynamic> item,
+                        {bool withAction = false}) {
                       final String label = item['label'];
                       final String value = item['value'].toString();
                       return SizedBox(
@@ -229,17 +252,21 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(8.0),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        leftIconMapping[label] ?? Icons.info_outline,
+                                        leftIconMapping[label] ??
+                                            Icons.info_outline,
                                         color: Colors.grey,
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Text(
                                               label,
@@ -249,7 +276,8 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                                             ),
                                             Text(
                                               value,
-                                              style: GoogleFonts.lato(fontSize: 12),
+                                              style: GoogleFonts.lato(
+                                                  fontSize: 12),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ],
@@ -261,13 +289,18 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                                               ? SizedBox(
                                                   width: 24,
                                                   height: 24,
-                                                  child: CircularProgressIndicator(
+                                                  child:
+                                                      CircularProgressIndicator(
                                                     strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                                Color>(
+                                                            Colors.orange),
                                                   ),
                                                 )
                                               : Icon(
-                                                  actionIconMapping[label] ?? Icons.arrow_forward,
+                                                  actionIconMapping[label] ??
+                                                      Icons.arrow_forward,
                                                   color: Colors.orange,
                                                 ),
                                           onPressed: () async {
@@ -276,34 +309,83 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                                             });
                                             try {
                                               bool? updated;
-                                              if (label == "Subject" && widget.currentRole != "Parent") {
-                                                updated = await showModalBottomSheet<bool>(
+                                              if (label == "Debt" &&
+                                                  widget.currentRole ==
+                                                      "Parent") {
+                                                // For Parents, simply pop the modal and redirect to the Payments page.
+                                                Navigator.pop(context);
+                                                if (!mounted) return;
+                                                Navigator.pushReplacementNamed(
+                                                  context,
+                                                  '/main',
+                                                  arguments: {
+                                                    'newBookedPacks': [],
+                                                    'initialIndex':
+                                                        2, // Payments tab index
+                                                  },
+                                                );
+                                                return; // Exit early.
+                                              } else if (label == "Subject" &&
+                                                  widget.currentRole !=
+                                                      "Parent") {
+                                                updated =
+                                                    await showModalBottomSheet<
+                                                        bool>(
                                                   context: context,
                                                   isScrollControlled: true,
-                                                  shape: const RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                  shape:
+                                                      const RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.vertical(
+                                                            top:
+                                                                Radius.circular(
+                                                                    16)),
                                                   ),
-                                                  builder: (context) => SubjectModal(packId: packId),
+                                                  builder: (context) =>
+                                                      SubjectModal(
+                                                          packId: packId),
                                                 );
-                                              } else if (label == "Students" && widget.currentRole != "Parent") {
-                                                updated = await showModalBottomSheet<bool>(
+                                              } else if (label == "Students" &&
+                                                  widget.currentRole !=
+                                                      "Parent") {
+                                                updated =
+                                                    await showModalBottomSheet<
+                                                        bool>(
                                                   context: context,
                                                   isScrollControlled: true,
-                                                  shape: const RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                  shape:
+                                                      const RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.vertical(
+                                                            top:
+                                                                Radius.circular(
+                                                                    16)),
                                                   ),
-                                                  builder: (context) => StudentsModal(packId: packId),
+                                                  builder: (context) =>
+                                                      StudentsModal(
+                                                          packId: packId),
                                                 );
-                                              } else if (label == "Instructors") {
-                                                updated = await showModalBottomSheet<bool>(
+                                              } else if (label ==
+                                                  "Instructors") {
+                                                updated =
+                                                    await showModalBottomSheet<
+                                                        bool>(
                                                   context: context,
                                                   isScrollControlled: true,
-                                                  shape: const RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                                  shape:
+                                                      const RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.vertical(
+                                                            top:
+                                                                Radius.circular(
+                                                                    16)),
                                                   ),
-                                                  builder: (context) => InstructorsModal(packId: packId),
+                                                  builder: (context) =>
+                                                      InstructorsModal(
+                                                          packId: packId),
                                                 );
-                                              } else if (label == "Debt" || label == "School") {
+                                              } else if (label == "Debt" ||
+                                                  label == "School") {
                                                 // For Debt or School actions, simply set updated true.
                                                 updated = true;
                                               }
@@ -328,7 +410,8 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                                 alignment: Alignment.bottomRight,
                                 child: Text(
                                   actionNoteMapping[label] ?? "",
-                                  style: GoogleFonts.lato(fontSize: 12, color: Colors.orange),
+                                  style: GoogleFonts.lato(
+                                      fontSize: 12, color: Colors.orange),
                                 ),
                               ),
                           ],
@@ -340,7 +423,8 @@ class _PackDetailsModalState extends State<PackDetailsModal> {
                       spacing: spacing,
                       runSpacing: spacing,
                       children: combinedItems.map((item) {
-                        final bool withAction = labelsWithAction.contains(item['label']);
+                        final bool withAction =
+                            labelsWithAction.contains(item['label']);
                         return buildCard(item, withAction: withAction);
                       }).toList(),
                     );
