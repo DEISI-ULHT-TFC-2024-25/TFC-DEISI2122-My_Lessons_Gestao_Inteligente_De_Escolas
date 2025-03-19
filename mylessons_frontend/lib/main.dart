@@ -195,7 +195,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           final args = ModalRoute.of(context)?.settings.arguments
                   as Map<String, dynamic>? ??
               {};
-          return MainScreen(newBookedPacks: args['newBookedPacks'] ?? []);
+          return MainScreen(
+            newBookedPacks: args['newBookedPacks'] ?? [],
+            initialIndex: args['initialIndex'] ?? 0,
+          );
         },
         '/login': (context) => const LoginPage(),
         '/register_landing_page': (context) => const RegisterLandingPage(),
