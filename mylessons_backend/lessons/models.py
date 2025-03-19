@@ -218,17 +218,6 @@ class Pack(models.Model):
             self.is_paid = True
         self.save(update_fields=["debt", "is_paid"])
         
-        # Create a Payment record for this pack payment.
-        payment_obj = Payment.objects.create(
-            value=payment,
-            user=user,
-            school=self.school,  # Assuming the pack has a school attribute; adjust if needed.
-            description={"pack_id": str(self.id), "update": "debt updated via update_debt"},
-        )
-        # Associate this pack with the created payment.
-        payment_obj.packs.add(self)
-        return payment_obj
-
     def suspend(self):
         self.is_suspended = True
         self.save(update_fields=["is_suspended"])

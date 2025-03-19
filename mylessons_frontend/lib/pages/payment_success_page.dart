@@ -1,13 +1,16 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 import 'package:http/http.dart' as http;
-
 import '../services/api_service.dart';
 import '../services/cart_service.dart';
-import 'home_page.dart';
+import 'package:flutter/material.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
-  const PaymentSuccessPage({Key? key}) : super(key: key);
+  final List<dynamic>? packIds;
+  const PaymentSuccessPage({
+    Key? key,
+    this.packIds, // not required
+  }) : super(key: key);
 
   @override
   _PaymentSuccessPageState createState() => _PaymentSuccessPageState();
@@ -17,56 +20,58 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   final CartService _cartService = CartService();
   List<dynamic> bookedPacks = [];
 
+  // Make sure you have the Stripe client secret from your payment flow.
+  // If you stored it in a variable like `_stripeClientSecret` in your previous page,
+  // pass it here via constructor or route arguments. For example:
+  final String? _stripeClientSecret = null; // or pass via constructor
+
   @override
   void initState() {
     super.initState();
     _processSuccess();
   }
 
-  /// Process the successful payment by creating a Payment record for debt
-  /// and then booking the packs.
+  /// 1) Overall success handler: first create the Payment record for debt,
+  ///    then optionally book packs, then go to the next screen, etc.
   Future<void> _processSuccess() async {
     await _createDebtPaymentRecord();
-    await _bookPacks();
+    // If you also need to call _bookPacks(), do so here:
+    // await _bookPacks();
   }
 
-  /// Creates a Payment record for debt.
-  /// It extracts the pack IDs from the cart items (for pack services),
-  /// sends them to your backend endpoint so that a Payment object can be
-  /// created with payment.user = request.user and the related packs.
+  /// 2) Create a debt payment record using the pack_ids from the Stripe metadata.
   Future<void> _createDebtPaymentRecord() async {
-    // Filter cart items that represent pack services.
-    List<dynamic> packIds = _cartService.items.where((item) {
-      if (item.containsKey('service') &&
-          item['service'] is Map<String, dynamic>) {
-        final service = item['service'];
-        if (service.containsKey('type') &&
-            service['type'] is Map<String, dynamic> &&
-            service['type'].containsKey('pack')) {
-          return true;
-        }
-      }
-      return false;
-    }).map((item) => item['id']).toList();
+    if (widget.packIds == null || widget.packIds!.isEmpty) {
+      debugPrint("No pack IDs to send; skipping debt payment record.");
+      return;
+    }
 
-    Map<String, dynamic> payload = {
-      "pack_ids": packIds,
+    final Map<String, dynamic> payload = {
+      "pack_ids": widget.packIds,
     };
 
     try {
+
+      final url =
+          Uri.parse("$baseUrl/api/payments/create_debt_payment_record/");
+      final headers = await getAuthHeaders();
+
       final response = await http.post(
-        Uri.parse("$baseUrl/api/payments/create_debt_payment_record/"),
-        headers: await getAuthHeaders(),
+        url,
+        headers: headers,
         body: json.encode(payload),
       );
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint("Debt Payment record created successfully: ${response.body}");
+        debugPrint(
+            "Debt Payment record created successfully: ${response.body}");
       } else {
         debugPrint(
-            "Failed to create debt payment record: ${response.statusCode}, ${response.body}");
+          "Failed to create debt payment record: ${response.statusCode}, ${response.body}",
+        );
       }
     } catch (e) {
-      debugPrint("Error creating debt payment record: $e");
+      debugPrint("Error creating debt payment record from Stripe metadata: $e");
     }
   }
 
