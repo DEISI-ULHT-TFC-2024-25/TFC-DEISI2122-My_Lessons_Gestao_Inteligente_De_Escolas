@@ -136,7 +136,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           dayOverlayColor: MaterialStateProperty.all(Colors.transparent),
         ),
         checkboxTheme: CheckboxThemeData(
-          fillColor: MaterialStateProperty.all(Colors.orange),
+          fillColor: MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.orange; // Fill orange when checked.
+            }
+            return Colors.transparent; // Transparent when unchecked.
+          }),
+          side: MaterialStateBorderSide.resolveWith((states) {
+            return BorderSide(
+                color: Colors.orange, width: 2.0); // Thicker border.
+          }),
         ),
         tabBarTheme: const TabBarTheme(
           labelColor: Colors.orange,

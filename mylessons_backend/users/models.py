@@ -48,10 +48,13 @@ class UserAccount(AbstractUser):
         A payment qualifies as a payout if:
         - payment.instructor matches self.instructor_profile, or
         - payment.monitor matches self.monitor_profile, or
-        - if neither instructor nor monitor is set, payment.user == self.
+        - if neither instructor nor monitor is set, the payment belongs to the user
+            and has no associated packs, lessons, activities, camp_orders, birthday_parties, or vouchers.
         
         Note: differences in date, time, school, and description are ignored.
         """
+        from datetime import datetime  # Ensure datetime is imported
+
         # Get Payment objects for this user in reverse chronological order.
         payments = Payment.objects.filter(user=self).order_by('-date', '-time')
         last_payout_payment = None
@@ -67,10 +70,27 @@ class UserAccount(AbstractUser):
                 if payment.monitor.id == self.monitor_profile.id:
                     last_payout_payment = payment
                     break
-            # If there is no instructor/monitor, use the payment if it belongs to the user.
+            # Otherwise, if there is no instructor/monitor, use the payment if:
+            # 1. The payment belongs to the user, and
+            # 2. The payment does NOT have any related packs, lessons, activities,
+            #    camp_orders, birthday_parties, or vouchers.
             if payment.user.id == self.id:
-                last_payout_payment = payment
-                break
+                no_related = True
+                if hasattr(payment, 'packs') and payment.packs.exists():
+                    no_related = False
+                if hasattr(payment, 'lessons') and payment.lessons.exists():
+                    no_related = False
+                if hasattr(payment, 'activities') and payment.activities.exists():
+                    no_related = False
+                if hasattr(payment, 'camp_orders') and payment.camp_orders.exists():
+                    no_related = False
+                if hasattr(payment, 'birthday_parties') and payment.birthday_parties.exists():
+                    no_related = False
+                if hasattr(payment, 'vouchers') and payment.vouchers.exists():
+                    no_related = False
+                if no_related:
+                    last_payout_payment = payment
+                    break
 
         # If no payout is found, return the entire balance_history.
         if not last_payout_payment:
@@ -91,6 +111,7 @@ class UserAccount(AbstractUser):
                 continue
 
         return filtered_history
+
     
     def update_balance(self, amount, message):
         """
