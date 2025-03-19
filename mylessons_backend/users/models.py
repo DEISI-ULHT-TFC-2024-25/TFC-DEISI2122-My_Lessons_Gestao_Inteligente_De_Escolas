@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date, time
 from decimal import Decimal
+import json
 import logging
 from django.contrib.auth.models import AbstractUser,  Group, Permission
 from django.db import models
@@ -51,29 +52,22 @@ class UserAccount(AbstractUser):
         - if neither instructor nor monitor is set, the payment belongs to the user
             and has no associated packs, lessons, activities, camp_orders, birthday_parties, or vouchers.
         
-        Note: differences in date, time, school, and description are ignored.
+        Returns a JSON-encoded string of the filtered balance_history.
         """
-        from datetime import datetime  # Ensure datetime is imported
-
         # Get Payment objects for this user in reverse chronological order.
         payments = Payment.objects.filter(user=self).order_by('-date', '-time')
         last_payout_payment = None
 
         for payment in payments:
-            # Check if the payment has an instructor that matches the user's profile.
             if payment.instructor and getattr(self, 'instructor_profile', None):
                 if payment.instructor.id == self.instructor_profile.id:
                     last_payout_payment = payment
                     break
-            # Otherwise, check if the payment has a monitor that matches the user's profile.
             if payment.monitor and getattr(self, 'monitor_profile', None):
                 if payment.monitor.id == self.monitor_profile.id:
                     last_payout_payment = payment
                     break
-            # Otherwise, if there is no instructor/monitor, use the payment if:
-            # 1. The payment belongs to the user, and
-            # 2. The payment does NOT have any related packs, lessons, activities,
-            #    camp_orders, birthday_parties, or vouchers.
+            # Check if the payment belongs to the user and has no related packs/lessons/etc.
             if payment.user.id == self.id:
                 no_related = True
                 if hasattr(payment, 'packs') and payment.packs.exists():
@@ -94,12 +88,9 @@ class UserAccount(AbstractUser):
 
         # If no payout is found, return the entire balance_history.
         if not last_payout_payment:
-            return self.balance_history
+            return json.dumps(self.balance_history)
 
-        # Combine the payment date and time to form a datetime.
         last_payout_dt = datetime.combine(last_payout_payment.date, last_payout_payment.time)
-
-        # Filter balance_history transactions that have a timestamp later than last_payout_dt.
         filtered_history = []
         for entry in self.balance_history:
             try:
@@ -107,11 +98,9 @@ class UserAccount(AbstractUser):
                 if entry_dt > last_payout_dt:
                     filtered_history.append(entry)
             except Exception:
-                # Skip entries with invalid timestamps.
                 continue
 
-        return filtered_history
-
+        return json.dumps(filtered_history)
     
     def update_balance(self, amount, message):
         """
