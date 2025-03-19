@@ -306,6 +306,9 @@ def create_debt_payment_record_view(request):
     # Associate the packs with the Payment.
     payment.packs.set(packs)
     
+    for pack in packs:
+        pack.update_debt(pack.debt)
+    
     return Response(
         {
             "message": "Debt payment record created successfully.",

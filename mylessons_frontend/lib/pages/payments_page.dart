@@ -287,12 +287,17 @@ class _PaymentsPageState extends State<PaymentsPage> {
   }
 
   Future<void> _presentPaymentSheetStripe() async {
+    List<dynamic> packIds = _unpaid.map((item) => item['pack_id']).toList();
     try {
       await Stripe.instance.presentPaymentSheet();
       // Payment succeeded: clear the cart and navigate to PaymentSuccessPage.
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const PaymentSuccessPage()),
+        MaterialPageRoute(
+          builder: (_) => PaymentSuccessPage(
+            packIds: packIds,
+          ),
+        ),
       );
     } catch (e) {
       debugPrint("PaymentSheet error: $e");
