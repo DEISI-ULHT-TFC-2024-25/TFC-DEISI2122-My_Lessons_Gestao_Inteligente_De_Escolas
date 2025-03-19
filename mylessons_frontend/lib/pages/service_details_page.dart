@@ -133,8 +133,9 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(32)),
                           ),
-                          child: Text("Choose Options",
+                          child: Text("Options",
                               style: GoogleFonts.lato(
+                                fontWeight: FontWeight.bold,
                                   color: Colors.orange, fontSize: 16)),
                         )
                       : ElevatedButton(
@@ -148,8 +149,9 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(32)),
                           ),
-                          child: Text("Choose Options",
+                          child: Text("Options",
                               style: GoogleFonts.lato(
+                                fontWeight: FontWeight.bold,
                                   color: Colors.white, fontSize: 16)),
                         ),
                 ),
@@ -167,8 +169,9 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(32)),
                           ),
-                          child: Text("View Table",
+                          child: Text("Table",
                               style: GoogleFonts.lato(
+                                fontWeight: FontWeight.bold,
                                   color: Colors.white, fontSize: 16)),
                         )
                       : OutlinedButton(
@@ -183,8 +186,9 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(32)),
                           ),
-                          child: Text("View Table",
+                          child: Text("Table",
                               style: GoogleFonts.lato(
+                                fontWeight: FontWeight.bold,
                                   color: Colors.orange, fontSize: 16)),
                         ),
                 ),
@@ -245,7 +249,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                 ),
                 child: Text('Book Service',
-                    style: GoogleFonts.lato(fontSize: 16, color: Colors.white)),
+                    style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
               ),
             ),
         ],
@@ -480,7 +484,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                       children: [
                         Text(
                           currentPrice != null
-                              ? 'Price: ${currentPrice!.toStringAsFixed(2)} $currencySymbol'
+                              ? 'Price:\n${currentPrice!.toStringAsFixed(2)}$currencySymbol'
                               : 'No pricing available',
                           style: GoogleFonts.lato(
                               fontSize: 20,
@@ -489,7 +493,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                         ),
                         const SizedBox(height: 8),
                         if (currentTimeLimit != null)
-                          Text('Time Limit: ${currentTimeLimit!} days',
+                          Text('Time Limit:\n${currentTimeLimit!} days',
                               style: GoogleFonts.lato(fontSize: 16)),
                       ],
                     ),

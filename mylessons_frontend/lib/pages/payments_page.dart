@@ -120,7 +120,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         final b = json.decode(balanceResponse.body)['current_balance'];
         _balance = double.tryParse(b.toString()) ?? 0.0;
       }
-      _nextPayoutDate = "31 January";
+      _nextPayoutDate = "Not Defined";
       _statsData = [12, 8, 14, 5, 19, 22, 7, 10, 13, 8, 12, 15];
     } catch (e) {
       debugPrint("Error fetching Instructor data: $e");
@@ -191,6 +191,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   }
 
   // ============ Shared: Payment Details Modal ============
+  // This is the generic modal (used by Parent/Instructor/History)
   Future<void> _showPaymentDetailsModal(Map<String, dynamic> item) async {
     final dateStr = item['date'] ?? "2025-01-15";
     final timeStr = item['time'] ?? "09:00";
@@ -240,6 +241,145 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
+  // NEW: Admin Balance Modal Details – shows only roles, amount and description.
+  Future<void> _showAdminBalanceModal(Map<String, dynamic> item) async {
+    // Expecting the upcoming payout item to have keys: "roles", "current_balance" and "description".
+    final roles = item['roles']?.toString() ?? "N/A";
+    final amount = double.tryParse(item['current_balance']?.toString() ?? "0")
+            ?.toStringAsFixed(2) ??
+        "0.00";
+    final description = item['description']?.toString() ?? "";
+    print("description_raw\n${item["description"]}\n");
+    print("description_str\n$description\n");
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (BuildContext context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 16,
+            left: 16,
+            right: 16,
+          ),
+          child: SingleChildScrollView(
+            child: _buildAdminBalanceModalContent(
+              roles: roles,
+              amount: amount,
+              description: description,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAdminBalanceModalContent({
+    required String roles,
+    required String amount,
+    required String description,
+  }) {
+    // Attempt to parse the description as JSON.
+    // We expect it to be a list of transaction entries.
+    List<dynamic> transactions = [];
+    try {
+      transactions = json.decode(description) as List<dynamic>;
+    } catch (e) {
+      debugPrint("Error parsing description JSON: $e");
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text("Balance Details",
+            style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        // Roles Info
+        Row(
+          children: [
+            Expanded(child: _buildInfoCard(Icons.person, "Roles", roles)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Amount Info
+        Row(
+          children: [
+            Expanded(
+                child:
+                    _buildInfoCard(Icons.attach_money, "Amount", "$amount€")),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Description Label
+        Text("Description",
+            style: GoogleFonts.lato(fontSize: 14, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        // Scrollable list of transactions from the description JSON
+        Container(
+          height: 200,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: transactions.isNotEmpty
+              ? ListView.builder(
+                  itemCount: transactions.length,
+                  itemBuilder: (context, index) {
+                    final tx = transactions[index] as Map<String, dynamic>;
+                    // Extract fields with defaults.
+                    final txTimestamp = tx["timestamp"] ?? "Unknown Time";
+                    final txAmount = tx["amount"] ?? "0.00";
+                    final txMessage = tx["message"] ?? "";
+                    final txBalance = tx["current_balance"] ?? "0.00";
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          vertical: 4, horizontal: 4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(txMessage,
+                                style: GoogleFonts.lato(
+                                    fontSize: 14, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text("Time: $txTimestamp",
+                                style: GoogleFonts.lato(fontSize: 12)),
+                            Text("Amount: $txAmount",
+                                style: GoogleFonts.lato(fontSize: 12)),
+                            Text("Balance: $txBalance",
+                                style: GoogleFonts.lato(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text("No transactions available.",
+                      style: GoogleFonts.lato(fontSize: 14)),
+                ),
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+          ),
+          child: const Text("Close", style: TextStyle(color: Colors.white)),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   bool _isLoading = false;
 
   ///////////////// Stripe Payment Integration ///////////////////
@@ -271,7 +411,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = json.decode(response.body);
         _stripeClientSecret = data["clientSecret"];
         await Stripe.instance.initPaymentSheet(
           paymentSheetParameters: SetupPaymentSheetParameters(
@@ -373,7 +513,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         body: jsonEncode(payload),
       );
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = json.decode(response.body);
         _stripeClientSecret = data["clientSecret"];
         await Stripe.instance.initPaymentSheet(
           paymentSheetParameters: SetupPaymentSheetParameters(
@@ -1036,6 +1176,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
           );
   }
 
+  // For Admin, the "Balance" tab (formerly Payouts) now shows a custom modal.
   Widget _buildAdminPayoutsTab() {
     return _loading
         ? const Center(child: CircularProgressIndicator(color: Colors.orange))
@@ -1081,7 +1222,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                               IconButton(
                                 icon: const Icon(Icons.more_vert,
                                     color: Colors.orange),
-                                onPressed: () => _showPaymentDetailsModal(item),
+                                onPressed: () => _showAdminBalanceModal(item),
                               ),
                             ],
                           ),
@@ -1135,7 +1276,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
               indicatorColor: Colors.orange,
               tabs: [
                 Tab(text: 'Debt'),
-                Tab(text: 'Payouts'),
+                Tab(text: 'Balance'),
                 Tab(text: 'History'),
               ],
             ),

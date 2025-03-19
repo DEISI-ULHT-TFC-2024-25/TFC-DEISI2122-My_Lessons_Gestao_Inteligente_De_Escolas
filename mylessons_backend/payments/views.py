@@ -588,8 +588,8 @@ def upcoming_payouts_view(request):
       - school.admins,
       - school.instructors (converted via Instructor.user),
       - school.monitors (converted via Monitor.user).
-    For each user, returns their id, name, current_balance, and the output of
-    get_balance_history_since_last_payout().
+    For each user, returns their id, name, current_balance, a list of roles (strings "Admin", "Instructor", "Monitor"),
+    and the output of get_balance_history_since_last_payout().
     Accessible only if request.user.current_role == "Admin".
     """
     if getattr(request.user, 'current_role', None) != "Admin":
@@ -621,14 +621,23 @@ def upcoming_payouts_view(request):
 
     data = []
     for user in all_users:
+        user_roles = []
+        if user in admins:
+            user_roles.append("Admin")
+        if user in instructors:
+            user_roles.append("Instructor")
+        if user in monitors:
+            user_roles.append("Monitor")
         data.append({
             "id": str(user.id),
             "name": str(user),
             "current_balance": str(user.balance),
+            "roles": user_roles,
             "description": user.get_balance_history_since_last_payout(),
         })
 
     return Response(data, status=status.HTTP_200_OK)
+
 
 
 
