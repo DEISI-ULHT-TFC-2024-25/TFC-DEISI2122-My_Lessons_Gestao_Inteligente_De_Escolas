@@ -190,15 +190,15 @@ class _PaymentsPageState extends State<PaymentsPage> {
     }
   }
 
-  // ============ Shared: Payment Details Modal ============
-  // This is the generic modal (used by Parent/Instructor/History)
+  // Example in _showPaymentDetailsModal:
   Future<void> _showPaymentDetailsModal(Map<String, dynamic> item) async {
     final dateStr = item['date'] ?? "2025-01-15";
     final timeStr = item['time'] ?? "09:00";
     final dateTimeStr = "$dateStr $timeStr";
     final parsedDate = DateTime.tryParse(dateTimeStr) ?? DateTime.now();
-    final formattedDate = DateFormat("d MMM yyyy").format(parsedDate);
-    final formattedTime = DateFormat("HH:mm").format(parsedDate);
+    // Updated formatting:
+    final formattedDate = DateFormat("dd MMM yyyy").format(parsedDate);
+    final formattedTime = DateFormat("hh:mm a").format(parsedDate);
     final school = (item['school'] ?? "").toString();
     final amount = double.tryParse(item['amount']?.toString() ?? "0")
             ?.toStringAsFixed(2) ??
@@ -330,11 +330,22 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   itemCount: transactions.length,
                   itemBuilder: (context, index) {
                     final tx = transactions[index] as Map<String, dynamic>;
-                    // Extract fields with defaults.
-                    final txTimestamp = tx["timestamp"] ?? "Unknown Time";
+                    final txTimestampRaw = tx["timestamp"] ?? "Unknown Time";
+                    DateTime? txDateTime;
+                    try {
+                      txDateTime = DateTime.parse(txTimestampRaw);
+                    } catch (e) {
+                      debugPrint("Error parsing transaction timestamp: $e");
+                    }
+                    final txTimestampFormatted = (txDateTime != null)
+                        ? DateFormat("dd MMM yyyy 'at' HH:mm")
+                            .format(txDateTime)
+                        : txTimestampRaw;
+
                     final txAmount = tx["amount"] ?? "0.00";
                     final txMessage = tx["message"] ?? "";
                     final txBalance = tx["current_balance"] ?? "0.00";
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
                           vertical: 4, horizontal: 4),
@@ -347,7 +358,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                                 style: GoogleFonts.lato(
                                     fontSize: 14, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
-                            Text("Time: $txTimestamp",
+                            Text("Registered: $txTimestampFormatted",
                                 style: GoogleFonts.lato(fontSize: 12)),
                             Text("Amount: $txAmount",
                                 style: GoogleFonts.lato(fontSize: 12)),
@@ -462,9 +473,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
       );
     } catch (e) {
       debugPrint("PaymentSheet error: $e");
-      Navigator.pushReplacement(
+      // From your payments flow:
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const PaymentFailPage()),
+        MaterialPageRoute(
+          builder: (_) => const PaymentFailPage(isFromCheckout: false),
+        ),
       );
     }
   }

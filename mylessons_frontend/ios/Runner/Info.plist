@@ -61,5 +61,8 @@
             </array>
         </dict>
     </array>
+    <key>NSCameraUsageDescription</key>
+    <string>This app uses the camera to scan QR codes and documents.</string>
+
 </dict>
 </plist>

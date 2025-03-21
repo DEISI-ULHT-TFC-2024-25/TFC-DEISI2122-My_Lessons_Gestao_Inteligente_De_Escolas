@@ -33,12 +33,15 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
     _processSuccess();
   }
 
-  /// Overall success handler: first create the Payment record for debt,
-  /// then optionally book packs, then go to the next screen.
+  /// Overall success handler:
+  /// - If there are no items in the cart, create a debt payment record.
+  /// - Otherwise, proceed to book packs.
   Future<void> _processSuccess() async {
-    await _createDebtPaymentRecord();
-    // If you also need to call _bookPacks(), do so here:
-    // await _bookPacks();
+    if (_cartService.items.isEmpty) {
+      await _createDebtPaymentRecord();
+    } else {
+      await _bookPacks();
+    }
   }
 
   /// Create a debt payment record using the provided pack amounts.

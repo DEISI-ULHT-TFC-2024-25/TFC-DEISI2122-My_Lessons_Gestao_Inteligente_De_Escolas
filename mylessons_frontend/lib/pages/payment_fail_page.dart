@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class PaymentFailPage extends StatelessWidget {
-  const PaymentFailPage({Key? key}) : super(key: key);
+  final bool isFromCheckout;
+
+  const PaymentFailPage({
+    Key? key,
+    required this.isFromCheckout,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +23,22 @@ class PaymentFailPage extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);
+                if (isFromCheckout) {
+                  // For the Checkout flow, just pop back
+                  Navigator.pop(context);
+                } else {
+                  // For the Payments page flow, do something else:
+                  // e.g., pop multiple times or push a specific route.
+                  // Example: go back to the PaymentsPage
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/main',
+                    arguments: {
+                      'newBookedPacks': [],
+                      'initialIndex': 2, // Payments tab index
+                    },
+                  );
+                }
               },
               child: const Text("Try Again"),
             ),
