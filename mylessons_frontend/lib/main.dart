@@ -182,8 +182,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           selectionHandleColor: Colors.orange,
         ),
         inputDecorationTheme: InputDecorationTheme(
-          labelStyle: const TextStyle(color: Colors.orange),
-          floatingLabelStyle: const TextStyle(color: Colors.orange),
+          hintStyle: const TextStyle(color: Colors.black), // Hint text in black
+          labelStyle:
+              const TextStyle(color: Colors.black), // Label text in black
+          floatingLabelStyle: const TextStyle(
+              color: Colors.black), // Floating label text in black
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
           ),

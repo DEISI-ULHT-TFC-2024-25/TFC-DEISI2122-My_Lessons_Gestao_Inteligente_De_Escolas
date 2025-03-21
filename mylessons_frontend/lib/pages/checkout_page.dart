@@ -501,9 +501,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
     } catch (e) {
       debugPrint("PaymentSheet error: $e");
-      Navigator.pushReplacement(
+      // From your checkout flow:
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const PaymentFailPage()),
+        MaterialPageRoute(
+          builder: (_) => const PaymentFailPage(isFromCheckout: true),
+        ),
       );
     }
   }
@@ -666,7 +669,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               bottom: 0,
               right: 0,
               child: IconButton(
-                icon: const Icon(Icons.delete),
+                icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () => _removeItem(index),
               ),
             ),
