@@ -1,6 +1,6 @@
-import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../../services/profile_service.dart';
 import 'school_setup_page.dart';
 import '../../main.dart'; // Ensure this imports your global routeObserver
@@ -24,19 +24,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   late TextEditingController _phoneController;
   late TextEditingController _birthdayController;
 
-  // For country picker, we keep a selected Country.
-  late Country _selectedCountry = Country(
-    countryCode: 'PT',
-    phoneCode: '351',
-    e164Sc: 0,
-    geographic: true,
-    level: 1,
-    name: 'Portugal',
-    displayName: 'Portugal',
-    displayNameNoCountryCode: 'Portugal',
-    e164Key: '351-PT-0',
-    example: '912345678',
-  );
+  // New variable to store the selected phone country code.
+  String _phoneCountryCode = 'PT';
 
   // Extra fields for role/school switching.
   List<String> availableRoles = [];
@@ -53,26 +42,12 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _birthdayController = TextEditingController();
-    // Set a default country.
-    _selectedCountry = Country(
-      countryCode: 'PT',
-      phoneCode: '351',
-      e164Sc: 0,
-      geographic: true,
-      level: 1,
-      name: 'Portugal',
-      displayName: 'Portugal',
-      displayNameNoCountryCode: 'Portugal',
-      e164Key: '351-PT-0',
-      example: '912345678',
-    );
     fetchProfileData();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Subscribe to route changes.
     final ModalRoute? route = ModalRoute.of(context);
     if (route is PageRoute) {
       routeObserver.subscribe(this, route);
@@ -90,10 +65,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     super.dispose();
   }
 
-  // This method is called when the current route has been popped back to.
   @override
   void didPopNext() {
-    // Refresh profile data when coming back to ProfilePage.
     fetchProfileData();
   }
 
@@ -104,27 +77,17 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         _firstNameController.text = profileData.firstName;
         _lastNameController.text = profileData.lastName;
         _emailController.text = profileData.email;
-        _phoneController.text = profileData.phone;
+        _phoneController.text = profileData.phone ?? '';
         _birthdayController.text = profileData.birthday ?? '';
         availableRoles = profileData.availableRoles;
         currentRole = profileData.currentRole;
         availableSchools = profileData.availableSchools;
         currentSchoolId = profileData.currentSchoolId;
         currentSchoolName = profileData.currentSchoolName;
-        // Update _selectedCountry if countryCode exists.
-        if (profileData.countryCode.isNotEmpty) {
-          _selectedCountry = Country(
-            countryCode: profileData.countryCode,
-            phoneCode: "", // update accordingly if needed
-            e164Sc: 0,
-            geographic: true,
-            level: 1,
-            name: 'Portugal',
-            displayName: 'Portugal',
-            displayNameNoCountryCode: 'Portugal',
-            e164Key: '351-PT-0',
-            example: '912345678',
-          );
+        // Update the country code if available from the response.
+        if (profileData.countryCode != null &&
+            profileData.countryCode.isNotEmpty) {
+          _phoneCountryCode = profileData.countryCode;
         }
         isLoading = false;
       });
@@ -141,7 +104,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       'first_name': _firstNameController.text,
       'last_name': _lastNameController.text,
       'email': _emailController.text,
-      'country_code': _selectedCountry.countryCode,
+      // Send the updated country code and phone number.
+      'country_code': _phoneCountryCode,
       'phone': _phoneController.text,
       'birthday': _birthdayController.text,
     };
@@ -193,7 +157,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
-  /// Builds a uniform input field using TextFormField.
   Widget buildProfileInputField(
       String label, TextEditingController controller) {
     return Padding(
@@ -213,78 +176,37 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
   }
 
-  /// Builds a row for the country code and phone input.
-  Widget buildCountryAndPhoneField() {
+  /// Replaces the previous country picker + phone field with IntlPhoneField.
+  Widget buildIntlPhoneField() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () {
-              if (isEditing) {
-                showCountryPicker(
-                  context: context,
-                  onSelect: (Country country) {
-                    setState(() {
-                      _selectedCountry = country;
-                    });
-                  },
-                  countryListTheme: CountryListThemeData(
-                    flagSize: 25,
-                    backgroundColor: Colors.white,
-                    textStyle:
-                        const TextStyle(fontSize: 16, color: Colors.black),
-                    bottomSheetHeight: 500,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20.0),
-                      topRight: Radius.circular(20.0),
-                    ),
-                  ),
-                );
-              }
-            },
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(4),
-                color: isEditing ? Colors.white : Colors.grey.shade200,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "${_selectedCountry.flagEmoji} +${_selectedCountry.phoneCode}",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                ],
-              ),
-            ),
+      child: IntlPhoneField(
+        // Use the stored country code and phone number so the field shows saved data.
+        initialCountryCode: _phoneCountryCode,
+        initialValue: _phoneController.text,
+        enabled: isEditing,
+        decoration: InputDecoration(
+          labelText: 'Phone Number',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.0),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextFormField(
-              controller: _phoneController,
-              readOnly: !isEditing,
-              decoration: const InputDecoration(
-                labelText: "Number",
-                border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              ),
-              keyboardType: TextInputType.phone,
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-        ],
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        ),
+        onCountryChanged: (country) {
+          setState(() {
+            _phoneCountryCode = country.code;
+          });
+        },
+        onChanged: (phone) {
+          setState(() {
+            _phoneController.text = phone.number;
+          });
+        },
       ),
     );
   }
 
-  /// Builds a row for the birthday field with a calendar icon.
   Widget buildBirthdayField() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -330,7 +252,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
     if (pickedDate != null) {
       setState(() {
-        _birthdayController.text = pickedDate.toIso8601String().split('T')[0];
+        _birthdayController.text =
+            pickedDate.toIso8601String().split('T')[0];
       });
     }
   }
@@ -360,7 +283,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
                           children: [
-                            // Optionally, you can show the profile photo here.
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -387,7 +309,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                                 "Last Name", _lastNameController),
                             buildProfileInputField("Email", _emailController),
                             buildBirthdayField(),
-                            buildCountryAndPhoneField(),
+                            // Use the updated IntlPhoneField widget.
+                            buildIntlPhoneField(),
                             if (isEditing)
                               Padding(
                                 padding: const EdgeInsets.only(top: 16.0),
@@ -441,7 +364,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                     if (currentRole == "Admin")
                       ElevatedButton(
                         onPressed: () async {
-                          final result = await Navigator.push(
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => SchoolSetupPage(
@@ -459,8 +382,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                     // Logout Button.
                     ElevatedButton(
                       onPressed: logout,
-                      style:
-                          ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red),
                       child: const Text("Logout",
                           style: TextStyle(color: Colors.white)),
                     ),

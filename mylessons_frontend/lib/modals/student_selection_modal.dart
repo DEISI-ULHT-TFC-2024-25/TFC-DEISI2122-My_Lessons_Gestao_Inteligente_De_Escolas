@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/services/api_service.dart';
-import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/cart_service.dart';
@@ -50,9 +49,6 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
 
-  /// Holds an existing student lookup result.
-  Map<String, dynamic>? _existingStudentConfirmation;
-
   /// Holds the currently selected birthday in the "New" tab.
   DateTime? selectedBirthday;
 
@@ -73,7 +69,7 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _studentsFuture = _fetchStudents();
 
     // Use the values passed from the parent.
@@ -155,42 +151,22 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
     );
   }
 
-  /// Opens a calendar for picking the birthday in the "New" tab.
-  void _showBirthdayPicker() {
-    showModalBottomSheet(
+  /// Opens a calendar for picking the birthday in the "New" tab using Flutter's built-in DatePicker.
+  Future<void> _showBirthdayPicker() async {
+    final DateTime initialDate = selectedBirthday ?? DateTime(2000, 1, 1);
+    final DateTime? pickedDate = await showDatePicker(
       context: context,
-      builder: (context) {
-        final DateTime initialDate = selectedBirthday ?? DateTime(2000, 1, 1);
-        return Container(
-          height: 400,
-          padding: const EdgeInsets.all(16),
-          child: SfDateRangePicker(
-            view: DateRangePickerView.month,
-            selectionMode: DateRangePickerSelectionMode.single,
-            initialSelectedDate: initialDate,
-            showActionButtons: true,
-            onSubmit: (Object? val) {
-              if (val is DateTime) {
-                setState(() {
-                  selectedBirthday = val;
-                  _birthdayController.text = _dateFormat.format(val);
-                });
-              }
-              Navigator.pop(context);
-            },
-            onCancel: () => Navigator.pop(context),
-            monthViewSettings: const DateRangePickerMonthViewSettings(
-              firstDayOfWeek: 1,
-              showTrailingAndLeadingDates: true,
-            ),
-            headerStyle: const DateRangePickerHeaderStyle(
-              textAlign: TextAlign.center,
-              textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ),
-        );
-      },
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      helpText: 'Select Birthday',
     );
+    if (pickedDate != null) {
+      setState(() {
+        selectedBirthday = pickedDate;
+        _birthdayController.text = _dateFormat.format(pickedDate);
+      });
+    }
   }
 
   /// Builds checkout details (if needed for cart/checkout operations).
@@ -259,7 +235,6 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                     },
                     tabs: const [
                       Tab(text: "Associated"),
-                      Tab(text: "Existing"),
                       Tab(text: "New"),
                     ],
                   ),
@@ -324,80 +299,7 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                             );
                           },
                         ),
-                        // 2) Existing Tab (Search by ID)
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                TextField(
-                                  controller: _studentIdController,
-                                  decoration: const InputDecoration(
-                                    labelText: "Enter Student ID",
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton(
-                                  onPressed: () async {
-                                    final enteredId =
-                                        _studentIdController.text.trim();
-                                    if (enteredId.isNotEmpty) {
-                                      // Dummy lookup logic.
-                                      if (enteredId == "s3") {
-                                        setState(() {
-                                          _existingStudentConfirmation = {
-                                            "id": "s3",
-                                            "first_name": "Charlie",
-                                            "last_name": "Brown",
-                                            "birthday": "2008-03-20"
-                                          };
-                                        });
-                                      } else {
-                                        setState(() {
-                                          _existingStudentConfirmation = null;
-                                        });
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                              content:
-                                                  Text("Student not found")),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  child: const Text("Check Student"),
-                                ),
-                                if (_existingStudentConfirmation != null)
-                                  ListTile(
-                                    title: Text(
-                                      "${_existingStudentConfirmation!['id']} - ${_existingStudentConfirmation!['first_name']} ${_existingStudentConfirmation!['last_name']}",
-                                    ),
-                                    subtitle: Text(
-                                        "Birthday: ${_existingStudentConfirmation!['birthday']}"),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () {
-                                        if (_selectedStudents.length <
-                                            (widget.requiredCount ?? 999999)) {
-                                          final newSelection = [
-                                            ..._selectedStudents,
-                                            _existingStudentConfirmation!
-                                          ];
-                                          _updateSelection(newSelection);
-                                          setState(() {
-                                            _existingStudentConfirmation = null;
-                                            _studentIdController.clear();
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // 3) New Tab (Register a new student)
+                        // 2) New Tab (Register a new student)
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: SingleChildScrollView(
@@ -424,16 +326,19 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                     Expanded(
                                       child: TextField(
                                         controller: _birthdayController,
+                                        onTap: _showBirthdayPicker,
                                         readOnly: true,
                                         decoration: const InputDecoration(
                                           labelText: "Birthday",
                                           border: OutlineInputBorder(),
-                                          hintText: "Select a date",
                                         ),
                                       ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.calendar_today),
+                                      icon: const Icon(
+                                        Icons.calendar_today,
+                                        color: Colors.orange,
+                                      ),
                                       onPressed: _showBirthdayPicker,
                                     ),
                                   ],
@@ -527,7 +432,8 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                         navigatorKey.currentState!.push(
                           MaterialPageRoute(
                             builder: (_) => CheckoutPage(
-                              onBack: () => navigatorKey.currentState!.pop(),
+                              onBack: () =>
+                                  navigatorKey.currentState!.pop(),
                             ),
                           ),
                         );

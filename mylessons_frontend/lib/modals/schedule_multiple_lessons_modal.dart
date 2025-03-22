@@ -9,10 +9,12 @@ import 'package:mylessons_frontend/services/api_service.dart';
 class ScheduleMultipleLessonsModal extends StatefulWidget {
   /// List of lessons. Each lesson must be a map with keys: "lesson_id" and "lesson_str"
   final List<dynamic> lessons;
+
   /// Callback to refresh the home page after scheduling is confirmed.
   final VoidCallback onScheduleConfirmed;
   final String currentRole;
   final int schoolScheduleTimeLimit;
+
   /// The expiration date as a string (yyyy-mm-dd) for parents - calendar will only allow dates until this date.
   final String expirationDate;
 
@@ -321,9 +323,8 @@ class _ScheduleMultipleLessonsModalState
                     Duration(hours: widget.schoolScheduleTimeLimit),
                   )
                 : null,
-            maxDate: widget.currentRole == "Parent"
-                ? parsedExpirationDate
-                : null,
+            maxDate:
+                widget.currentRole == "Parent" ? parsedExpirationDate : null,
             view: DateRangePickerView.month,
             selectionMode: DateRangePickerSelectionMode.single,
             onSelectionChanged: (args) {
@@ -333,9 +334,18 @@ class _ScheduleMultipleLessonsModalState
                   singleAvailableTimes = [];
                   singleIsLoading = true;
                 });
-                // Convert lesson_id to int
-                final lessonId = int.parse(widget.lessons.first['lesson_id']);
-                fetchAvailableTimes(lessonId, singleSelectedDate!, singleIncrement)
+                // Find the selected lesson id instead of hardcoding the first lesson
+                final selectedIndex =
+                    selectedLessons.indexWhere((isSelected) => isSelected);
+                if (selectedIndex == -1) {
+                  // Fallback or error handling if no lesson is selected.
+                  return;
+                }
+                final lessonId =
+                    int.parse(widget.lessons[selectedIndex]['lesson_id']);
+                print("Lesson id: $lessonId");
+                fetchAvailableTimes(
+                        lessonId, singleSelectedDate!, singleIncrement)
                     .then((times) {
                   setState(() {
                     singleAvailableTimes = times;
@@ -368,8 +378,16 @@ class _ScheduleMultipleLessonsModalState
                     }
                   });
                   if (singleSelectedDate != null) {
-                    final lessonId = int.parse(widget.lessons.first['lesson_id']);
-                    fetchAvailableTimes(lessonId, singleSelectedDate!, singleIncrement)
+                    final selectedIndex =
+                        selectedLessons.indexWhere((isSelected) => isSelected);
+                    if (selectedIndex == -1) {
+                      // Handle error appropriately if no lesson is selected.
+                      return;
+                    }
+                    final lessonId =
+                        int.parse(widget.lessons[selectedIndex]['lesson_id']);
+                    fetchAvailableTimes(
+                            lessonId, singleSelectedDate!, singleIncrement)
                         .then((times) {
                       setState(() {
                         singleAvailableTimes = times;
@@ -533,11 +551,13 @@ class _ScheduleMultipleLessonsModalState
                                         firstDate: DateTime.now(),
                                         lastDate: widget.currentRole == "Parent"
                                             ? parsedExpirationDate
-                                            : DateTime.now().add(const Duration(days: 365)),
+                                            : DateTime.now()
+                                                .add(const Duration(days: 365)),
                                       );
                                       if (picked != null) {
                                         setState(() {
-                                          schedulingBlocks[blockIndex]['from_date'] = picked;
+                                          schedulingBlocks[blockIndex]
+                                              ['from_date'] = picked;
                                         });
                                       }
                                     },
@@ -553,14 +573,16 @@ class _ScheduleMultipleLessonsModalState
                                 Expanded(
                                   child: ElevatedButton(
                                     onPressed: () async {
-                                      final initial = block['from_date'] ?? DateTime.now();
+                                      final initial =
+                                          block['from_date'] ?? DateTime.now();
                                       DateTime? picked = await showDatePicker(
                                         context: context,
                                         initialDate: initial,
                                         firstDate: initial,
                                         lastDate: widget.currentRole == "Parent"
                                             ? parsedExpirationDate
-                                            : DateTime.now().add(const Duration(days: 365)),
+                                            : DateTime.now()
+                                                .add(const Duration(days: 365)),
                                       );
                                       if (picked != null) {
                                         setState(() {
@@ -639,9 +661,10 @@ class _ScheduleMultipleLessonsModalState
                                     ),
                                     if ((block['options'] as List).length > 1)
                                       IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        onPressed: () =>
-                                            removeSchedulingOption(blockIndex, optionIndex),
+                                        icon: const Icon(
+                                            Icons.remove_circle_outline),
+                                        onPressed: () => removeSchedulingOption(
+                                            blockIndex, optionIndex),
                                       ),
                                   ],
                                 );
@@ -650,7 +673,8 @@ class _ScheduleMultipleLessonsModalState
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () => addSchedulingOption(blockIndex),
+                                onPressed: () =>
+                                    addSchedulingOption(blockIndex),
                                 child: const Text("Add Option"),
                               ),
                             ),

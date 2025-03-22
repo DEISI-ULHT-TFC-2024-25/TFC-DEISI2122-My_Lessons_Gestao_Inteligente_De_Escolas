@@ -38,13 +38,14 @@ class ProfileData {
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
       email: json['email'] ?? '',
-      countryCode: json['country_code'] ?? '',
+      countryCode: json['country_code'] ?? 'PT',
       phone: json['phone'] ?? '',
       birthday: json['birthday'],
       photo: json['photo'],
       availableRoles: List<String>.from(json['available_roles'] ?? []),
       currentRole: json['current_role'] ?? '',
-      availableSchools: List<Map<String, dynamic>>.from(json['available_schools'] ?? []),
+      availableSchools:
+          List<Map<String, dynamic>>.from(json['available_schools'] ?? []),
       currentSchoolId: json['current_school_id']?.toString(),
       currentSchoolName: json['current_school_name'] ?? '',
     );
@@ -62,7 +63,7 @@ class ProfileService {
     };
   }
 
-  /// Fetch profile data including basic profile fields plus extra info
+  // Fetch profile data including basic profile fields plus extra info
   /// for role/school switching.
   static Future<ProfileData> fetchProfileData() async {
     final headers = await getAuthHeaders();
@@ -104,7 +105,8 @@ class ProfileService {
       );
       if (schoolsResponse.statusCode == 200) {
         final data = json.decode(utf8.decode(schoolsResponse.bodyBytes));
-        availableSchools = List<Map<String, dynamic>>.from(data['available_schools']);
+        availableSchools =
+            List<Map<String, dynamic>>.from(data['available_schools']);
       } else {
         print("Failed to fetch schools: ${schoolsResponse.body}");
       }
@@ -123,7 +125,7 @@ class ProfileService {
       }
     }
 
-    // Also fetch the basic profile info.
+    // Fetch the basic profile info including phone and country_code.
     final profileResponse = await http.get(
       Uri.parse('$baseUrl/api/users/profile_data/'),
       headers: headers,
@@ -152,7 +154,8 @@ class ProfileService {
   static Future<String> updateProfileData(Map<String, dynamic> data) async {
     final headers = await getAuthHeaders();
     final url = Uri.parse('$baseUrl/api/users/profile_data/');
-    final response = await http.put(url, headers: headers, body: jsonEncode(data));
+    final response =
+        await http.put(url, headers: headers, body: jsonEncode(data));
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
       return jsonResponse['message'] ?? 'Profile updated successfully';

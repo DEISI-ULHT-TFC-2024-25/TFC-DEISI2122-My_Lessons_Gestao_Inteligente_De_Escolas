@@ -1,78 +1,191 @@
-import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
-class ProfileCompletionModal extends StatefulWidget {
-  const ProfileCompletionModal({Key? key}) : super(key: key);
+class ProfileCompletionPage extends StatefulWidget {
+  // Optional initial values (for instance, fetched from the backend)
+  final String? initialFirstName;
+  final String? initialLastName;
+  final String? initialPhone;
+  final String? initialCountryCode;
+
+  const ProfileCompletionPage({
+    Key? key,
+    this.initialFirstName,
+    this.initialLastName,
+    this.initialPhone,
+    this.initialCountryCode,
+  }) : super(key: key);
 
   @override
-  State<ProfileCompletionModal> createState() => _ProfileCompletionModalState();
+  State<ProfileCompletionPage> createState() => _ProfileCompletionPageState();
 }
 
-class _ProfileCompletionModalState extends State<ProfileCompletionModal> {
+class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
+  late final TextEditingController _firstNameController;
+  late final TextEditingController _lastNameController;
+  late final TextEditingController _phoneController;
+
+  // Save the ISO country code (e.g., "PT"). This is what you want to save.
+  String _selectedCountryCode = 'PT';
+
   int _currentPage = 0;
-  final PageController _pageController = PageController();
-
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _phoneController = TextEditingController();
-
-  // Use a default country (Portugal) as in your registration page.
-  Country _selectedCountry = Country(
-    countryCode: 'PT',
-    phoneCode: '351',
-    e164Sc: 0,
-    geographic: true,
-    level: 1,
-    name: 'Portugal',
-    displayName: 'Portugal',
-    displayNameNoCountryCode: 'Portugal',
-    e164Key: '351-PT-0',
-    example: '912345678',
-  );
+  late final PageController _pageController;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    // Listen to text changes so our validity getters update
-    _firstNameController.addListener(() => setState(() {}));
-    _lastNameController.addListener(() => setState(() {}));
-    _phoneController.addListener(() => setState(() {}));
-  }
+    _firstNameController =
+        TextEditingController(text: widget.initialFirstName ?? '');
+    _lastNameController =
+        TextEditingController(text: widget.initialLastName ?? '');
+    _phoneController = TextEditingController(text: widget.initialPhone ?? '');
+    _selectedCountryCode = widget.initialCountryCode ?? 'PT';
+    _pageController = PageController();
 
-  bool get _isStep1Valid =>
-      _firstNameController.text.trim().isNotEmpty &&
-      _lastNameController.text.trim().isNotEmpty;
+    _buildPages();
 
-  // For step 2, we only require the phone input since a country is always selected.
-  bool get _isStep2Valid => _phoneController.text.trim().isNotEmpty;
-
-  void _nextPage() {
-    if (_currentPage == 0 && _isStep1Valid) {
-      setState(() => _currentPage = 1);
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else if (_currentPage == 1 && _isStep2Valid) {
-      // Return the entered data:
-      // 'id' is taken from the selected country's code (or phone code, as required)
-      Navigator.of(context).pop({
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        'id': _selectedCountry.countryCode, // or use phoneCode if needed
-        'phone': _phoneController.text.trim(),
+    // If no page is required, immediately complete.
+    if (_pages.isEmpty) {
+      Future.microtask(() {
+        _completeProfile();
       });
     }
   }
 
-  void _previousPage() {
-    if (_currentPage > 0) {
-      setState(() => _currentPage = 0);
-      _pageController.previousPage(
+  // Build the list of pages based on missing data.
+  void _buildPages() {
+    _pages = [];
+    // If either first name or last name is missing, add the name page.
+    if (_firstNameController.text.trim().isEmpty ||
+        _lastNameController.text.trim().isEmpty) {
+      _pages.add(_buildNamePage());
+    }
+    // If the phone is missing, add the contact page.
+    if (_phoneController.text.trim().isEmpty) {
+      _pages.add(_buildContactPage());
+    }
+  }
+
+  bool get _isNameValid =>
+    _firstNameController.text.trim().isNotEmpty &&
+    _lastNameController.text.trim().isNotEmpty;
+
+  bool get _isContactValid =>
+      _phoneController.text.trim().isNotEmpty; // phone is required
+
+  void _nextPage() {
+    if (_currentPage < _pages.length - 1) {
+      setState(() {
+        _currentPage++;
+      });
+      _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+    } else {
+      // Last step completed, complete the profile.
+      _completeProfile();
     }
+  }
+
+  void _completeProfile() {
+    // Instead of popping a modal, return data or navigate to home.
+    Navigator.of(context).pop({
+      'firstName': _firstNameController.text.trim(),
+      'lastName': _lastNameController.text.trim(),
+      'id': _selectedCountryCode, // ISO country code
+      'phone': _phoneController.text.trim(),
+    });
+  }
+
+  Widget _buildNamePage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Step 1 of 2",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Please enter your name",
+            style: TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _firstNameController,
+            decoration: const InputDecoration(
+              labelText: "First Name",
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (_) {
+              setState(() {}); // Update validity
+            },
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _lastNameController,
+            decoration: const InputDecoration(
+              labelText: "Last Name",
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (_) {
+              setState(() {}); // Update validity
+            },
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: ElevatedButton(
+              onPressed: _isNameValid ? _nextPage : null,
+              child: const Text("Next"),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 24),
+          IntlPhoneField(
+            initialCountryCode: _selectedCountryCode,
+            initialValue: _phoneController.text,
+            decoration: InputDecoration(
+              labelText: "Phone",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+            ),
+            onCountryChanged: (phoneCountry) {
+              setState(() {
+                // Save the ISO country code (e.g., "PT")
+                _selectedCountryCode = phoneCountry.code;
+              });
+            },
+            onChanged: (phone) {
+              setState(() {
+                _phoneController.text = phone.number;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: ElevatedButton(
+              onPressed: _isContactValid ? _nextPage : null,
+              child: const Text("Submit"),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -86,177 +199,21 @@ class _ProfileCompletionModalState extends State<ProfileCompletionModal> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    // When keyboard is visible, use 90% of screen height; otherwise, 50%.
-    final modalHeight =
-        keyboardHeight > 0 ? screenHeight * 0.9 : screenHeight * 0.5;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-      height: modalHeight,
-      // This padding prevents content from being overlapped by the keyboard.
-      padding: EdgeInsets.only(bottom: keyboardHeight),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    // Disable system back navigation
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Complete Your Profile"),
+          automaticallyImplyLeading: false, // No back button in the AppBar
         ),
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Orange handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.orange,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Use Flexible to let the PageView expand within available space.
-            Flexible(
-              child: PageView(
+        body: _pages.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  // STEP 1: First Name & Last Name
-                  SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Step 1 of 2",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _firstNameController,
-                          decoration: const InputDecoration(
-                            labelText: "First Name",
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _lastNameController,
-                          decoration: const InputDecoration(
-                            labelText: "Last Name",
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Center(
-                          child: ElevatedButton(
-                            onPressed: _isStep1Valid ? _nextPage : null,
-                            child: const Text("Next"),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // STEP 2: Country Picker (ID) & Phone
-                  SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: _previousPage,
-                              icon: const Icon(Icons.arrow_back),
-                            ),
-                            const Spacer(),
-                            const Text(
-                              "Step 2 of 2",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const Spacer(),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                showCountryPicker(
-                                  context: context,
-                                  onSelect: (Country country) {
-                                    setState(() {
-                                      _selectedCountry = country;
-                                    });
-                                  },
-                                  countryListTheme: CountryListThemeData(
-                                    flagSize: 25,
-                                    backgroundColor: Colors.white,
-                                    textStyle: const TextStyle(
-                                        fontSize: 16, color: Colors.black),
-                                    bottomSheetHeight: 500,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(20.0),
-                                      topRight: Radius.circular(20.0),
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                height: 56,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      "${_selectedCountry.flagEmoji} +${_selectedCountry.phoneCode}",
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.arrow_drop_down,
-                                        color: Colors.grey),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _phoneController,
-                                decoration: const InputDecoration(
-                                  labelText: "Phone",
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.phone,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Center(
-                          child: ElevatedButton(
-                            onPressed: _isStep2Valid ? _nextPage : null,
-                            child: const Text("Submit"),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                children: _pages,
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

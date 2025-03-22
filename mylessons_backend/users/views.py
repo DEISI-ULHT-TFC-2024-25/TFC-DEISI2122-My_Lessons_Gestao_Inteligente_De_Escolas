@@ -240,6 +240,9 @@ def user_profile(request):
     data = {
         "id": user.id,
         "first_name": user.first_name,
+        "last_name": user.last_name,
+        "phone": user.phone,
+        "country_code" : user.country_code,
         "notifications_count": str(unread_notifications),
         "phone" : user.phone
     }
