@@ -290,39 +290,48 @@ class _HomePageState extends State<HomePage> {
       markNotificationsAsRead(notificationIds);
 
   Future<void> _promptProfileCompletion() async {
-    final result = await Navigator.push<Map<String, String>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProfileCompletionPage(
-          initialFirstName: firstName,
-          initialLastName: lastName,
-          initialPhone: phone,
-          initialCountryCode: countryCode,
-        ),
+  final result = await Navigator.push<Map<String, String>>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ProfileCompletionPage(
+        initialFirstName: firstName,
+        initialLastName: lastName,
+        initialPhone: phone,
+        initialCountryCode: countryCode,
       ),
-    );
+    ),
+  );
 
-    if (result != null) {
-      final payload = {
-        'first_name': result['firstName']!,
-        'last_name': result['lastName']!,
-        'country_code': result['id']!,
-        'phone': result['phone']!,
-      };
+  if (result != null) {
+    final payload = {
+      'first_name': result['firstName']!,
+      'last_name': result['lastName']!,
+      'country_code': result['id']!, // This is your ISO country code
+      'phone': result['phone']!,
+    };
 
-      try {
-        final message = await ProfileService.updateProfileData(payload);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-        await fetchData();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error updating profile: $e")),
-        );
-      }
+    try {
+      final message = await ProfileService.updateProfileData(payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      // Update local state immediately with returned values.
+      setState(() {
+        firstName = result['firstName']!;
+        lastName = result['lastName']!;
+        phone = result['phone']!;
+        countryCode = result['id']!;
+      });
+      // Then re-fetch the profile data.
+      await fetchData();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error updating profile: $e")),
+      );
     }
   }
+}
+
 
   // ----------------- Modal Options for Cards -----------------
 
