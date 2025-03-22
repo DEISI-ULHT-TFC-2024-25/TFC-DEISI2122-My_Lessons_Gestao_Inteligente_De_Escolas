@@ -25,6 +25,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final storage = const FlutterSecureStorage();
   String firstName = '';
+  String lastName = '';
+  String phone = '';
+  String countryCode = '';
   int notificationsCount = 0;
   String currentRole = '';
   List<dynamic> upcomingLessons = [];
@@ -101,6 +104,9 @@ class _HomePageState extends State<HomePage> {
 
         setState(() {
           firstName = profileData['first_name'] ?? '';
+          lastName = profileData['last_name'] ?? '';
+          phone = profileData['phone'] ?? '';
+          countryCode = profileData['country_code'] ?? '';
           notificationsCount =
               int.tryParse(profileData['notifications_count'].toString()) ?? 0;
           currentRole = roleData['current_role'];
@@ -120,10 +126,8 @@ class _HomePageState extends State<HomePage> {
         });
 
         // Prompt profile completion if needed.
-        if ((profileData['first_name'] == null ||
-                profileData['first_name'].toString().isEmpty) ||
-            (profileData['phone'] == null ||
-                profileData['phone'].toString().isEmpty)) {
+        // Prompt profile completion if needed.
+        if ((firstName.isEmpty) || (phone.isEmpty)) {
           _promptProfileCompletion();
         }
       }
@@ -286,11 +290,16 @@ class _HomePageState extends State<HomePage> {
       markNotificationsAsRead(notificationIds);
 
   Future<void> _promptProfileCompletion() async {
-    final result = await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      isDismissible: false,
-      isScrollControlled: true,
-      builder: (context) => const ProfileCompletionModal(),
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileCompletionPage(
+          initialFirstName: firstName,
+          initialLastName: lastName,
+          initialPhone: phone,
+          initialCountryCode: countryCode,
+        ),
+      ),
     );
 
     if (result != null) {
@@ -327,7 +336,7 @@ class _HomePageState extends State<HomePage> {
         return Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.schedule, color: Colors.orange),
+              leading: const Icon(Icons.calendar_today, color: Colors.orange),
               title: const Text("Schedule Lesson"),
               onTap: () {
                 Navigator.pop(context);
@@ -352,7 +361,7 @@ class _HomePageState extends State<HomePage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline, color: Colors.orange),
+              leading: const Icon(Icons.more_vert, color: Colors.orange),
               title: const Text("View Details"),
               onTap: () {
                 Navigator.pop(context);
@@ -375,7 +384,7 @@ class _HomePageState extends State<HomePage> {
         return Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.schedule, color: Colors.orange),
+              leading: const Icon(Icons.calendar_today, color: Colors.orange),
               title: const Text("Schedule Lessons"),
               onTap: () {
                 Navigator.pop(context);
@@ -401,7 +410,7 @@ class _HomePageState extends State<HomePage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline, color: Colors.orange),
+              leading: const Icon(Icons.more_vert, color: Colors.orange),
               title: const Text("View Details"),
               onTap: () {
                 Navigator.pop(context);
@@ -1096,13 +1105,39 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               const SizedBox(width: 16),
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(
-                  isLastLesson ? Icons.article : Icons.calendar_today,
-                  size: 28,
-                  color: Colors.orange,
+              // Wrap the calendar icon in its own InkWell.
+              InkWell(
+                onTap: () {
+                  // Shortcut directly to scheduling modal.
+                  if (lesson['type']?.toString().toLowerCase() == 'group') {
+                    // For group lessons, show an alert if scheduling is unavailable.
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Scheduling Unavailable"),
+                        content: const Text(
+                            "To change the schedule of a group lesson, please contact the school."),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          )
+                        ],
+                      ),
+                    );
+                  } else {
+                    _showScheduleLessonModal(lesson);
+                  }
+                },
+                // Use InkWell to provide ripple feedback.
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    isLastLesson ? Icons.article : Icons.calendar_today,
+                    size: 28,
+                    color: Colors.orange,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -1133,7 +1168,14 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.grey,
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.more_vert, size: 28, color: Colors.orange),
+                  // Wrap the three dots icon in its own InkWell.
+                  InkWell(
+                    onTap: () {
+                      _showLessonDetailsModal(lesson);
+                    },
+                    child: const Icon(Icons.more_vert,
+                        size: 28, color: Colors.orange),
+                  ),
                 ],
               ),
               const SizedBox(width: 8),
@@ -1156,11 +1198,35 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               const SizedBox(width: 16),
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: const Icon(Icons.calendar_today,
-                    size: 28, color: Colors.orange),
+              // Wrap the calendar icon in its own InkWell.
+              InkWell(
+                onTap: () {
+                  if (pack['type'].toString().toLowerCase() == 'group') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Scheduling Unavailable"),
+                        content: const Text(
+                            "To change the schedule of a group lesson, please contact the school."),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          )
+                        ],
+                      ),
+                    );
+                  } else {
+                    _showScheduleMultipleLessonsModal(
+                        pack['lessons'], pack["expiration_date"]);
+                  }
+                },
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: const Icon(Icons.calendar_today,
+                      size: 28, color: Colors.orange),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1192,7 +1258,14 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.grey,
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.more_vert, size: 28, color: Colors.orange),
+                  // Wrap the three dots icon in its own InkWell.
+                  InkWell(
+                    onTap: () {
+                      _showPackDetailsModal(pack);
+                    },
+                    child: const Icon(Icons.more_vert,
+                        size: 28, color: Colors.orange),
+                  ),
                 ],
               ),
               const SizedBox(width: 8),
@@ -1426,7 +1499,8 @@ class _HomePageState extends State<HomePage> {
             : const BorderSide(width: 1, color: Colors.orange),
         elevation: 0,
       ),
-      child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+      child: Text(label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
     );
   }
 

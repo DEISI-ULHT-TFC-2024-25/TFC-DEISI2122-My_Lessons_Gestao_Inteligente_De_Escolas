@@ -1,8 +1,7 @@
-import 'dart:async';
+// main_layout.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:connectivity_plus/connectivity_plus.dart'; // import connectivity_plus
 import 'pages/home_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/payments_page.dart';
@@ -16,6 +15,7 @@ class MainScreen extends StatefulWidget {
   final int initialIndex;
   final List<dynamic> newBookedPacks;
 
+  // initialIndex is optional (defaults to 0)
   const MainScreen(
       {Key? key, this.newBookedPacks = const [], this.initialIndex = 0})
       : super(key: key);
@@ -30,54 +30,14 @@ class _MainScreenState extends State<MainScreen> {
   String _currentRole = "";
   bool _isLoadingRole = true;
 
-  // Create a navigator key for each bottom nav tab.
-  final List<GlobalKey<NavigatorState>> _navigatorKeys =
-      List.generate(4, (_) => GlobalKey<NavigatorState>());
-
-  // Create a unique key for each page to force rebuilds.
-  List<UniqueKey> _pageKeys = List.generate(4, (_) => UniqueKey());
-
   late List<Widget> _pages;
   late List<BottomNavigationBarItem> _navBarItems;
-
-  // Connectivity subscription and status flag.
-  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
-  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
+    _currentIndex = widget.initialIndex; // use initial index if provided
     _fetchUserRole();
-
-    // Wait until after the first frame to ensure ScaffoldMessenger is available.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _connectivitySubscription =
-          Connectivity().onConnectivityChanged.listen((result) {
-        bool offline = result == ConnectivityResult.none;
-        if (offline && !_isOffline) {
-          // Show a persistent Snackbar if going offline.
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text("No internet connection"),
-              // Set a very long duration so it stays visible.
-              duration: const Duration(days: 1),
-              behavior: SnackBarBehavior.fixed,
-            ),
-          );
-        } else if (!offline && _isOffline) {
-          // Hide the Snackbar when internet is restored.
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        }
-        _isOffline = offline;
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _connectivitySubscription.cancel();
-    super.dispose();
   }
 
   Future<void> _fetchUserRole() async {
@@ -89,6 +49,7 @@ class _MainScreenState extends State<MainScreen> {
       );
       if (roleResponse.statusCode == 200) {
         final roleData = json.decode(utf8.decode(roleResponse.bodyBytes));
+        // assuming the API returns a JSON with a "current_role" key.
         _currentRole = roleData['current_role'] ?? "";
       } else {
         _currentRole = "";
@@ -106,39 +67,10 @@ class _MainScreenState extends State<MainScreen> {
   void _buildPagesAndNavItems() {
     if (_currentRole == "Instructor") {
       _pages = [
-        KeyedSubtree(
-          key: _pageKeys[0],
-          child: Navigator(
-            key: _navigatorKeys[0],
-            onGenerateRoute: (_) => MaterialPageRoute(
-                builder: (_) =>
-                    HomePage(newBookedPacks: widget.newBookedPacks)),
-          ),
-        ),
-        KeyedSubtree(
-          key: _pageKeys[1],
-          child: Navigator(
-            key: _navigatorKeys[1],
-            onGenerateRoute: (_) =>
-                MaterialPageRoute(builder: (_) => const AvailabilityPage()),
-          ),
-        ),
-        KeyedSubtree(
-          key: _pageKeys[2],
-          child: Navigator(
-            key: _navigatorKeys[2],
-            onGenerateRoute: (_) =>
-                MaterialPageRoute(builder: (_) => const PaymentsPage()),
-          ),
-        ),
-        KeyedSubtree(
-          key: _pageKeys[3],
-          child: Navigator(
-            key: _navigatorKeys[3],
-            onGenerateRoute: (_) =>
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
-          ),
-        ),
+        HomePage(newBookedPacks: widget.newBookedPacks),
+        const AvailabilityPage(),
+        const PaymentsPage(),
+        const ProfilePage(),
       ];
       _navBarItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -149,39 +81,10 @@ class _MainScreenState extends State<MainScreen> {
       ];
     } else {
       _pages = [
-        KeyedSubtree(
-          key: _pageKeys[0],
-          child: Navigator(
-            key: _navigatorKeys[0],
-            onGenerateRoute: (_) => MaterialPageRoute(
-                builder: (_) =>
-                    HomePage(newBookedPacks: widget.newBookedPacks)),
-          ),
-        ),
-        KeyedSubtree(
-          key: _pageKeys[1],
-          child: Navigator(
-            key: _navigatorKeys[1],
-            onGenerateRoute: (_) =>
-                MaterialPageRoute(builder: (_) => const SchoolsPage()),
-          ),
-        ),
-        KeyedSubtree(
-          key: _pageKeys[2],
-          child: Navigator(
-            key: _navigatorKeys[2],
-            onGenerateRoute: (_) =>
-                MaterialPageRoute(builder: (_) => const PaymentsPage()),
-          ),
-        ),
-        KeyedSubtree(
-          key: _pageKeys[3],
-          child: Navigator(
-            key: _navigatorKeys[3],
-            onGenerateRoute: (_) =>
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
-          ),
-        ),
+        HomePage(newBookedPacks: widget.newBookedPacks),
+        const SchoolsPage(),
+        const PaymentsPage(),
+        const ProfilePage(),
       ];
       _navBarItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -193,24 +96,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onItemTapped(int index) {
-    // If the same bottom nav item is tapped:
-    if (index == _currentIndex) {
-      // Pop the navigator to the first route.
-      _navigatorKeys[index]
-          .currentState
-          ?.popUntil((route) => route.isFirst);
-      // Force a rebuild of that tab by generating a new unique key.
-      setState(() {
-        _pageKeys[index] = UniqueKey();
-        // Also rebuild the page using the same _buildPagesAndNavItems logic.
-        _buildPagesAndNavItems();
-      });
-    } else {
-      setState(() {
-        _currentIndex = index;
-        _isCheckout = false; // exit checkout mode when a nav item is tapped
-      });
-    }
+    setState(() {
+      _currentIndex = index;
+      _isCheckout = false; // exit checkout mode when a nav item is tapped
+    });
   }
 
   @override
@@ -243,31 +132,30 @@ class _MainScreenState extends State<MainScreen> {
               builder: (context, count, child) {
                 if (count > 0) {
                   return Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 4),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isCheckout = true;
-                        });
-                      },
-                      icon: const Icon(
-                        Icons.shopping_cart,
-                        color: Colors.white,
-                      ),
-                      label: Text(
-                        "Checkout Cart – $count ${count == 1 ? 'item' : 'items'}",
-                        style: const TextStyle(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 4),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _isCheckout = true;
+                          });
+                        },
+                        icon: const Icon(
+                          Icons.shopping_cart,
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  );
+                        label: Text(
+                          "Checkout Cart – $count ${count == 1 ? 'item' : 'items'}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                      ));
                 } else {
                   return const SizedBox.shrink();
                 }

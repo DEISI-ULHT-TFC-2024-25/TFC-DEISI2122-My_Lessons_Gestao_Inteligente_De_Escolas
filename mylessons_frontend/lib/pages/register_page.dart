@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:country_picker/country_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../services/register_service.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -22,21 +22,13 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
+  // We'll use this controller to hold just the phone number part.
   final TextEditingController _phoneController = TextEditingController();
 
-  // Default country (Portugal) using a Country object.
-  Country _selectedCountry = Country(
-    countryCode: 'PT',
-    phoneCode: '351',
-    e164Sc: 0,
-    geographic: true,
-    level: 1,
-    name: 'Portugal',
-    displayName: 'Portugal',
-    displayNameNoCountryCode: 'Portugal',
-    e164Key: '351-PT-0',
-    example: '912345678',
-  );
+  // Default country values.
+  String _selectedCountryCode = 'PT';
+  // Although the dial code is used for display, we won't send it in the payload.
+  String _selectedDialCode = '351';
 
   // Checkbox states.
   bool _dontReceiveMarketing = false;
@@ -133,7 +125,8 @@ class _RegisterPageState extends State<RegisterPage> {
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         phone: _phoneController.text,
-        countryCode: _selectedCountry.phoneCode,
+        // Send the ISO country code (e.g., "PT") instead of the dial code.
+        countryCode: _selectedCountryCode,
       );
 
       if (response.statusCode == 201) {
@@ -415,61 +408,28 @@ class _RegisterPageState extends State<RegisterPage> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  showCountryPicker(
-                    context: context,
-                    onSelect: (Country country) {
-                      setState(() {
-                        _selectedCountry = country;
-                      });
-                    },
-                    countryListTheme: CountryListThemeData(
-                      flagSize: 25,
-                      backgroundColor: Colors.white,
-                      textStyle: const TextStyle(fontSize: 16, color: Colors.black),
-                      bottomSheetHeight: 500,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20.0),
-                        topRight: Radius.circular(20.0),
-                      ),
-                    ),
-                  );
-                },
-                child: Container(
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "${_selectedCountry.flagEmoji} +${_selectedCountry.phoneCode}",
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                    ],
-                  ),
-                ),
+          // Updated phone input using IntlPhoneField.
+          IntlPhoneField(
+            initialCountryCode: _selectedCountryCode,
+            initialValue: _phoneController.text,
+            decoration: InputDecoration(
+              labelText: "Phone Number",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: "Number",
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
-                ),
-              ),
-            ],
+            ),
+            onCountryChanged: (phoneCountry) {
+              setState(() {
+                // Update the ISO country code.
+                _selectedCountryCode = phoneCountry.code;
+                _selectedDialCode = phoneCountry.dialCode;
+              });
+            },
+            onChanged: (phone) {
+              setState(() {
+                _phoneController.text = phone.number;
+              });
+            },
           ),
           const SizedBox(height: 24),
           ElevatedButton(
