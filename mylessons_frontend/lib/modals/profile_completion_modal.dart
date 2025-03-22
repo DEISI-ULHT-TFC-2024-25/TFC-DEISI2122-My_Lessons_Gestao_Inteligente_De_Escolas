@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 
 class ProfileCompletionPage extends StatefulWidget {
-  // Optional initial values (for instance, fetched from the backend)
+  // Optional initial values (from your backend)
   final String? initialFirstName;
   final String? initialLastName;
   final String? initialPhone;
@@ -23,14 +23,15 @@ class ProfileCompletionPage extends StatefulWidget {
 class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
-  late final TextEditingController _phoneController;
+  // We'll store the phone number in a separate variable.
+  String _phoneNumber = '';
 
-  // Save the ISO country code (e.g., "PT"). This is what you want to save.
+  // Save the ISO country code (e.g., "PT")
   String _selectedCountryCode = 'PT';
 
   int _currentPage = 0;
   late final PageController _pageController;
-  late final List<Widget> _pages;
+  late List<Widget> _pages;
 
   @override
   void initState() {
@@ -39,13 +40,13 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
         TextEditingController(text: widget.initialFirstName ?? '');
     _lastNameController =
         TextEditingController(text: widget.initialLastName ?? '');
-    _phoneController = TextEditingController(text: widget.initialPhone ?? '');
+    _phoneNumber = widget.initialPhone ?? '';
     _selectedCountryCode = widget.initialCountryCode ?? 'PT';
     _pageController = PageController();
 
     _buildPages();
 
-    // If no page is required, immediately complete.
+    // If no data is missing, complete immediately.
     if (_pages.isEmpty) {
       Future.microtask(() {
         _completeProfile();
@@ -53,26 +54,19 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
     }
   }
 
-  // Build the list of pages based on missing data.
+  // Build pages based on missing data.
   void _buildPages() {
     _pages = [];
-    // If either first name or last name is missing, add the name page.
+    // Add the name page if either first or last name is missing.
     if (_firstNameController.text.trim().isEmpty ||
         _lastNameController.text.trim().isEmpty) {
       _pages.add(_buildNamePage());
     }
-    // If the phone is missing, add the contact page.
-    if (_phoneController.text.trim().isEmpty) {
+    // Add the contact page if phone is missing.
+    if (_phoneNumber.trim().isEmpty) {
       _pages.add(_buildContactPage());
     }
   }
-
-  bool get _isNameValid =>
-    _firstNameController.text.trim().isNotEmpty &&
-    _lastNameController.text.trim().isNotEmpty;
-
-  bool get _isContactValid =>
-      _phoneController.text.trim().isNotEmpty; // phone is required
 
   void _nextPage() {
     if (_currentPage < _pages.length - 1) {
@@ -84,18 +78,16 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
         curve: Curves.easeInOut,
       );
     } else {
-      // Last step completed, complete the profile.
       _completeProfile();
     }
   }
 
   void _completeProfile() {
-    // Instead of popping a modal, return data or navigate to home.
     Navigator.of(context).pop({
       'firstName': _firstNameController.text.trim(),
       'lastName': _lastNameController.text.trim(),
       'id': _selectedCountryCode, // ISO country code
-      'phone': _phoneController.text.trim(),
+      'phone': _phoneNumber.trim(),
     });
   }
 
@@ -122,7 +114,7 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
               border: OutlineInputBorder(),
             ),
             onChanged: (_) {
-              setState(() {}); // Update validity
+              setState(() {}); // Rebuild to update potential validation
             },
           ),
           const SizedBox(height: 16),
@@ -133,13 +125,33 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
               border: OutlineInputBorder(),
             ),
             onChanged: (_) {
-              setState(() {}); // Update validity
+              setState(() {});
             },
           ),
           const SizedBox(height: 24),
           Center(
             child: ElevatedButton(
-              onPressed: _isNameValid ? _nextPage : null,
+              onPressed: () {
+                if (_firstNameController.text.trim().isEmpty ||
+                    _lastNameController.text.trim().isEmpty) {
+                  // Show a warning if either field is empty.
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text("Warning"),
+                      content: const Text("Please enter your first and last name."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  _nextPage();
+                }
+              },
               child: const Text("Next"),
             ),
           ),
@@ -154,10 +166,20 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            "Step 2 of 2",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Please enter your phone number",
+            style: TextStyle(fontSize: 16),
+          ),
           const SizedBox(height: 24),
           IntlPhoneField(
             initialCountryCode: _selectedCountryCode,
-            initialValue: _phoneController.text,
+            // Pass initial value if any.
+            initialValue: _phoneNumber,
             decoration: InputDecoration(
               labelText: "Phone",
               border: OutlineInputBorder(
@@ -166,20 +188,37 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
             ),
             onCountryChanged: (phoneCountry) {
               setState(() {
-                // Save the ISO country code (e.g., "PT")
                 _selectedCountryCode = phoneCountry.code;
               });
             },
             onChanged: (phone) {
               setState(() {
-                _phoneController.text = phone.number;
+                _phoneNumber = phone.number;
               });
             },
           ),
           const SizedBox(height: 24),
           Center(
             child: ElevatedButton(
-              onPressed: _isContactValid ? _nextPage : null,
+              onPressed: () {
+                if (_phoneNumber.trim().isEmpty) {
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text("Warning"),
+                      content: const Text("Please enter your phone number."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  _nextPage();
+                }
+              },
               child: const Text("Submit"),
             ),
           ),
@@ -193,19 +232,18 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
     _pageController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Disable system back navigation
+    // Disable system back navigation so the user must complete the fields.
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Complete Your Profile"),
-          automaticallyImplyLeading: false, // No back button in the AppBar
+          automaticallyImplyLeading: false,
         ),
         body: _pages.isEmpty
             ? const Center(child: CircularProgressIndicator())

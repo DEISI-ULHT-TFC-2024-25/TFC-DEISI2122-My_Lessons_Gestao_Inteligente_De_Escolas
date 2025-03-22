@@ -57,7 +57,7 @@ def profile_view(request):
             'first_name': user.first_name,
             'last_name': user.last_name,
             'country_code': str(user.country_code),
-            'phone': str(user.phone),
+            'phone': user.phone,
             'birthday': user.birthday.isoformat() if user.birthday else None,
             'photo': user.photo.url if user.photo else None,
         }

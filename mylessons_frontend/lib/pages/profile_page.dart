@@ -77,17 +77,17 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         _firstNameController.text = profileData.firstName;
         _lastNameController.text = profileData.lastName;
         _emailController.text = profileData.email;
-        _phoneController.text = profileData.phone ?? '';
+        // Convert phone and countryCode to strings if needed.
+        _phoneController.text = profileData.phone?.toString() ?? '';
         _birthdayController.text = profileData.birthday ?? '';
         availableRoles = profileData.availableRoles;
         currentRole = profileData.currentRole;
         availableSchools = profileData.availableSchools;
         currentSchoolId = profileData.currentSchoolId;
         currentSchoolName = profileData.currentSchoolName;
-        // Update the country code if available from the response.
         if (profileData.countryCode != null &&
-            profileData.countryCode.isNotEmpty) {
-          _phoneCountryCode = profileData.countryCode;
+            profileData.countryCode.toString().isNotEmpty) {
+          _phoneCountryCode = profileData.countryCode.toString();
         }
         isLoading = false;
       });
@@ -104,7 +104,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       'first_name': _firstNameController.text,
       'last_name': _lastNameController.text,
       'email': _emailController.text,
-      // Send the updated country code and phone number.
       'country_code': _phoneCountryCode,
       'phone': _phoneController.text,
       'birthday': _birthdayController.text,
@@ -176,12 +175,11 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
   }
 
-  /// Replaces the previous country picker + phone field with IntlPhoneField.
+  /// Uses IntlPhoneField to show phone and country.
   Widget buildIntlPhoneField() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: IntlPhoneField(
-        // Use the stored country code and phone number so the field shows saved data.
         initialCountryCode: _phoneCountryCode,
         initialValue: _phoneController.text,
         enabled: isEditing,
