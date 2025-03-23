@@ -33,7 +33,7 @@ Future<bool> isUsernameAvailable(String username) async {
   final url = Uri.parse('$baseUrl/api/users/check_username/?username=$username');
   final response = await http.get(url, headers: {"Content-Type": "application/json"});
   if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
+    final data = json.decode(utf8.decode(response.bodyBytes));
     return data['available'] as bool;
   } else {
     throw Exception("Failed to check username availability");

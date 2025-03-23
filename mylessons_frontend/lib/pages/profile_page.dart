@@ -77,7 +77,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         _firstNameController.text = profileData.firstName;
         _lastNameController.text = profileData.lastName;
         _emailController.text = profileData.email;
-        // Convert phone and countryCode to strings if needed.
+        // Print the type of phone
+
         _phoneController.text = profileData.phone?.toString() ?? '';
         _birthdayController.text = profileData.birthday ?? '';
         availableRoles = profileData.availableRoles;
@@ -91,8 +92,9 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         }
         isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       print("Error fetching profile data: $e");
+      print("StackTrace: $stackTrace");
       setState(() {
         isLoading = false;
       });
@@ -250,8 +252,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
     if (pickedDate != null) {
       setState(() {
-        _birthdayController.text =
-            pickedDate.toIso8601String().split('T')[0];
+        _birthdayController.text = pickedDate.toIso8601String().split('T')[0];
       });
     }
   }
@@ -380,8 +381,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                     // Logout Button.
                     ElevatedButton(
                       onPressed: logout,
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red),
+                      style:
+                          ElevatedButton.styleFrom(backgroundColor: Colors.red),
                       child: const Text("Logout",
                           style: TextStyle(color: Colors.white)),
                     ),

@@ -49,7 +49,7 @@ class _LoginPageState extends State<LoginPage> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'firebase_token': idToken}),
       );
-      final data = jsonDecode(response.body);
+      final data = json.decode(utf8.decode(response.bodyBytes));
       // Check if the response status code is 200 before navigating.
       if (response.statusCode == 200) {
         if (data.containsKey('token')) {
@@ -109,7 +109,7 @@ class _LoginPageState extends State<LoginPage> {
           body: jsonEncode({'firebase_token': idToken}),
         );
 
-        final data = jsonDecode(response.body);
+        final data = json.decode(utf8.decode(response.bodyBytes));
 
         if (response.statusCode == 200) {
           if (data.containsKey('token')) {

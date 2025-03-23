@@ -1231,3 +1231,32 @@ def edit_pack_subject(request):
     
     pack.save()
     return Response({"status": status_msg}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unschedulable_lessons(request):
+    user = request.user
+    current_role = user.current_role
+    lesson_ids = []
+    
+    if current_role == "Parent":
+        schools = user.schools.all()
+        # Query lessons that are not done, that belong to any of the user's students,
+        # and that are in one of the user's schools.
+        lessons = Lesson.objects.filter(
+            is_done=False,
+            students__in=user.students.all(),
+            school__in=schools
+        ).distinct()
+        
+        # Check each lesson whether it can be rescheduled.
+        # Since the view is for lessons that are unable to be rescheduled,
+        # we add the lesson's ID if it *cannot* be rescheduled.
+        for lesson in lessons:
+            if not lesson.can_still_reschedule(current_role):
+                lesson_ids.append(str(lesson.id))
+           
+    data = {
+        "lesson_ids": lesson_ids,
+    }
+    return Response(data)
