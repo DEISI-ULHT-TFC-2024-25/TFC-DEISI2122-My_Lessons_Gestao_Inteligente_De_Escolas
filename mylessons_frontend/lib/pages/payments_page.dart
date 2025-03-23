@@ -77,11 +77,11 @@ class _PaymentsPageState extends State<PaymentsPage> {
           .get(Uri.parse('$baseUrl/api/payments/history/'), headers: headers);
 
       if (debtRes.statusCode == 200) {
-        final decoded = json.decode(debtRes.body);
+        final decoded = json.decode(utf8.decode(debtRes.bodyBytes));
         _debt = double.tryParse(decoded['current_debt'].toString()) ?? 0;
       }
       if (unpaidRes.statusCode == 200) {
-        _unpaid = List<Map<String, dynamic>>.from(json.decode(unpaidRes.body));
+        _unpaid = List<Map<String, dynamic>>.from(json.decode(utf8.decode(unpaidRes.bodyBytes)));
         // Initialize each item's selection state and split amount.
         for (var item in _unpaid) {
           var packId = item['pack_id'];
@@ -95,7 +95,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       }
       if (historyRes.statusCode == 200) {
         _parentHistory =
-            List<Map<String, dynamic>>.from(json.decode(historyRes.body));
+            List<Map<String, dynamic>>.from(json.decode(utf8.decode(historyRes.bodyBytes)));
       }
     } catch (e) {
       debugPrint("Error fetching Parent data: $e");
@@ -111,13 +111,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
           headers: headers);
       if (historyRes.statusCode == 200) {
         _instructorHistory =
-            List<Map<String, dynamic>>.from(json.decode(historyRes.body));
+            List<Map<String, dynamic>>.from(json.decode(utf8.decode(historyRes.bodyBytes)));
       }
       final balanceResponse = await http.get(
           Uri.parse('$baseUrl/api/users/current_balance/'),
           headers: headers);
       if (balanceResponse.statusCode == 200) {
-        final b = json.decode(balanceResponse.body)['current_balance'];
+        final b = json.decode(utf8.decode(balanceResponse.bodyBytes))['current_balance'];
         _balance = double.tryParse(b.toString()) ?? 0.0;
       }
       _nextPayoutDate = "Not Defined";
@@ -141,7 +141,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
           Uri.parse('$baseUrl/api/payments/school_payment_history/'),
           headers: headers);
 
-      final decodedDebt = json.decode(debtRes.body);
+      final decodedDebt = json.decode(utf8.decode(debtRes.bodyBytes));
       if (decodedDebt is List) {
         _userDebt = List<Map<String, dynamic>>.from(decodedDebt);
       } else if (decodedDebt is Map && decodedDebt.containsKey("data")) {
@@ -150,7 +150,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         _userDebt = [];
       }
 
-      final decodedUpcoming = json.decode(upcomingRes.body);
+      final decodedUpcoming = json.decode(utf8.decode(upcomingRes.bodyBytes));
       if (decodedUpcoming is List) {
         _upcomingPayouts = List<Map<String, dynamic>>.from(decodedUpcoming);
       } else if (decodedUpcoming is Map &&
@@ -161,7 +161,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         _upcomingPayouts = [];
       }
 
-      final decodedHistory = json.decode(historyRes.body);
+      final decodedHistory = json.decode(utf8.decode(historyRes.bodyBytes));
       if (decodedHistory is List) {
         _adminHistory = List<Map<String, dynamic>>.from(decodedHistory);
       } else if (decodedHistory is Map && decodedHistory.containsKey("data")) {
@@ -186,7 +186,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         debugPrint("Failed to redulate debt. Status: ${response.statusCode}");
       }
     } catch (e) {
-      debugPrint("Error redulating debt: $e");
+      debugPrint("Error redulating debt: $e"); // TODO utf8?
     }
   }
 
@@ -286,7 +286,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     // We expect it to be a list of transaction entries.
     List<dynamic> transactions = [];
     try {
-      transactions = json.decode(description) as List<dynamic>;
+      transactions = json.decode(utf8.decode(description.codeUnits)) as List<dynamic>;
     } catch (e) {
       debugPrint("Error parsing description JSON: $e");
     }
@@ -422,7 +422,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = json.decode(utf8.decode(response.bodyBytes));
         _stripeClientSecret = data["clientSecret"];
         await Stripe.instance.initPaymentSheet(
           paymentSheetParameters: SetupPaymentSheetParameters(
@@ -527,7 +527,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         body: jsonEncode(payload),
       );
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = json.decode(utf8.decode(response.bodyBytes));
         _stripeClientSecret = data["clientSecret"];
         await Stripe.instance.initPaymentSheet(
           paymentSheetParameters: SetupPaymentSheetParameters(

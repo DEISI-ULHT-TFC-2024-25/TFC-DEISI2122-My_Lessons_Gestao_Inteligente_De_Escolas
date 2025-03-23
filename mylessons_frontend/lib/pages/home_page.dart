@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/profile_service.dart';
 import 'lesson_report_page.dart'; // Import our API services
 import 'profile_page.dart' as profile;
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   final List<dynamic> newBookedPacks;
@@ -34,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> lastLessons = [];
   List<dynamic> activePacks = [];
   List<dynamic> lastPacks = [];
+  List<String> unschedulable_lessons = [];
   int numberOfActiveStudents = 0;
   double currentBalance = 0.0;
   bool _isLoading = true; // Loading flag
@@ -96,6 +98,16 @@ class _HomePageState extends State<HomePage> {
         headers: headers,
       );
 
+      final unschedulableLessonsResponse = await http.get(
+        Uri.parse('$baseUrl/api/users/unschedulable_lessons/'),
+        headers: headers,
+      );
+
+      setState(() {
+        unschedulable_lessons =
+            json.decode(utf8.decode(unschedulableLessonsResponse.bodyBytes));
+      });
+
       if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
         final decodedProfile = utf8.decode(profileResponse.bodyBytes);
         final decodedRole = utf8.decode(roleResponse.bodyBytes);
@@ -103,13 +115,14 @@ class _HomePageState extends State<HomePage> {
         final roleData = json.decode(decodedRole);
 
         setState(() {
-          firstName = profileData['first_name'] ?? '';
-          lastName = profileData['last_name'] ?? '';
-          phone = profileData['phone'] ?? '';
-          countryCode = profileData['country_code'] ?? '';
-          notificationsCount =
-              int.tryParse(profileData['notifications_count'].toString()) ?? 0;
-          currentRole = roleData['current_role'];
+          firstName = (profileData['first_name'] ?? '').toString();
+          lastName = (profileData['last_name'] ?? '').toString();
+          phone = (profileData['phone'] ?? '').toString();
+          countryCode = (profileData['country_code'] ?? 'PT').toString();
+          notificationsCount = int.tryParse(
+                  (profileData['notifications_count'] ?? '0').toString()) ??
+              0;
+          currentRole = roleData['current_role'].toString();
           schoolId = schoolResponse.statusCode == 200
               ? int.tryParse(json
                       .decode(utf8.decode(schoolResponse.bodyBytes))[
@@ -126,8 +139,7 @@ class _HomePageState extends State<HomePage> {
         });
 
         // Prompt profile completion if needed.
-        // Prompt profile completion if needed.
-        if ((firstName.isEmpty) || (phone.isEmpty)) {
+        if (firstName.isEmpty || phone.isEmpty) {
           _promptProfileCompletion();
         }
       }
@@ -290,48 +302,44 @@ class _HomePageState extends State<HomePage> {
       markNotificationsAsRead(notificationIds);
 
   Future<void> _promptProfileCompletion() async {
-  final result = await Navigator.push<Map<String, String>>(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ProfileCompletionPage(
-        initialFirstName: firstName,
-        initialLastName: lastName,
-        initialPhone: phone,
-        initialCountryCode: countryCode,
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileCompletionPage(
+          initialFirstName: firstName,
+          initialLastName: lastName,
+          initialPhone: phone,
+          initialCountryCode: countryCode,
+        ),
       ),
-    ),
-  );
+    );
 
-  if (result != null) {
-    final payload = {
-      'first_name': result['firstName']!,
-      'last_name': result['lastName']!,
-      'country_code': result['id']!, // This is your ISO country code
-      'phone': result['phone']!,
-    };
+    if (result != null) {
+      final payload = {
+        'first_name': result['firstName']!,
+        'last_name': result['lastName']!,
+        'country_code': result['id']!, // ISO country code
+        'phone': result['phone']!,
+      };
 
-    try {
-      final message = await ProfileService.updateProfileData(payload);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-      // Update local state immediately with returned values.
-      setState(() {
-        firstName = result['firstName']!;
-        lastName = result['lastName']!;
-        phone = result['phone']!;
-        countryCode = result['id']!;
-      });
-      // Then re-fetch the profile data.
-      await fetchData();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error updating profile: $e")),
-      );
+      try {
+        final message = await ProfileService.updateProfileData(payload);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+        // Instead of just calling fetchData(), we now push a new ProfilePage,
+        // which re-runs its initState and fetchProfileData.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfilePage()),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error updating profile: $e")),
+        );
+      }
     }
   }
-}
-
 
   // ----------------- Modal Options for Cards -----------------
 
@@ -1117,6 +1125,22 @@ class _HomePageState extends State<HomePage> {
               // Wrap the calendar icon in its own InkWell.
               InkWell(
                 onTap: () {
+                  if (unschedulable_lessons.contains(lesson['id'])) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Reschedule Unavailable"),
+                        content:
+                            const Text("The reschedule period has passed!"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else
                   // Shortcut directly to scheduling modal.
                   if (lesson['type']?.toString().toLowerCase() == 'group') {
                     // For group lessons, show an alert if scheduling is unavailable.

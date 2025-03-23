@@ -35,19 +35,24 @@ class ProfileData {
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
     return ProfileData(
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
-      email: json['email'] ?? '',
-      countryCode: json['country_code'] ?? 'PT',
-      phone: json['phone'] ?? '',
-      birthday: json['birthday'],
-      photo: json['photo'],
-      availableRoles: List<String>.from(json['available_roles'] ?? []),
-      currentRole: json['current_role'] ?? '',
-      availableSchools:
-          List<Map<String, dynamic>>.from(json['available_schools'] ?? []),
+      firstName: json['first_name']?.toString() ?? '',
+      lastName: json['last_name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      countryCode: json['country_code']?.toString() ?? 'PT',
+      phone: json['phone']?.toString() ?? '',
+      birthday: json['birthday']?.toString(),
+      photo: json['photo']?.toString(),
+      availableRoles: (json['available_roles'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      currentRole: json['current_role']?.toString() ?? '',
+      availableSchools: (json['available_schools'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [],
       currentSchoolId: json['current_school_id']?.toString(),
-      currentSchoolName: json['current_school_name'] ?? '',
+      currentSchoolName: json['current_school_name']?.toString() ?? '',
     );
   }
 }
@@ -76,7 +81,9 @@ class ProfileService {
     List<String> availableRoles = [];
     if (roleResponse.statusCode == 200) {
       final data = json.decode(utf8.decode(roleResponse.bodyBytes));
-      availableRoles = List<String>.from(data['available_roles']);
+      availableRoles = (data['available_roles'] as List<dynamic>)
+          .map((e) => e.toString())
+          .toList();
     } else {
       print("Failed to fetch roles: ${roleResponse.body}");
     }
@@ -125,7 +132,6 @@ class ProfileService {
       }
     }
 
-    // Fetch the basic profile info including phone and country_code.
     final profileResponse = await http.get(
       Uri.parse('$baseUrl/api/users/profile_data/'),
       headers: headers,
@@ -136,8 +142,7 @@ class ProfileService {
     } else {
       print("Failed to fetch basic profile info: ${profileResponse.body}");
     }
-
-    // Merge both sources (profileResponse + role/school info).
+    // Merge additional info
     final mergedJson = {
       ...profileJson,
       'available_roles': availableRoles,
@@ -146,7 +151,6 @@ class ProfileService {
       'current_school_id': currentSchoolId,
       'current_school_name': currentSchoolName,
     };
-
     return ProfileData.fromJson(mergedJson);
   }
 
@@ -160,7 +164,7 @@ class ProfileService {
       final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
       return jsonResponse['message'] ?? 'Profile updated successfully';
     } else {
-      final jsonResponse = jsonDecode(response.body);
+      final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
       throw Exception(jsonResponse['error'] ?? 'Failed to update profile');
     }
   }
@@ -174,10 +178,10 @@ class ProfileService {
       body: jsonEncode({"new_role": newRole}),
     );
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      final data = json.decode(utf8.decode(response.bodyBytes));
       return data['message'];
     } else {
-      final data = json.decode(response.body);
+      final data = json.decode(utf8.decode(response.bodyBytes));
       throw Exception(data['error']);
     }
   }
@@ -191,10 +195,10 @@ class ProfileService {
       body: jsonEncode({"new_school_id": schoolId}),
     );
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      final data = json.decode(utf8.decode(response.bodyBytes));
       return data['message'];
     } else {
-      final data = json.decode(response.body);
+      final data = json.decode(utf8.decode(response.bodyBytes));
       throw Exception(data['error']);
     }
   }

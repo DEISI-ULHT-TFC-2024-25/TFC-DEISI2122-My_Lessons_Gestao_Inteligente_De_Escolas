@@ -364,7 +364,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
       final response = await http.post(Uri.parse(url),
           headers: headers, body: jsonEncode(payload));
       if (response.statusCode == 200) {
-        final result = json.decode(response.body);
+        final result = json.decode(utf8.decode(response.bodyBytes));
         final summary = result["summary"] ?? "Update successful";
         showDialog(
           context: context,

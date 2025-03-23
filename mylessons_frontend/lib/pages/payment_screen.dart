@@ -63,7 +63,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = json.decode(utf8.decode(response.bodyBytes));
         _clientSecret = data["clientSecret"];
         // Initialize PaymentSheet using the client secret.
         await Stripe.instance.initPaymentSheet(

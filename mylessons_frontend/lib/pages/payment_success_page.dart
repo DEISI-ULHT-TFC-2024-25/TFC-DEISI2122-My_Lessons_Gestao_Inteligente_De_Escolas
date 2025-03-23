@@ -134,7 +134,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
       if (response.statusCode == 201) {
         _cartService.clear();
         debugPrint("Pack booking successful: ${response.body}");
-        final decodedResponse = json.decode(response.body);
+        final decodedResponse = json.decode(utf8.decode(response.bodyBytes));
         setState(() {
           bookedPacks = decodedResponse["booked_packs"];
         });

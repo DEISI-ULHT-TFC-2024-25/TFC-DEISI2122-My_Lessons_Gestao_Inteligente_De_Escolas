@@ -137,7 +137,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         );
 
         // Decode the JSON response body.
-        final Map<String, dynamic> responseData = json.decode(response.body);
+        final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
         // Extract the booked packs list.
         final List<dynamic> bookedPacks = responseData['booked_packs'];
 
@@ -466,7 +466,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = json.decode(utf8.decode(response.bodyBytes));
         _stripeClientSecret = data["clientSecret"];
         await Stripe.instance.initPaymentSheet(
           paymentSheetParameters: SetupPaymentSheetParameters(
@@ -561,7 +561,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
 
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
+        final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
         final checkoutUrl = jsonResponse['url'];
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Redirecting to Stripe Checkout...")),

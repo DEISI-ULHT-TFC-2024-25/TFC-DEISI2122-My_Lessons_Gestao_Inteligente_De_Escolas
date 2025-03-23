@@ -130,7 +130,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
+        final data = json.decode(utf8.decode(response.bodyBytes));
         // Store the token securely.
         final storage = const FlutterSecureStorage();
         await storage.write(key: 'auth_token', value: data['token']);
@@ -141,7 +141,7 @@ class _RegisterPageState extends State<RegisterPage> {
         Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
       } else {
         final errorMessage =
-            jsonDecode(response.body)['error'] ?? "An error occurred.";
+            json.decode(utf8.decode(response.bodyBytes))['error'] ?? "An error occurred.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error: $errorMessage")),
         );

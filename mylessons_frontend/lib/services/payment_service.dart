@@ -22,7 +22,7 @@ Future<Map<String, dynamic>> postPaymentTypeData({
   final headers = await getAuthHeaders();
   final response =
       await http.post(url, headers: headers, body: jsonEncode(payload));
-  if (response.statusCode == 200) return jsonDecode(response.body);
+  if (response.statusCode == 200) return json.decode(utf8.decode(response.bodyBytes));
   throw Exception('Failed to update payment type: ${response.body}');
 }
 

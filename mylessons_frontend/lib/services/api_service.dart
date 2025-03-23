@@ -49,7 +49,7 @@ Future<Map<String, dynamic>> login(String email, String password) async {
       'password': password,
     }),
   );
-  final data = jsonDecode(response.body);
+  final data = json.decode(utf8.decode(response.bodyBytes));
   if (response.statusCode == 200) {
     if (data.containsKey('token')) {
       // Store the token securely.
@@ -85,7 +85,7 @@ Future<Map<String, dynamic>> googleSignInAuth() async {
     headers: {'Content-Type': 'application/json'},
     body: jsonEncode({'token': googleAuth.idToken}),
   );
-  final data = jsonDecode(response.body);
+  final data = json.decode(utf8.decode(response.bodyBytes));
   if (response.statusCode == 200) {
     // Optionally, store the token if returned.
     return data;
@@ -206,7 +206,7 @@ Future<String?> schedulePrivateLesson(
   if (response.statusCode == 200) {
     return null; // Success, no error message
   } else {
-    final data = jsonDecode(response.body);
+    final data = json.decode(utf8.decode(response.bodyBytes));
     return data['error'] ?? "Failed to schedule lesson";
   }
 }
@@ -234,7 +234,7 @@ Future<int> fetchSchoolScheduleTimeLimit(schoolName) async {
     body: jsonEncode({"school_name": schoolName}),
   );
   if (response.statusCode == 200) {
-    final Map<String, dynamic> data = json.decode(response.body);
+    final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
     return data['time_limit'] as int;
   } else {
     // If an error occurs, default to 0 hours.

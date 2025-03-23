@@ -70,7 +70,7 @@ class _MainScreenState extends State<MainScreen> {
         HomePage(newBookedPacks: widget.newBookedPacks),
         const AvailabilityPage(),
         const PaymentsPage(),
-        const ProfilePage(),
+        ProfilePage(),
       ];
       _navBarItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -84,7 +84,7 @@ class _MainScreenState extends State<MainScreen> {
         HomePage(newBookedPacks: widget.newBookedPacks),
         const SchoolsPage(),
         const PaymentsPage(),
-        const ProfilePage(),
+        ProfilePage(),
       ];
       _navBarItems = const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),

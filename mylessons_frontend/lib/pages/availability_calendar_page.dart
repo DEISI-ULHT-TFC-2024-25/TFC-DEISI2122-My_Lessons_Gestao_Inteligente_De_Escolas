@@ -50,7 +50,7 @@ class _AvailabilityCalendarPageState extends State<AvailabilityCalendarPage> {
     try {
       final response = await http.get(Uri.parse(url), headers: headers);
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
         List<Event> events = [];
         for (var item in data) {
           String type = item['type'];
