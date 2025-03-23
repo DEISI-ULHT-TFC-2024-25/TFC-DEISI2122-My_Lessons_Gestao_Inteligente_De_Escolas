@@ -41,7 +41,7 @@ class Pack(models.Model):
         if self.expiration_date < today:
             print(f"PACK IS EXPIRED: {str(self)}")
             if self.type == "private":
-                for lesson in self.lessons.filter(is_done=True):
+                for lesson in self.lessons.filter(is_done=False):
                     lesson.mark_as_given()
                 self.update_pack_status()
         days_until_expiration = None
