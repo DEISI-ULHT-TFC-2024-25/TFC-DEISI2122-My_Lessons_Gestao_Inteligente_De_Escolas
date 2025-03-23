@@ -34,6 +34,18 @@ class Pack(models.Model):
     def __str__(self):
         return f"{self.type} pack for {self.get_students_name()}, {self.number_of_classes_left}/{self.number_of_classes} lessons left, {self.get_number_of_unscheduled_lessons()} number of unscheduled lessons"
     
+    def handle_expiration_date(self):
+        today = now().date()
+        if self.expiration_date < today:
+            for lesson in self.lessons.filter(is_done=True):
+                lesson.mark_as_given()
+            self.update_pack_status()
+        days_until_expiration = None
+        if self.expiration_date:
+            days_until_expiration = (self.expiration_date - today).days
+        return days_until_expiration
+            
+        
     def update_pack_status(self):
 
         if self.number_of_classes_left > 0:
