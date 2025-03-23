@@ -27,54 +27,68 @@ def get_lessons_data(user, date_lookup, is_done_flag):
     :param date_lookup: A dict with the lookup to apply on dates 
                         (e.g. {'date__gte': today} for upcoming lessons)
     :param is_done_flag: Boolean indicating if lessons are completed.
-                          Used in the filter for PrivateClass.
+                          Used in the filter for Lesson.
     :return: Combined list of private and group lessons data.
     """
     today = now().date()
     
+    # For each user role, conditionally add the date filters only if lessons are not done.
     if user.current_role == "Parent":
         student_ids = user.students.values_list('id', flat=True)
-        
-        # Adjust the private class filters with the given parameters.
-        lessons = Lesson.objects.filter(
-            students__id__in=student_ids,
-            is_done=is_done_flag,
-            **date_lookup  # expects key like date__gte or date__lte with value today
-        ).order_by('date', 'start_time').distinct()
-        
+        if is_done_flag:
+            lessons = Lesson.objects.filter(
+                students__id__in=student_ids,
+                is_done=is_done_flag,
+            ).order_by('date', 'start_time').distinct()
+        else:
+            lessons = Lesson.objects.filter(
+                students__id__in=student_ids,
+                is_done=is_done_flag,
+                **date_lookup  # Applies date filtering when lessons are upcoming
+            ).order_by('date', 'start_time').distinct()
+    
     elif user.current_role == "Instructor":
-        
-        # Adjust the private class filters with the given parameters.
-        lessons = Lesson.objects.filter(
-            instructors__id__in=[user.instructor_profile.id],
-            is_done=is_done_flag,
-            **date_lookup  # expects key like date__gte or date__lte with value today
-        ).order_by('date', 'start_time').distinct()
-        
+        if is_done_flag:
+            lessons = Lesson.objects.filter(
+                instructors__id__in=[user.instructor_profile.id],
+                is_done=is_done_flag,
+            ).order_by('date', 'start_time').distinct()
+        else:
+            lessons = Lesson.objects.filter(
+                instructors__id__in=[user.instructor_profile.id],
+                is_done=is_done_flag,
+                **date_lookup
+            ).order_by('date', 'start_time').distinct()
+    
     elif user.current_role == "Admin":
         if not user.current_school_id:
             lessons = []
         else:
-            # Adjust the private class filters with the given parameters.
-            lessons = Lesson.objects.filter(
-                school_id=user.current_school_id,
-                is_done=is_done_flag,
-                **date_lookup  # expects key like date__gte or date__lte with value today
-            ).order_by('date', 'start_time').distinct()
+            if is_done_flag:
+                lessons = Lesson.objects.filter(
+                    school_id=user.current_school_id,
+                    is_done=is_done_flag,
+                ).order_by('date', 'start_time').distinct()
+            else:
+                lessons = Lesson.objects.filter(
+                    school_id=user.current_school_id,
+                    is_done=is_done_flag,
+                    **date_lookup
+                ).order_by('date', 'start_time').distinct()
 
-    # Process private lessons data.
+    # Process lessons data.
     lessons_data = [
         {
             "lesson_id": lesson.id,
             "date": lesson.date.strftime("%d %b %Y") if lesson.date else "None",
             "start_time": lesson.start_time.strftime("%H:%M") if lesson.start_time else "None",
-            "lesson_number": lesson.class_number if lesson.class_number else "None", # TODO fix for group lessons
-            "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None", # TODO fix for group lessons
+            "lesson_number": lesson.class_number if lesson.class_number else "None",  # TODO: fix for group lessons
+            "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None",  # TODO: fix for group lessons
             "students_name": lesson.get_students_name(),
             "type": lesson.type,
             "duration_in_minutes": lesson.duration_in_minutes,
             "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
-            "school": str(lesson.school) if lesson.school else "" 
+            "school": str(lesson.school) if lesson.school else ""
         }
         for lesson in lessons
     ]
