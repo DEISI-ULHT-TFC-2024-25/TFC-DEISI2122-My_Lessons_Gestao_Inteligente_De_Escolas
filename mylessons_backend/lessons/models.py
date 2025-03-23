@@ -36,10 +36,14 @@ class Pack(models.Model):
     
     def handle_expiration_date(self):
         today = now().date()
+        print("ENTERED HANDLE EXPIRATION")
+        print(self.expiration_date)
         if self.expiration_date < today:
-            for lesson in self.lessons.filter(is_done=True):
-                lesson.mark_as_given()
-            self.update_pack_status()
+            print(f"PACK IS EXPIRED: {str(self)}")
+            if self.type == "private":
+                for lesson in self.lessons.filter(is_done=True):
+                    lesson.mark_as_given()
+                self.update_pack_status()
         days_until_expiration = None
         if self.expiration_date:
             days_until_expiration = (self.expiration_date - today).days
