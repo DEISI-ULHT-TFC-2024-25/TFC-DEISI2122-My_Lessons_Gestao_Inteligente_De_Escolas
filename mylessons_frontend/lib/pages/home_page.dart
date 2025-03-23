@@ -11,8 +11,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../modals/profile_completion_modal.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
-import 'lesson_report_page.dart'; // Import our API services
-import 'profile_page.dart' as profile;
 import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -35,7 +33,7 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> lastLessons = [];
   List<dynamic> activePacks = [];
   List<dynamic> lastPacks = [];
-  List<String> unschedulable_lessons = [];
+  List<String> unschedulableLessons = [];
   int numberOfActiveStudents = 0;
   double currentBalance = 0.0;
   bool _isLoading = true; // Loading flag
@@ -99,14 +97,19 @@ class _HomePageState extends State<HomePage> {
       );
 
       final unschedulableLessonsResponse = await http.get(
-        Uri.parse('$baseUrl/api/users/unschedulable_lessons/'),
+        Uri.parse('$baseUrl/api/lessons/unschedulable_lessons/'),
         headers: headers,
       );
 
+      final decodedResponse =
+          json.decode(utf8.decode(unschedulableLessonsResponse.bodyBytes));
+
+// Assuming the API returns a map with a key "unschedulable_lessons" that holds the list.
       setState(() {
-        unschedulable_lessons =
-            json.decode(utf8.decode(unschedulableLessonsResponse.bodyBytes));
+        unschedulableLessons =
+            List<String>.from(decodedResponse['lesson_ids']);
       });
+      print(unschedulableLessons);
 
       if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
         final decodedProfile = utf8.decode(profileResponse.bodyBytes);
@@ -139,7 +142,7 @@ class _HomePageState extends State<HomePage> {
         });
 
         // Prompt profile completion if needed.
-        if (firstName.isEmpty || phone.isEmpty) {
+        if (firstName.isEmpty || lastName.isEmpty || countryCode.isEmpty || phone.isEmpty) {
           _promptProfileCompletion();
         }
       }
@@ -328,11 +331,7 @@ class _HomePageState extends State<HomePage> {
           SnackBar(content: Text(message)),
         );
         // Instead of just calling fetchData(), we now push a new ProfilePage,
-        // which re-runs its initState and fetchProfileData.
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
-        );
+        await fetchData();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error updating profile: $e")),
@@ -479,6 +478,7 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       builder: (BuildContext context) => ScheduleMultipleLessonsModal(
         lessons: lessons,
+        unschedulableLessons: unschedulableLessons,
         expirationDate: expirationDate,
         currentRole: currentRole,
         schoolScheduleTimeLimit: schoolScheduleTimeLimit,
@@ -491,6 +491,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _showScheduleLessonModal(dynamic lesson) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
+    print(lessonId);
+    
     DateTime? selectedDate;
     int increment = 60;
     List<String> availableTimes = [];
@@ -1125,7 +1127,7 @@ class _HomePageState extends State<HomePage> {
               // Wrap the calendar icon in its own InkWell.
               InkWell(
                 onTap: () {
-                  if (unschedulable_lessons.contains(lesson['id'])) {
+                  if (unschedulableLessons.contains(lesson['lesson_id'].toString())) {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(

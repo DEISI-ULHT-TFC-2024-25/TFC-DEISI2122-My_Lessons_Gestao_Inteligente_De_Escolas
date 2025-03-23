@@ -9,7 +9,7 @@ import 'package:mylessons_frontend/services/api_service.dart';
 class ScheduleMultipleLessonsModal extends StatefulWidget {
   /// List of lessons. Each lesson must be a map with keys: "lesson_id" and "lesson_str"
   final List<dynamic> lessons;
-  final List<String> unschedulable_lessons;
+  final List<String> unschedulableLessons;
 
   /// Callback to refresh the home page after scheduling is confirmed.
   final VoidCallback onScheduleConfirmed;
@@ -26,7 +26,7 @@ class ScheduleMultipleLessonsModal extends StatefulWidget {
     required this.currentRole,
     required this.schoolScheduleTimeLimit,
     required this.expirationDate,
-    required this.unschedulable_lessons,
+    required this.unschedulableLessons,
   });
 
   @override
@@ -78,7 +78,11 @@ class _ScheduleMultipleLessonsModalState
     setState(() {
       selectAll = value ?? false;
       for (int i = 0; i < selectedLessons.length; i++) {
-        selectedLessons[i] = selectAll;
+        final lessonId = widget.lessons[i]['lesson_id'];
+        // Only update if the lesson is schedulable.
+        if (!widget.unschedulableLessons.contains(lessonId)) {
+          selectedLessons[i] = selectAll;
+        }
       }
     });
   }
@@ -508,7 +512,7 @@ class _ScheduleMultipleLessonsModalState
               ...List.generate(widget.lessons.length, (index) {
                 final lessonId = widget.lessons[index]['lesson_id'];
                 final isUnschedulable =
-                    widget.unschedulable_lessons.contains(lessonId);
+                    widget.unschedulableLessons.contains(lessonId);
                 return CheckboxListTile(
                   title: Text(widget.lessons[index]['lesson_str']),
                   value: selectedLessons[index],
@@ -519,10 +523,10 @@ class _ScheduleMultipleLessonsModalState
                             selectedLessons[index] = value ?? false;
                           });
                         },
-                  // Optionally, show a disabled icon if the lesson cannot be rescheduled.
                   secondary: isUnschedulable ? const Icon(Icons.block) : null,
                 );
               }),
+
               const Divider(),
               // Single or multiple logic
               if (selectedCount == 1)

@@ -126,7 +126,7 @@ def get_packs_data(user, is_done_flag):
                         ],
             "lessons_remaining": pack.number_of_classes_left,
             "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
-            "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
+            "days_until_expiration": pack.handle_expiration_date(),
             "students_name": pack.get_students_name(),
             "type": pack.type,
             "expiration_date": str(pack.expiration_date),
