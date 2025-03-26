@@ -55,8 +55,11 @@ class _EditClassDetailsModalState extends State<EditClassDetailsModal> {
           const SizedBox(height: 16),
           TextFormField(
             controller: noteController,
+            keyboardType: TextInputType.multiline,
+            minLines: 1,
+            maxLines: null, // Allows the field to expand as needed.
             decoration: const InputDecoration(
-              labelText: 'Quick Note',
+              hintText: "Enter detailed notes...",
               border: OutlineInputBorder(),
             ),
           ),

@@ -241,6 +241,10 @@ Future<int> fetchSchoolScheduleTimeLimit(schoolName) async {
   }
 }
 
+
+
+
+
 // ==================== New API Functions for Flutter Frontend ====================
 
 /// Fetches the list of skill proficiencies for the current user.
@@ -256,11 +260,23 @@ Future<List<dynamic>> getSkillProficiencies() async {
   }
 }
 
+Future<List<dynamic>> getSkillForASubject(int subjectId) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/skills/$subjectId';
+  final response = await http.get(Uri.parse(url), headers: headers);
+  if (response.statusCode == 200) {
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data;
+  } else {
+    throw Exception("Failed to load available skills: ${response.statusCode}");
+  }
+}
+
 /// Updates a skill proficiency level.
 /// Sends a POST request to the custom action endpoint.
-Future<void> updateSkillProficiencyLevel(int proficiencyId, int newLevel) async {
+Future<void> updateSkillProficiencyLevel(int proficiencyId, int newLevel, int studentId) async {
   final headers = await getAuthHeaders();
-  final url = '$baseUrl/api/progress/skill-proficiencies/$proficiencyId/update-level/';
+  final url = '$baseUrl/api/progress/skill-proficiencies/$studentId/$proficiencyId/update-level/';
   final response = await http.post(
     Uri.parse(url),
     headers: headers,
