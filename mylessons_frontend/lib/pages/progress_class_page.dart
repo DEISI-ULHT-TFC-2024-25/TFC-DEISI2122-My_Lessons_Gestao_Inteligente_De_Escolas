@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart'; // Assumes baseUrl and getAuthHeaders are defined
+import 'progress_student_page.dart';
+import 'progress_update_page.dart';
 
 class ClassProgressPage extends StatefulWidget {
   final Map<String, dynamic> lesson;
-  const ClassProgressPage({Key? key, required this.lesson}) : super(key: key);
+  final String currentRole; // "Instructor", "Admin", or others
+  const ClassProgressPage({Key? key, required this.lesson, required this.currentRole}) : super(key: key);
 
   @override
   _ClassProgressPageState createState() => _ClassProgressPageState();
@@ -40,10 +43,10 @@ class _ClassProgressPageState extends State<ClassProgressPage> {
           progressRecord = json.decode(response.body);
         });
       } else {
-        // Handle error if necessary
+        // Handle error if necessary.
       }
     } catch (e) {
-      // Handle exception if necessary
+      // Handle exception if necessary.
     }
     setState(() {
       _isLoading = false;
@@ -128,8 +131,45 @@ class _ClassProgressPageState extends State<ClassProgressPage> {
                         ),
                       ),
                       const SizedBox(height: 24),
+                      // ----------------- Update Progress Button for Instructors -----------------
+                      if (widget.currentRole == "Instructor" || widget.currentRole == "Admin")
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProgressUpdatePage(recordId: progressRecord!['id']),
+                                ),
+                              ).then((_) {
+                                // Refresh the progress record after update.
+                                fetchProgressRecord();
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                            ),
+                            child: Text("Update Progress", style: GoogleFonts.lato(color: Colors.white)),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
                     ],
                   ),
+      ),
+      // ----------------- Floating button to view overall Student Progress -----------------
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const StudentProgressPage(),
+            ),
+          );
+        },
+        label: Text("View Student Progress", style: GoogleFonts.lato()),
+        icon: const Icon(Icons.assessment),
+        backgroundColor: Colors.orange,
       ),
     );
   }
