@@ -93,7 +93,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
         final payload = {
           'student_id': widget.student['id'],
           'lesson_id': widget
-              .lesson['id'], // Ensure this key exists in your lesson object.
+              .lesson['lesson_id'], // Ensure this key exists in your lesson object.
           'notes': _notesController.text,
           'goals': goalProgress.entries
               .map((e) => {'goal_id': e.key, 'progress': e.value})
