@@ -159,8 +159,8 @@ def create_progress_record(request):
       - 'student_id' (required)
       - optionally 'lesson_id' and 'notes'
       - 'goals': a list of dictionaries with 'goal_id' and 'progress'
-    For each goal in the list, if the progress (i.e. new level) differs from the current level,
-    the goal’s update_level method is called.
+    For each goal provided, if the new progress (i.e. new level) differs from the current level,
+    the goal’s update_level method is called, and the goal is linked to the progress record.
     """
     student_id = request.data.get('student_id')
     if not student_id:
@@ -181,10 +181,11 @@ def create_progress_record(request):
     except Exception as e:
         return JsonResponse({'error': f'Failed to create progress record: {e}'}, status=status.HTTP_400_BAD_REQUEST)
     
-    # Update goals if provided.
+    # Process and update goals if provided.
     goals_data = request.data.get('goals')
     if goals_data:
-        from progress.models import Goal  # Ensure you import the Goal model.
+        from progress.models import Goal  # Import the Goal model.
+        goal_ids = []
         for goal_data in goals_data:
             goal_id = goal_data.get('goal_id')
             new_level = goal_data.get('progress')
@@ -192,11 +193,14 @@ def create_progress_record(request):
                 continue
             try:
                 goal_instance = Goal.objects.get(pk=goal_id)
+                # Update the goal level if needed using the model's method.
                 if goal_instance.level != new_level:
-                    # Use the model method to update the level.
                     goal_instance.update_level(new_level)
+                goal_ids.append(goal_instance.id)
             except Goal.DoesNotExist:
                 continue
+        # Associate the goals with the progress record.
+        progress_record.goals.set(goal_ids)
     
     data = {
         'id': progress_record.id,

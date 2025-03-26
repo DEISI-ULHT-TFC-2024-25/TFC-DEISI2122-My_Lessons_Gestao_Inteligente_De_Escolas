@@ -67,7 +67,7 @@ class ProgressRecord(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     def add_covered_skill(self, skill):
-        self.skills.add(skill)
+        self.goals.add(skill)
         self.save()
 
     def update_notes(self, new_notes):
