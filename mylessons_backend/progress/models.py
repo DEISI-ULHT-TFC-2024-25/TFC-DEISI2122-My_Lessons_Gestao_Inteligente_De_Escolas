@@ -16,9 +16,9 @@ class Skill(models.Model):
 class Goal(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="goals")
     skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name="goals")
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
     start_datetime = models.DateTimeField(auto_now_add=True, null=True, blank=True)
-    target_date = models.DateField()
+    target_date = models.DateField(null=True, blank=True)
     level = models.PositiveIntegerField(default=1)  # Example: 1 = Beginner, 5 = Expert
     last_updated = models.DateTimeField(auto_now=True)
     is_completed = models.BooleanField(default=False)
