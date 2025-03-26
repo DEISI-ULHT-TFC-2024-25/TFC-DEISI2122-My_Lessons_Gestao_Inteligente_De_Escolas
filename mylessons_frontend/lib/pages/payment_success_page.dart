@@ -6,12 +6,14 @@ import '../services/cart_service.dart';
 import 'package:flutter/material.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
+  final bool? cameFromPaymentsPage;
   /// Instead of a list of pack IDs, we now accept a map of
   /// each pack's ID to the amount paid.
   final Map<dynamic, double>? packAmounts;
   const PaymentSuccessPage({
     Key? key,
     this.packAmounts, // mapping of pack ID to amount (in euros)
+    this.cameFromPaymentsPage,
   }) : super(key: key);
 
   @override
@@ -37,7 +39,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   /// - If there are no items in the cart, create a debt payment record.
   /// - Otherwise, proceed to book packs.
   Future<void> _processSuccess() async {
-    if (_cartService.items.isEmpty) {
+    if (widget.cameFromPaymentsPage == true) {
       await _createDebtPaymentRecord();
     } else {
       await _bookPacks();

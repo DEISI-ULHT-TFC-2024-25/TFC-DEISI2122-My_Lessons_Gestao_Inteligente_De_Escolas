@@ -466,6 +466,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         context,
         MaterialPageRoute(
           builder: (_) => PaymentSuccessPage(
+            cameFromPaymentsPage: true,
             packAmounts:
                 selectedAmounts, // Pass the mapping to the success page.
           ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import '../../services/profile_service.dart';
-import 'school_setup_page.dart';
+import 'manage_school.dart';
 import '../../main.dart'; // Ensure this imports your global routeObserver
 
 class ProfilePage extends StatefulWidget {

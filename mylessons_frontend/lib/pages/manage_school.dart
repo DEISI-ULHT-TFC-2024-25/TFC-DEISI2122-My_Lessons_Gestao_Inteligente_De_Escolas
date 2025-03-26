@@ -14,10 +14,12 @@ import '../widgets/staff_widgets.dart';
 
 class SchoolSetupPage extends StatefulWidget {
   final bool isCreatingSchool;
-  final Future<void> Function()
-      fetchProfileData; // Callback to refresh the whole home page
-  const SchoolSetupPage({super.key, this.isCreatingSchool = false, required this.fetchProfileData});
-  
+  final Future<void> Function() fetchProfileData; // Callback to refresh the whole home page
+  const SchoolSetupPage({
+    super.key,
+    this.isCreatingSchool = false,
+    required this.fetchProfileData,
+  });
 
   @override
   _SchoolSetupPageState createState() => _SchoolSetupPageState();
@@ -55,9 +57,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
   }
 
-  /// This function calls fetchSchoolDetails() from school_service.dart.
-  /// Ensure that fetchSchoolDetails() decodes HTTP responses using:
-  ///    jsonDecode(utf8.decode(response.bodyBytes))
   Future<void> fetchAndDisplaySchoolDetails() async {
     try {
       final details = await fetchSchoolDetails();
@@ -76,8 +75,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
   }
 
-  /// This function calls createSchool() from school_service.dart.
-  /// Ensure that createSchool() decodes HTTP responses using UTF8 as well.
   Future<void> createSchoolAction() async {
     final schoolName = _schoolNameController.text.trim();
     if (schoolName.isEmpty) {
@@ -101,7 +98,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
   }
 
-  /// Tabs Content
+  // Tabs Content
 
   Widget _buildServicesTab() {
     if (schoolDetails == null) {
@@ -112,47 +109,42 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     if (servicesData is List) {
       services = servicesData;
     } else if (servicesData is Map) {
-      // If you want to convert the Map values to a list, do:
       services = servicesData.values.toList();
     } else {
       services = [];
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: services.isNotEmpty
-              ? Column(
-                  children: services.map<Widget>((service) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      child: ListTile(
-                        title: Text(
-                          service['name'] ?? "No Name",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(
-                            Icons.edit,
-                            color: Colors.orange,
-                          ),
-                          onPressed: () async {
-                            await showAddEditServiceModal(
-                                context, schoolDetails!,
-                                service: service);
-                            await fetchAndDisplaySchoolDetails();
-                          },
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: services.isNotEmpty
+            ? Column(
+                children: services.map<Widget>((service) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    child: ListTile(
+                      title: Text(
+                        service['name'] ?? "No Name",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  }).toList(),
-                )
-              : const Text("No services available."),
-        ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.edit,
+                          color: Colors.orange,
+                        ),
+                        onPressed: () async {
+                          await showAddEditServiceModal(context, schoolDetails!,
+                              service: service);
+                          await fetchAndDisplaySchoolDetails();
+                        },
+                      ),
+                    ),
+                  );
+                }).toList(),
+              )
+            : const Text("No services available."),
       ),
     );
   }
@@ -162,21 +154,18 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return const Center(child: CircularProgressIndicator());
     }
     final List staff = (schoolDetails!['staff'] as List?) ?? [];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: staff.isNotEmpty
-              ? buildStaffSection(
-                  List<dynamic>.from(staff),
-                  context: context,
-                  schoolDetails: schoolDetails!,
-                  schoolNameController: _schoolNameController,
-                  refreshSchoolDetails: fetchAndDisplaySchoolDetails,
-                )
-              : const Text("No staff data available."),
-        ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: staff.isNotEmpty
+            ? buildStaffSection(
+                List<dynamic>.from(staff),
+                context: context,
+                schoolDetails: schoolDetails!,
+                schoolNameController: _schoolNameController,
+                refreshSchoolDetails: fetchAndDisplaySchoolDetails,
+              )
+            : const Text("No staff data available."),
       ),
     );
   }
@@ -187,21 +176,18 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
     final Map<String, dynamic> paymentTypes =
         (schoolDetails!['payment_types'] as Map<String, dynamic>?) ?? {};
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: paymentTypes.isNotEmpty
-              ? buildPaymentTypesWidget(
-                  paymentTypes,
-                  context: context,
-                  schoolDetails: schoolDetails!,
-                  schoolNameController: _schoolNameController,
-                  refreshSchoolDetails: fetchAndDisplaySchoolDetails,
-                )
-              : const Text("No payment types available."),
-        ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: paymentTypes.isNotEmpty
+            ? buildPaymentTypesWidget(
+                paymentTypes,
+                context: context,
+                schoolDetails: schoolDetails!,
+                schoolNameController: _schoolNameController,
+                refreshSchoolDetails: fetchAndDisplaySchoolDetails,
+              )
+            : const Text("No payment types available."),
       ),
     );
   }
@@ -211,24 +197,21 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return const Center(child: CircularProgressIndicator());
     }
     final List subjects = (schoolDetails!['subjects'] as List?) ?? [];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: subjects.isNotEmpty
-              ? Column(
-                  children: subjects.map<Widget>((subject) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      child: ListTile(
-                        title: Text(subject['subject_name'] ?? "No Name"),
-                      ),
-                    );
-                  }).toList(),
-                )
-              : const Text("No subjects available."),
-        ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: subjects.isNotEmpty
+            ? Column(
+                children: subjects.map<Widget>((subject) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    child: ListTile(
+                      title: Text(subject['subject_name'] ?? "No Name"),
+                    ),
+                  );
+                }).toList(),
+              )
+            : const Text("No subjects available."),
       ),
     );
   }
@@ -238,25 +221,22 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return const Center(child: CircularProgressIndicator());
     }
     final List equipments = (schoolDetails!['equipment'] as List?) ?? [];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: equipments.isNotEmpty
-              ? Column(
-                  children: equipments.map<Widget>((equipment) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      child: ListTile(
-                        title: Text(equipment['equipment_name'] ?? "No Name"),
-                        subtitle: Text(equipment['location'] ?? ""),
-                      ),
-                    );
-                  }).toList(),
-                )
-              : const Text("No equipments available."),
-        ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: equipments.isNotEmpty
+            ? Column(
+                children: equipments.map<Widget>((equipment) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    child: ListTile(
+                      title: Text(equipment['equipment_name'] ?? "No Name"),
+                      subtitle: Text(equipment['location'] ?? ""),
+                    ),
+                  );
+                }).toList(),
+              )
+            : const Text("No equipments available."),
       ),
     );
   }
@@ -266,49 +246,42 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return const Center(child: CircularProgressIndicator());
     }
     final List locations = (schoolDetails!['locations'] as List?) ?? [];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: locations.isNotEmpty
-              ? Column(
-                  children: locations.map<Widget>((location) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      child: ListTile(
-                        title: Text(location['location_name'] ?? "No Name"),
-                        subtitle: Text(location['address'] ?? ""),
-                      ),
-                    );
-                  }).toList(),
-                )
-              : const Text("No locations available."),
-        ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: locations.isNotEmpty
+            ? Column(
+                children: locations.map<Widget>((location) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    child: ListTile(
+                      title: Text(location['location_name'] ?? "No Name"),
+                      subtitle: Text(location['address'] ?? ""),
+                    ),
+                  );
+                }).toList(),
+              )
+            : const Text("No locations available."),
       ),
     );
   }
 
-  /// Actions for the bottom button
   Future<void> _onBottomButtonPressed() async {
     int index = _tabController.index;
     switch (index) {
       case 0:
-        // Services tab
         if (schoolDetails != null) {
           await showAddEditServiceModal(context, schoolDetails!);
           await fetchAndDisplaySchoolDetails();
         }
         break;
       case 1:
-        // Staff tab - open the Add Staff modal
         final result = await showAddStaffModal(context);
         if (result == true) {
           await fetchAndDisplaySchoolDetails();
         }
         break;
       case 2:
-        // Staff Payments tab
         if (schoolDetails != null) {
           await showPaymentTypeModal(
             context,
@@ -321,7 +294,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         }
         break;
       case 3:
-        // Subjects tab: show the Subject modal.
         if (schoolDetails != null) {
           await showModalBottomSheet(
             context: context,
@@ -334,13 +306,11 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         }
         break;
       case 4:
-        // Equipments tab - placeholder
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Add Equipment clicked")),
         );
         break;
       case 5:
-        // Locations tab: show the Location modal.
         if (schoolDetails != null && schoolDetails!['school_id'] != null) {
           await showModalBottomSheet(
             context: context,
@@ -362,30 +332,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     return "Add ${_tabLabels[currentIndex]}";
   }
 
-  /// Builds the bottom-aligned pill-shaped button
-  Widget _buildBottomButton() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ElevatedButton(
-          onPressed: _onBottomButtonPressed,
-          style: ElevatedButton.styleFrom(
-            shape: const StadiumBorder(),
-            backgroundColor: Colors.orange,
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-          ),
-          child: Text(
-            _getBottomButtonLabel(),
-            style: const TextStyle(color: Colors.black, fontSize: 16),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // If in creation mode and the school has not been created yet, show the creation UI.
     if (widget.isCreatingSchool && !_isCreated) {
       return Scaffold(
         appBar: AppBar(title: const Text("School Setup")),
@@ -418,7 +366,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       );
     }
 
-    // After the school is created, display the school name in the AppBar title.
     String appBarTitle = schoolDetails?['school_name'] != null
         ? "${schoolDetails!['school_name']} Settings"
         : "School Settings";
@@ -445,7 +392,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  // Display the critical message banner if present.
                   if (schoolDetails != null &&
                       schoolDetails!['critical_message'] != null &&
                       schoolDetails!['critical_message']
@@ -470,21 +416,44 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                       ),
                     ),
                   Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
+                    child: Stack(
                       children: [
-                        _buildServicesTab(),
-                        _buildStaffTab(),
-                        _buildStaffPaymentsTab(),
-                        _buildSubjectsTab(),
-                        _buildEquipmentsTab(),
-                        _buildLocationsTab(),
+                        TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildServicesTab(),
+                            _buildStaffTab(),
+                            _buildStaffPaymentsTab(),
+                            _buildSubjectsTab(),
+                            _buildEquipmentsTab(),
+                            _buildLocationsTab(),
+                          ],
+                        ),
+                        // Positioned button overlayed at the bottom of the content
+                        Positioned(
+                          bottom: 24,
+                          left: 24,
+                          right: 24,
+                          child: ElevatedButton(
+                            onPressed: _onBottomButtonPressed,
+                            style: ElevatedButton.styleFrom(
+                              shape: const StadiumBorder(),
+                              backgroundColor: Colors.orange,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 10),
+                            ),
+                            child: Text(
+                              _getBottomButtonLabel(),
+                              style: const TextStyle(
+                                  color: Colors.black, fontSize: 16),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-        bottomNavigationBar: _buildBottomButton(),
       ),
     );
   }

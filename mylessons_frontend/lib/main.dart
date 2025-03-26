@@ -63,6 +63,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       navigatorKey: navigatorKey,
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
+        toggleButtonsTheme: ToggleButtonsThemeData(
+          fillColor: Colors.orange,
+          selectedColor: Colors.white,
+          color: Colors.orange, // unselected text color
+          borderColor: Colors.orange,
+          borderWidth: 2.0, // thicker border
+          borderRadius: BorderRadius.circular(32.0),
+          selectedBorderColor: Colors.orange,
+        ),
         bottomSheetTheme: BottomSheetThemeData(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -104,6 +113,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         datePickerTheme: DatePickerThemeData(
           headerBackgroundColor: Colors.orange,
           headerForegroundColor: Colors.white,
+          backgroundColor: Colors.white,
           todayBorder: const BorderSide(color: Colors.orange, width: 1.5),
           dayForegroundColor:
               MaterialStateProperty.resolveWith<Color?>((states) {
@@ -156,7 +166,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             fontWeight: FontWeight.bold,
           ),
           unselectedLabelStyle: TextStyle(
-            fontSize: 14.0,
+            fontSize: 16.0,
+            fontWeight: FontWeight.bold,
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -182,21 +193,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           selectionHandleColor: Colors.orange,
         ),
         inputDecorationTheme: InputDecorationTheme(
-          hintStyle: const TextStyle(color: Colors.black), // Hint text in black
-          labelStyle:
-              const TextStyle(color: Colors.black), // Label text in black
-          floatingLabelStyle: const TextStyle(
-              color: Colors.black), // Floating label text in black
+          hintStyle: const TextStyle(color: Colors.black),
+          labelStyle: const TextStyle(color: Colors.black),
+          floatingLabelStyle: const TextStyle(color: Colors.black),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
-            borderSide: const BorderSide(color: Colors.orange),
+            borderSide: const BorderSide(color: Colors.orange, width: 2.0),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
-            borderSide: const BorderSide(color: Colors.orange),
+            borderSide: const BorderSide(color: Colors.orange, width: 2.0),
           ),
         ),
       ),

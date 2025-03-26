@@ -37,6 +37,7 @@ class StudentSelectionModal extends StatefulWidget {
 
 class _StudentSelectionModalState extends State<StudentSelectionModal>
     with SingleTickerProviderStateMixin {
+  // Initialize TabController with length 2. It will only be used when associated students exist.
   late TabController _tabController;
   int _selectedTabIndex = 0;
 
@@ -196,111 +197,51 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
 
   @override
   Widget build(BuildContext context) {
-    // Use a ConstrainedBox to allow the modal to expand up to 90% of the screen height if needed.
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
-      child: Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Drag handle.
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                color: Colors.grey,
-                margin: const EdgeInsets.only(bottom: 16),
-              ),
+    // Use a FutureBuilder to fetch the students data.
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _studentsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return const Center(child: Text("Error loading students"));
+        }
+
+        // Retrieve associated students from the fetched data.
+        final List<Map<String, dynamic>> associatedStudents = ((snapshot.data?["associated_students"] ?? []) as List)
+            .map((e) => e as Map<String, dynamic>)
+            .toList();
+
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          child: Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              left: 16,
+              right: 16,
+              top: 16,
             ),
-            // Only display the selection header.
-            _buildSelectionHeader(),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Column(
-                children: [
-                  TabBar(
-                    controller: _tabController,
-                    onTap: (index) {
-                      setState(() {
-                        _selectedTabIndex = index;
-                      });
-                    },
-                    tabs: const [
-                      Tab(text: "Associated"),
-                      Tab(text: "New"),
-                    ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Drag handle.
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    color: Colors.grey,
+                    margin: const EdgeInsets.only(bottom: 16),
                   ),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        // 1) Associated Tab
-                        FutureBuilder<Map<String, dynamic>>(
-                          future: _studentsFuture,
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            }
-                            if (snapshot.hasError) {
-                              return const Center(
-                                  child: Text("Error loading students"));
-                            }
-                            final List<Map<String, dynamic>> assoc =
-                                (snapshot.data?["associated_students"]
-                                        as List<dynamic>)
-                                    .map((e) => e as Map<String, dynamic>)
-                                    .toList();
-                            return ListView.builder(
-                              itemCount: assoc.length,
-                              itemBuilder: (context, index) {
-                                final student = assoc[index];
-                                final alreadySelected = _selectedStudents
-                                    .any((s) => s['id'] == student['id']);
-                                return ListTile(
-                                  title: Text(
-                                    "${student['id']} - ${student['first_name']} ${student['last_name']}",
-                                  ),
-                                  subtitle:
-                                      Text("Birthday: ${student['birthday']}"),
-                                  trailing: alreadySelected
-                                      ? const Icon(Icons.check,
-                                          color: Colors.green)
-                                      : null,
-                                  onTap: () {
-                                    if (!alreadySelected) {
-                                      if (_selectedStudents.length <
-                                          (widget.requiredCount ?? 999999)) {
-                                        final newSelection = [
-                                          ..._selectedStudents,
-                                          student
-                                        ];
-                                        _updateSelection(newSelection);
-                                      }
-                                    } else {
-                                      final newSelection = _selectedStudents
-                                          .where(
-                                              (s) => s['id'] != student['id'])
-                                          .toList();
-                                      _updateSelection(newSelection);
-                                    }
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        ),
-                        // 2) New Tab (Register a new student)
-                        Padding(
+                ),
+                _buildSelectionHeader(),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: associatedStudents.isEmpty
+                      // When there are no associated students, simply show the "New" student UI.
+                      ? Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: SingleChildScrollView(
                             child: Column(
@@ -346,24 +287,16 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                 const SizedBox(height: 8),
                                 ElevatedButton(
                                   onPressed: () async {
-                                    if (_firstNameController.text
-                                            .trim()
-                                            .isNotEmpty &&
-                                        _lastNameController.text
-                                            .trim()
-                                            .isNotEmpty &&
+                                    if (_firstNameController.text.trim().isNotEmpty &&
+                                        _lastNameController.text.trim().isNotEmpty &&
                                         selectedBirthday != null) {
                                       try {
-                                        final createdStudent =
-                                            await _createStudent(
+                                        final createdStudent = await _createStudent(
                                           _firstNameController.text.trim(),
                                           _lastNameController.text.trim(),
                                           _dateFormat.format(selectedBirthday!),
                                         );
-                                        final newSelection = [
-                                          ..._selectedStudents,
-                                          createdStudent
-                                        ];
+                                        final newSelection = [..._selectedStudents, createdStudent];
                                         _updateSelection(newSelection);
                                         _firstNameController.clear();
                                         _lastNameController.clear();
@@ -372,13 +305,9 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                         setState(() {
                                           _studentsFuture = _fetchStudents();
                                         });
-                                        _tabController.animateTo(0);
                                       } catch (e) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                              content: Text(
-                                                  "Error creating student: $e")),
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text("Error creating student: $e")),
                                         );
                                       }
                                     }
@@ -388,64 +317,180 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                               ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_isSelectionComplete)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      final checkoutDetails = _buildCheckoutDetails();
-                      final serviceWithCheckout =
-                          Map<String, dynamic>.from(widget.service)
-                            ..['checkout_details'] = checkoutDetails;
-                      CartService().addToCart(
-                          serviceWithCheckout, _selectedStudents, currentPrice);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Added to cart")),
-                      );
-                      // Pop using the root navigator
-                      Navigator.of(context, rootNavigator: true).pop();
-                    },
-                    child: const Text("Add to Cart"),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      final checkoutDetails = _buildCheckoutDetails();
-                      final serviceWithCheckout =
-                          Map<String, dynamic>.from(widget.service)
-                            ..['checkout_details'] = checkoutDetails;
-                      CartService().addToCart(
-                          serviceWithCheckout, _selectedStudents, currentPrice);
-
-                      // Pop the modal using the global navigator.
-                      navigatorKey.currentState!.pop();
-
-                      // Delay to ensure the modal is completely dismissed.
-                      Future.delayed(const Duration(milliseconds: 100), () {
-                        navigatorKey.currentState!.push(
-                          MaterialPageRoute(
-                            builder: (_) => CheckoutPage(
-                              onBack: () =>
-                                  navigatorKey.currentState!.pop(),
+                        )
+                      // If there are associated students, display both the "Associated" and "New" tabs.
+                      : Column(
+                          children: [
+                            TabBar(
+                              controller: _tabController,
+                              onTap: (index) {
+                                setState(() {
+                                  _selectedTabIndex = index;
+                                });
+                              },
+                              tabs: const [
+                                Tab(text: "Associated"),
+                                Tab(text: "New"),
+                              ],
                             ),
-                          ),
-                        );
-                      });
-                    },
-                    child: const Text("Buy Now"),
+                            Expanded(
+                              child: TabBarView(
+                                controller: _tabController,
+                                children: [
+                                  ListView.builder(
+                                    itemCount: associatedStudents.length,
+                                    itemBuilder: (context, index) {
+                                      final student = associatedStudents[index];
+                                      final alreadySelected = _selectedStudents.any((s) => s['id'] == student['id']);
+                                      return ListTile(
+                                        title: Text(
+                                          "${student['id']} - ${student['first_name']} ${student['last_name']}",
+                                        ),
+                                        subtitle: Text("Birthday: ${student['birthday']}"),
+                                        trailing: alreadySelected
+                                            ? const Icon(Icons.check, color: Colors.green)
+                                            : null,
+                                        onTap: () {
+                                          if (!alreadySelected) {
+                                            if (_selectedStudents.length < (widget.requiredCount ?? 999999)) {
+                                              final newSelection = [..._selectedStudents, student];
+                                              _updateSelection(newSelection);
+                                            }
+                                          } else {
+                                            final newSelection = _selectedStudents.where((s) => s['id'] != student['id']).toList();
+                                            _updateSelection(newSelection);
+                                          }
+                                        },
+                                      );
+                                    },
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: SingleChildScrollView(
+                                      child: Column(
+                                        children: [
+                                          TextField(
+                                            controller: _firstNameController,
+                                            decoration: const InputDecoration(
+                                              labelText: "First Name",
+                                              border: OutlineInputBorder(),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          TextField(
+                                            controller: _lastNameController,
+                                            decoration: const InputDecoration(
+                                              labelText: "Last Name",
+                                              border: OutlineInputBorder(),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: TextField(
+                                                  controller: _birthdayController,
+                                                  onTap: _showBirthdayPicker,
+                                                  readOnly: true,
+                                                  decoration: const InputDecoration(
+                                                    labelText: "Birthday",
+                                                    border: OutlineInputBorder(),
+                                                  ),
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.calendar_today,
+                                                  color: Colors.orange,
+                                                ),
+                                                onPressed: _showBirthdayPicker,
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          ElevatedButton(
+                                            onPressed: () async {
+                                              if (_firstNameController.text.trim().isNotEmpty &&
+                                                  _lastNameController.text.trim().isNotEmpty &&
+                                                  selectedBirthday != null) {
+                                                try {
+                                                  final createdStudent = await _createStudent(
+                                                    _firstNameController.text.trim(),
+                                                    _lastNameController.text.trim(),
+                                                    _dateFormat.format(selectedBirthday!),
+                                                  );
+                                                  final newSelection = [..._selectedStudents, createdStudent];
+                                                  _updateSelection(newSelection);
+                                                  _firstNameController.clear();
+                                                  _lastNameController.clear();
+                                                  _birthdayController.clear();
+                                                  selectedBirthday = null;
+                                                  setState(() {
+                                                    _studentsFuture = _fetchStudents();
+                                                  });
+                                                  _tabController.animateTo(0);
+                                                } catch (e) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text("Error creating student: $e")),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            child: const Text("Register Student"),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+                if (_isSelectionComplete)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          final checkoutDetails = _buildCheckoutDetails();
+                          final serviceWithCheckout = Map<String, dynamic>.from(widget.service)
+                            ..['checkout_details'] = checkoutDetails;
+                          CartService().addToCart(serviceWithCheckout, _selectedStudents, currentPrice);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Added to cart")),
+                          );
+                          Navigator.of(context, rootNavigator: true).pop();
+                        },
+                        child: const Text("Add to Cart"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          final checkoutDetails = _buildCheckoutDetails();
+                          final serviceWithCheckout = Map<String, dynamic>.from(widget.service)
+                            ..['checkout_details'] = checkoutDetails;
+                          CartService().addToCart(serviceWithCheckout, _selectedStudents, currentPrice);
+                          navigatorKey.currentState!.pop();
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            navigatorKey.currentState!.push(
+                              MaterialPageRoute(
+                                builder: (_) => CheckoutPage(
+                                  onBack: () => navigatorKey.currentState!.pop(),
+                                ),
+                              ),
+                            );
+                          });
+                        },
+                        child: const Text("Buy Now"),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,8 +1,17 @@
+# progress/serializers.py
 from rest_framework import serializers
-from .models import ProgressRecord, ProgressReport, SkillProficiency
-from lessons.models import Lesson  # adjust the import if needed
+from lessons.models import Lesson
+from users.models import Student
+from .models import ProgressRecord, ProgressReport, SkillProficiency, Skill 
+
+class SkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Skill
+        fields = ['id', 'name']
 
 class SkillProficiencySerializer(serializers.ModelSerializer):
+    skill = SkillSerializer(read_only=True)
+
     class Meta:
         model = SkillProficiency
         fields = ['id', 'skill', 'level', 'last_updated']
@@ -10,7 +19,7 @@ class SkillProficiencySerializer(serializers.ModelSerializer):
 class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
-        fields = ['id', 'title']  # include additional fields as needed
+        fields = ['id', 'students_name', 'date', 'start_time']  # Adjust fields as needed
 
 class ProgressRecordSerializer(serializers.ModelSerializer):
     lesson = LessonSerializer(read_only=True)
@@ -18,7 +27,7 @@ class ProgressRecordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProgressRecord
-        fields = ['id', 'date', 'lesson', 'skills', 'notes']
+        fields = ['id', 'date', 'lesson', 'notes', 'skills']
 
 class ProgressReportSerializer(serializers.ModelSerializer):
     class Meta:

@@ -5,6 +5,7 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
+import '../modals/schedule_first_lesson_modal.dart';
 import '../services/api_service.dart';
 import '../services/cart_service.dart';
 import 'payment_success_page.dart';
@@ -59,6 +60,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _handleConfirmBooking() async {
+    // Prevent multiple submissions by checking if already loading.
+    if (_isLoading) return;
+
     final cartItems = CartService().items;
     // Filter only pack services.
     final packItems = cartItems.where((item) {
@@ -136,33 +140,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ),
         );
 
-        // Decode the JSON response body.
-        final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
-        // Extract the booked packs list.
-        final List<dynamic> bookedPacks = responseData['booked_packs'];
-
-        // Filter only private packs (where "type" is not "group")
-        final List<dynamic> privatePacks = bookedPacks.where((packItem) {
-          final type = packItem['type'];
-          return type.toLowerCase() != 'group';
-        }).toList();
-
-        // Pair each private pack with its corresponding checkout item.
-        // (Assuming the order of packItems is maintained.)
-        List<Map<String, dynamic>> packsToSchedule = [];
-        for (int i = 0; i < privatePacks.length; i++) {
-          packsToSchedule.add({
-            "bookedPack": privatePacks[i],
-            "checkoutItem": checkoutPackItems[i],
-          });
-        }
-
-        // Sequentially schedule the first lesson of each private pack.
-        await _schedulePrivatePacks(packsToSchedule);
-
         // Finally clear the cart and redirect to home.
         CartService().clear();
-        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/main',
+          (route) => false,
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Booking failed: ${response.body}")),
@@ -177,263 +161,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<String?> _schedulePrivateLesson(
-          int lessonId, DateTime newDate, String newTime) =>
-      schedulePrivateLesson(lessonId, newDate, newTime);
-
-  Future<List<String>> _fetchAvailableTimes(
-          int lessonId, DateTime date, int increment) =>
-      fetchAvailableTimes(lessonId, date, increment);
-
-  Future<void> _showScheduleLessonModal(
-      dynamic lesson, Map<String, dynamic> checkoutItem) async {
-    final int lessonId = lesson['id'] ?? lesson['lesson_id'];
-    DateTime? selectedDate;
-    int increment = 60;
-    List<String> availableTimes = [];
-    bool isLoading = false;
-
-    // Fetch the school's schedule time limit (in hours) from the API.
-    int schoolScheduleTimeLimit =
-        await fetchSchoolScheduleTimeLimit(lesson["school"]);
-    debugPrint("school schedule limit: $schoolScheduleTimeLimit");
-
-    return await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext sheetContext) {
-        // Use sheetContext for Navigator calls later.
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header with title and checkout card.
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Schedule The First Lesson",
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildCheckoutCard(checkoutItem),
-                          const Divider(),
-                        ],
-                      ),
-                    ),
-                    // Date picker widget.
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      child: SfDateRangePicker(
-                        view: DateRangePickerView.month,
-                        selectionMode: DateRangePickerSelectionMode.single,
-                        showActionButtons: true,
-                        // Set the initialDisplayDate and minDate to now + schoolScheduleTimeLimit (in hours).
-                        initialDisplayDate: DateTime.now().add(
-                          Duration(hours: schoolScheduleTimeLimit),
-                        ),
-                        minDate: DateTime.now().add(
-                          Duration(hours: schoolScheduleTimeLimit),
-                        ),
-                        maxDate: lesson['expiration_date'] != "None"
-                            ? DateTime.parse(lesson['expiration_date'])
-                            : null,
-                        onSelectionChanged:
-                            (DateRangePickerSelectionChangedArgs args) {
-                          if (args.value is DateTime) {
-                            setModalState(() {
-                              selectedDate = args.value;
-                              availableTimes = [];
-                              isLoading = true;
-                            });
-                            _fetchAvailableTimes(
-                                    lessonId, selectedDate!, increment)
-                                .then((times) {
-                              setModalState(() {
-                                availableTimes = times;
-                                isLoading = false;
-                              });
-                            });
-                          }
-                        },
-                        monthViewSettings:
-                            const DateRangePickerMonthViewSettings(
-                          firstDayOfWeek: 1,
-                          showTrailingAndLeadingDates: true,
-                        ),
-                        headerStyle: const DateRangePickerHeaderStyle(
-                          textAlign: TextAlign.center,
-                          textStyle: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Dropdown for time increment selection.
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        children: [
-                          const Text("Increment: "),
-                          DropdownButton<int>(
-                            value: increment,
-                            items: [15, 30, 60].map((value) {
-                              return DropdownMenuItem<int>(
-                                value: value,
-                                child: Text("$value minutes"),
-                              );
-                            }).toList(),
-                            onChanged: (newValue) {
-                              if (newValue != null) {
-                                setModalState(() {
-                                  increment = newValue;
-                                  if (selectedDate != null) {
-                                    isLoading = true;
-                                    availableTimes = [];
-                                  }
-                                });
-                                if (selectedDate != null) {
-                                  _fetchAvailableTimes(
-                                          lessonId, selectedDate!, increment)
-                                      .then((times) {
-                                    setModalState(() {
-                                      availableTimes = times;
-                                      isLoading = false;
-                                    });
-                                  });
-                                }
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isLoading) const CircularProgressIndicator(),
-                    if (!isLoading && availableTimes.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 2,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
-                          itemCount: availableTimes.length,
-                          itemBuilder: (context, index) {
-                            String timeStr = availableTimes[index];
-                            return InkWell(
-                              onTap: () {
-                                // Use sheetContext when showing the dialog.
-                                showDialog(
-                                  context: sheetContext,
-                                  builder: (BuildContext dialogContext) {
-                                    return AlertDialog(
-                                      title: const Text("Confirm Reschedule"),
-                                      content: Text(
-                                        "Reschedule lesson to ${DateFormat('d MMM yyyy').format(selectedDate!).toLowerCase()} at $timeStr?",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(dialogContext).pop(),
-                                          child: const Text("Cancel"),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(dialogContext)
-                                                .pop(); // Close the dialog.
-                                            _schedulePrivateLesson(lessonId,
-                                                    selectedDate!, timeStr)
-                                                .then((errorMessage) {
-                                              if (errorMessage == null) {
-                                                // Use sheetContext to pop the bottom sheet.
-                                                Navigator.of(sheetContext)
-                                                    .pop();
-                                                ScaffoldMessenger.of(
-                                                        sheetContext)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                        "Lesson successfully rescheduled"),
-                                                  ),
-                                                );
-                                              } else {
-                                                ScaffoldMessenger.of(
-                                                        sheetContext)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(errorMessage),
-                                                  ),
-                                                );
-                                              }
-                                            });
-                                          },
-                                          child: const Text("Confirm"),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.blueAccent.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  timeStr,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _schedulePrivatePacks(
-      List<Map<String, dynamic>> packsToSchedule) async {
-    if (packsToSchedule.isEmpty) return;
-    final currentPack = packsToSchedule.first;
-    // We assume that currentPack['bookedPack']['lessons'] is a list.
-    // Pass both the first lesson and the checkout item to the scheduling modal.
-    await _showScheduleLessonModal(
-        currentPack["bookedPack"]["lessons"][0], currentPack["checkoutItem"]);
-    // Remove the current pack and recursively schedule the next one.
-    packsToSchedule.removeAt(0);
-    await _schedulePrivatePacks(packsToSchedule);
   }
 
   bool _isLoading = false;
@@ -523,68 +250,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   //////////////////////////////////////////////////////////////////
-
-  /// (Old function to initiate Stripe Checkout - now unused.)
-  Future<void> _initiateStripeCheckout() async {
-    try {
-      // Transform your cart items into the expected payload structure.
-      List<Map<String, dynamic>> stripeCart = CartService().items.map((item) {
-        final checkoutDetails =
-            item['service']['checkout_details'] as Map<String, dynamic>? ?? {};
-        return {
-          "type": checkoutDetails['type'] is Map
-              ? checkoutDetails['type']['pack']
-              : checkoutDetails['type'] ?? "private",
-          "number_of_classes": checkoutDetails['classes'],
-          "duration_in_minutes": checkoutDetails['duration'],
-          "price": checkoutDetails['price'],
-          "student_ids_list": item['students'] ?? [],
-          "school_name": checkoutDetails['school_name'] ?? "",
-        };
-      }).toList();
-
-      // Build the JSON payload. Adjust discount value if needed.
-      final body = jsonEncode({
-        "cart": stripeCart,
-        "discount": 0,
-      });
-
-      // Use $baseUrl for your backend endpoint.
-      final url = Uri.parse('$baseUrl/api/payments/create_checkout_session/');
-      // Await the auth headers.
-      final headers = await getAuthHeaders();
-
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: body,
-      );
-
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
-        final checkoutUrl = jsonResponse['url'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Redirecting to Stripe Checkout...")),
-        );
-        final uri = Uri.parse(checkoutUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          throw 'Could not launch $uri';
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text("Error initiating Stripe Checkout: ${response.body}")),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Stripe checkout error: $e")),
-      );
-    }
-  }
 
   Widget _buildCheckoutCard(Map<String, dynamic> checkoutItem) {
     final service = checkoutItem['service'] as Map<String, dynamic>? ?? {};
@@ -717,7 +382,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   children: [
                     // Cash Payment Button calls the integrated booking method.
                     ElevatedButton(
-                      onPressed: _handleConfirmBooking,
+                      onPressed: _isLoading ? null : _handleConfirmBooking,
                       child: const Text("Pay by Cash"),
                     ),
                     // Stripe Payment Button now calls the integrated Stripe payment flow.

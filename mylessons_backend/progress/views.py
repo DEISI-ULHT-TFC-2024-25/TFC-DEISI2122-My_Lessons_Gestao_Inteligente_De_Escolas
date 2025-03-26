@@ -1,55 +1,60 @@
-from rest_framework import generics, status
+# progress/views.py
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from django.utils.dateparse import parse_date
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, permissions
+from django.shortcuts import get_object_or_404
 from .models import ProgressRecord, ProgressReport
 from .serializers import ProgressRecordSerializer, ProgressReportSerializer
 
-# List/Create progress records for the current student
-class ProgressRecordListCreateAPIView(generics.ListCreateAPIView):
-    serializer_class = ProgressRecordSerializer
-    permission_classes = [IsAuthenticated]
+# Helper: assume each user has a related Student instance (e.g., request.user.student)
+def get_student_from_user(user):
+    try:
+        return user.student
+    except AttributeError:
+        return None
 
-    def get_queryset(self):
-        # Assumes that request.user has a related student profile.
-        student = self.request.user.student
-        return ProgressRecord.objects.filter(student=student).order_by('-date')
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def progress_record_detail(request, lesson_id):
+    """
+    Returns the progress record for the given lesson_id and logged-in student.
+    """
+    student = get_student_from_user(request.user)
+    if not student:
+        return Response({'detail': 'Student profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Optionally, if more than one record can exist per lesson, you may choose the latest one.
+    progress_record = ProgressRecord.objects.filter(lesson__id=lesson_id, student=student).order_by('-date').first()
+    if not progress_record:
+        return Response({'detail': 'No progress record found for this lesson.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = ProgressRecordSerializer(progress_record)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def perform_create(self, serializer):
-        student = self.request.user.student
-        serializer.save(student=student)
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def progress_records_list(request):
+    """
+    Returns all progress records for the logged-in student.
+    """
+    student = get_student_from_user(request.user)
+    if not student:
+        return Response({'detail': 'Student profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    records = ProgressRecord.objects.filter(student=student).order_by('-date')
+    serializer = ProgressRecordSerializer(records, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-# Get the latest progress report for the current student.
-class ProgressReportLatestAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        student = request.user.student
-        try:
-            report = ProgressReport.get_latest_report(student)
-            serializer = ProgressReportSerializer(report)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except ProgressReport.DoesNotExist:
-            return Response({"detail": "No progress report available."},
-                            status=status.HTTP_404_NOT_FOUND)
-
-# Generate a progress report for a given period.
-class ProgressReportGenerateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        student = request.user.student
-        start_date_str = request.data.get('start_date')
-        end_date_str = request.data.get('end_date')
-        if not start_date_str or not end_date_str:
-            return Response({"detail": "start_date and end_date are required."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        start_date = parse_date(start_date_str)
-        end_date = parse_date(end_date_str)
-        if not start_date or not end_date:
-            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        report = ProgressReport.generate_report(student, start_date, end_date)
-        serializer = ProgressReportSerializer(report)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def progress_reports_list(request):
+    """
+    Returns all progress reports for the logged-in student.
+    """
+    student = get_student_from_user(request.user)
+    if not student:
+        return Response({'detail': 'Student profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    reports = ProgressReport.objects.filter(student=student).order_by('-created_at')
+    serializer = ProgressReportSerializer(reports, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
