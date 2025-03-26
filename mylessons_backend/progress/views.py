@@ -195,7 +195,7 @@ def create_progress_record(request):
                 goal_instance = Goal.objects.get(pk=goal_id)
                 # Update the goal level if needed using the model's method.
                 if goal_instance.level != new_level:
-                    goal_instance.update_level(new_level)
+                    goal_instance.update_level(int(new_level))
                 goal_ids.append(goal_instance.id)
             except Goal.DoesNotExist:
                 continue
