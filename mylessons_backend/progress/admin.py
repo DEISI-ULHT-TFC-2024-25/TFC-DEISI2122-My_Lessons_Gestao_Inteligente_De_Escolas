@@ -21,7 +21,7 @@ class ProgressRecordAdmin(admin.ModelAdmin):
     list_display = ('student', 'lesson', 'date', 'notes')  # Display progress details
     search_fields = ('student__user__username', 'notes')  # Search by student or notes
     list_filter = ('date',)  # Filter by date
-    autocomplete_fields = ('skills',)  # Enable skill autocomplete
+    autocomplete_fields = ('goals',)  # Enable skill autocomplete
 
 
 @admin.register(ProgressReport)
