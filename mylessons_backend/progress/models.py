@@ -51,7 +51,7 @@ class Goal(models.Model):
 
     def __str__(self):
         status = "Completed" if self.is_completed else "In Progress"
-        return f"Goal: {self.description} ({status})"
+        return f"Goal: ({status})"
 
 class ProgressRecord(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="progress_records")
