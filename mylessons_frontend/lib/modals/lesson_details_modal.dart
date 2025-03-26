@@ -1,3 +1,4 @@
+// File: lib/modals/lesson_details_modal.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,11 +9,13 @@ import 'students_modal.dart';
 import 'subject_modal.dart'; // Make sure this file exports SubjectModal
 import 'location_modal.dart'; // Make sure this file exports LocationModal
 
+// Import the Class Progress Page.
+import 'package:mylessons_frontend/pages/progress_class_page.dart';
+
 class LessonDetailsModal extends StatefulWidget {
   final dynamic lesson;
   final String currentRole;
-  final Future<void> Function()
-      fetchData; // Callback to refresh the whole home page
+  final Future<void> Function() fetchData; // Callback to refresh the whole home page
 
   const LessonDetailsModal({
     super.key,
@@ -103,8 +106,8 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             ),
           );
         }
-        final details = snapshot.data!;
 
+        final details = snapshot.data!;
         // Compute merged/simplified values.
         final date = details['date'] ?? '';
         final startTime = details['start_time'] ?? '';
@@ -145,7 +148,6 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             {'label': 'School', 'value': school},
             {'label': 'Location', 'value': location},
           ];
-
           leftIconMapping = {
             'Date': Icons.calendar_today,
             'Time': Icons.access_time,
@@ -158,7 +160,6 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'School': Icons.school,
             'Location': Icons.location_on,
           };
-
           labelsWithAction = ['Extras', 'Instructors', 'School', 'Location'];
           actionIconMapping = {
             'Extras': Icons.edit,
@@ -187,7 +188,6 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             {'label': 'School', 'value': school},
             {'label': 'Location', 'value': location},
           ];
-
           leftIconMapping = {
             'Date': Icons.calendar_today,
             'Time': Icons.access_time,
@@ -201,7 +201,6 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'School': Icons.school,
             'Location': Icons.location_on,
           };
-
           labelsWithAction = [
             'Is Done',
             'Students',
@@ -222,7 +221,6 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'School': Icons.phone,
             'Location': Icons.edit,
           };
-
           actionNoteMapping = {
             'Date': 'Edit date',
             'Time': 'Edit time',
@@ -271,7 +269,8 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 80),
+                              constraints:
+                                  const BoxConstraints(minHeight: 80),
                               child: Card(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -323,8 +322,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                   await toggleLessonCompletion(
                                                       lessonId);
                                               if (result != null &&
-                                                  result
-                                                      .containsKey("status")) {
+                                                  result.containsKey("status")) {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   SnackBar(
@@ -355,10 +353,10 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                   },
                                                 );
                                               }
-                                            } else if (label == "Subject" && widget.currentRole != "Parent") {
+                                            } else if (label == "Subject" &&
+                                                widget.currentRole != "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<
-                                                      bool>(
+                                                  await showModalBottomSheet<bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -379,13 +377,14 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   const SnackBar(
-                                                      content: Text("Error")),
+                                                      content:
+                                                          Text("Error")),
                                                 );
                                               }
-                                            } else if (label == "Location" && widget.currentRole != "Parent") {
+                                            } else if (label == "Location" &&
+                                                widget.currentRole != "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<
-                                                      bool>(
+                                                  await showModalBottomSheet<bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -403,10 +402,10 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 await widget.fetchData();
                                                 _refreshLessonDetails();
                                               }
-                                            } else if (label == "Students" && widget.currentRole != "Parent") {
+                                            } else if (label == "Students" &&
+                                                widget.currentRole != "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<
-                                                      bool>(
+                                                  await showModalBottomSheet<bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -424,10 +423,10 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 await widget.fetchData();
                                                 _refreshLessonDetails();
                                               }
-                                            } else if (label == "Instructors" && widget.currentRole != "Parent") {
+                                            } else if (label == "Instructors" &&
+                                                widget.currentRole != "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<
-                                                      bool>(
+                                                  await showModalBottomSheet<bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -479,11 +478,30 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                   },
                 ),
                 const SizedBox(height: 16),
+                // ----------------- New Button to view Class Progress -----------------
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ClassProgressPage(lesson: widget.lesson, currentRole: widget.currentRole,),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  child: Text("View Class Progress",
+                      style: GoogleFonts.lato(color: Colors.white)),
+                ),
+                const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text("Close", selectionColor: Colors.orange),
+                    child:
+                        const Text("Close", selectionColor: Colors.orange),
                   ),
                 ),
               ],
