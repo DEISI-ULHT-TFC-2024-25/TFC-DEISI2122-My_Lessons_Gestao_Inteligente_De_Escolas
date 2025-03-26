@@ -9,6 +9,7 @@ import 'students_modal.dart';
 import 'subject_modal.dart'; // Make sure this file exports SubjectModal
 import 'location_modal.dart'; // Make sure this file exports LocationModal
 import 'package:mylessons_frontend/pages/progress_hub_page.dart'; // NEW: Import the Progress Hub Page
+import 'package:mylessons_frontend/modals/student_selection_modal.dart'; // NEW: Import the Student Selection Modal
 
 class LessonDetailsModal extends StatefulWidget {
   final dynamic lesson;
@@ -273,8 +274,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ConstrainedBox(
-                              constraints:
-                                  const BoxConstraints(minHeight: 80),
+                              constraints: const BoxConstraints(minHeight: 80),
                               child: Card(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -326,7 +326,8 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                   await toggleLessonCompletion(
                                                       lessonId);
                                               if (result != null &&
-                                                  result.containsKey("status")) {
+                                                  result
+                                                      .containsKey("status")) {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   SnackBar(
@@ -358,9 +359,11 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 );
                                               }
                                             } else if (label == "Subject" &&
-                                                widget.currentRole != "Parent") {
+                                                widget.currentRole !=
+                                                    "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<bool>(
+                                                  await showModalBottomSheet<
+                                                      bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -381,14 +384,15 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   const SnackBar(
-                                                      content:
-                                                          Text("Error")),
+                                                      content: Text("Error")),
                                                 );
                                               }
                                             } else if (label == "Location" &&
-                                                widget.currentRole != "Parent") {
+                                                widget.currentRole !=
+                                                    "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<bool>(
+                                                  await showModalBottomSheet<
+                                                      bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -407,9 +411,11 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 _refreshLessonDetails();
                                               }
                                             } else if (label == "Students" &&
-                                                widget.currentRole != "Parent") {
+                                                widget.currentRole !=
+                                                    "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<bool>(
+                                                  await showModalBottomSheet<
+                                                      bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -428,9 +434,11 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                                                 _refreshLessonDetails();
                                               }
                                             } else if (label == "Instructors" &&
-                                                widget.currentRole != "Parent") {
+                                                widget.currentRole !=
+                                                    "Parent") {
                                               bool? updated =
-                                                  await showModalBottomSheet<bool>(
+                                                  await showModalBottomSheet<
+                                                      bool>(
                                                 context: context,
                                                 isScrollControlled: true,
                                                 shape:
@@ -482,7 +490,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                   },
                 ),
                 const SizedBox(height: 16),
-                // NEW: Manage Progress Card
+                // NEW: Manage Progress Card with new student selection modal
                 Card(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -497,34 +505,22 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                     onTap: () async {
                       // Retrieve a list of students from the lesson details.
                       // Here we assume details has a field 'students_list'.
-                      List<dynamic> studentsList = details['students_list'] ?? [];
+                      List<dynamic> studentsList =
+                          details['students_list'] ?? [];
                       if (studentsList.isEmpty) {
                         // If no proper list, fallback to use the 'students' string.
                         studentsList = [
                           {'id': 1, 'name': students.toString()}
                         ];
                       }
-                      dynamic selectedStudent;
-                      if (studentsList.length > 1) {
-                        selectedStudent = await showDialog(
-                          context: context,
-                          builder: (context) {
-                            return SimpleDialog(
-                              title: const Text("Select a Student"),
-                              children: studentsList
-                                  .map((student) => SimpleDialogOption(
-                                        onPressed: () {
-                                          Navigator.pop(context, student);
-                                        },
-                                        child: Text(student['name']),
-                                      ))
-                                  .toList(),
-                            );
-                          },
-                        );
-                      } else {
-                        selectedStudent = studentsList.first;
-                      }
+                      dynamic selectedStudent = await showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (context) => StudentsModal(
+                          lessonId: widget.lesson["lesson_id"],
+                          manageProgress: true,
+                        ),
+                      );
                       if (selectedStudent != null) {
                         Navigator.push(
                           context,

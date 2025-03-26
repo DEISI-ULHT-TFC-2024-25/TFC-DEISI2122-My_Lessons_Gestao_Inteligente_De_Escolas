@@ -9,9 +9,10 @@ import '../modals/edit_class_details_modal.dart';
 
 class ProgressHubPage extends StatelessWidget {
   final dynamic student; // Selected student object
-  final dynamic lesson;  // Lesson object from which we came
+  final dynamic lesson; // Lesson object from which we came
 
-  const ProgressHubPage({Key? key, required this.student, required this.lesson}) : super(key: key);
+  const ProgressHubPage({Key? key, required this.student, required this.lesson})
+      : super(key: key);
 
   // Helper method to build a navigation card with the same style
   Widget _buildNavCard({
@@ -26,7 +27,8 @@ class ProgressHubPage extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: ListTile(
         leading: Icon(icon, color: Colors.orange),
-        title: Text(title, style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+        title:
+            Text(title, style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle, style: GoogleFonts.lato(fontSize: 12)),
         trailing: const Icon(Icons.arrow_forward, color: Colors.orange),
         onTap: onTap,
@@ -47,7 +49,8 @@ class ProgressHubPage extends StatelessWidget {
             context: context,
             icon: Icons.note_add,
             title: "New Progress Record",
-            subtitle: "Add a new record for ${student['name']}",
+            subtitle:
+                "Add a new record for ${student['first_name']} ${student['last_name']}",
             onTap: () {
               Navigator.push(
                 context,
@@ -61,7 +64,8 @@ class ProgressHubPage extends StatelessWidget {
             context: context,
             icon: Icons.school,
             title: "My Skills",
-            subtitle: "View & update skills for ${student['name']}",
+            subtitle:
+                "View & update skills for ${student['first_name']} ${student['last_name']}",
             onTap: () {
               Navigator.push(
                 context,
@@ -75,7 +79,8 @@ class ProgressHubPage extends StatelessWidget {
             context: context,
             icon: Icons.flag,
             title: "Create New Goal",
-            subtitle: "Set a new goal for ${student['name']}",
+            subtitle:
+                "Set a new goal for ${student['first_name']} ${student['last_name']}",
             onTap: () {
               Navigator.push(
                 context,
@@ -111,13 +116,16 @@ class ProgressHubPage extends StatelessWidget {
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                builder: (context) => EditClassDetailsModal(
-                  skillsCovered: lesson['skills_covered'] ?? [],
-                  initialNote: lesson['class_note'] ?? '',
-                  onSave: (updatedSkills, updatedNote) {
-                    // Call an API to update class details here.
-                    Navigator.pop(context);
-                  },
+                builder: (context) => Container(
+                  height: MediaQuery.of(context).size.height * 0.9,
+                  child: EditClassDetailsModal(
+                    skillsCovered: lesson['skills_covered'] ?? [],
+                    initialNote: lesson['class_note'] ?? '',
+                    onSave: (updatedSkills, updatedNote) {
+                      // Call an API to update class details here.
+                      Navigator.pop(context);
+                    },
+                  ),
                 ),
               );
             },

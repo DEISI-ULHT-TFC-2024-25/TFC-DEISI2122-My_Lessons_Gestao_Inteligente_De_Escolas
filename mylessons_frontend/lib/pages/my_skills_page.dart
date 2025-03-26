@@ -60,7 +60,7 @@ class _MySkillsPageState extends State<MySkillsPage> {
           skillName: proficiency['skill']['name'],
           currentLevel: proficiency['level'],
           onSave: (newLevel) async {
-            await ApiService.updateSkillProficiencyLevel(proficiency['id'], newLevel);
+            await ApiService.updateSkillProficiencyLevel(proficiency['id'], newLevel, widget.student["id"]);
             _fetchSkillProficiencies();
           },
         );

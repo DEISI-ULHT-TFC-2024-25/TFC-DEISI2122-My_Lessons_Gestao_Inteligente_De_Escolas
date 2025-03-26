@@ -1,188 +1,215 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
 from django.utils.timezone import now
+from rest_framework.decorators import api_view
+from rest_framework import status
 
-# Import your models
 from .models import Skill, SkillProficiency, Goal, ProgressRecord, ProgressReport
-# Import your serializers (make sure these are defined appropriately)
-from .serializers import (
-    SkillSerializer, 
-    SkillProficiencySerializer, 
-    GoalSerializer, 
-    ProgressRecordSerializer, 
-    ProgressReportSerializer
-)
+from users.models import Student
 
-class SkillViewSet(viewsets.ModelViewSet):
+@api_view(['GET'])
+def get_skill_proficiencies(request):
     """
-    Provides CRUD operations for Skills.
+    Returns a list of skill proficiencies for the provided student.
+    Expects a 'student_id' query parameter.
     """
-    queryset = Skill.objects.all()
-    serializer_class = SkillSerializer
-
-
-class SkillProficiencyViewSet(viewsets.ModelViewSet):
-    """
-    Provides CRUD operations for Skill Proficiencies.
-    """
-    queryset = SkillProficiency.objects.all()
-    serializer_class = SkillProficiencySerializer
+    student_id = request.query_params.get('student_id')
+    if not student_id:
+        return JsonResponse({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['post'])
-    def update_level(self, request, pk=None):
-        """
-        Custom endpoint to update the proficiency level.
-        Expects a 'level' in the request data.
-        """
-        proficiency = self.get_object()
-        level = request.data.get('level')
-        if level is None:
-            return Response({'error': 'Level not provided'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            level = int(level)
-            if not (1 <= level <= 5):
-                return Response({'error': 'Level must be between 1 and 5'}, status=status.HTTP_400_BAD_REQUEST)
-            proficiency.update_level(level)
-            serializer = self.get_serializer(proficiency)
-            return Response(serializer.data)
-        except ValueError:
-            return Response({'error': 'Invalid level provided'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class GoalViewSet(viewsets.ModelViewSet):
-    """
-    Provides CRUD operations for Goals.
-    """
-    queryset = Goal.objects.all()
-    serializer_class = GoalSerializer
-
-    @action(detail=True, methods=['post'])
-    def mark_completed(self, request, pk=None):
-        """
-        Marks a goal as completed.
-        """
-        goal = self.get_object()
-        goal.mark_completed()
-        serializer = self.get_serializer(goal)
-        return Response(serializer.data)
+    student = get_object_or_404(Student, pk=student_id)
+    proficiencies = SkillProficiency.objects.filter(student=student)
     
-    @action(detail=True, methods=['post'])
-    def mark_uncompleted(self, request, pk=None):
-        """
-        Reverts a goal to 'in progress'.
-        """
-        goal = self.get_object()
-        goal.mark_uncompleted()
-        serializer = self.get_serializer(goal)
-        return Response(serializer.data)
+    data = []
+    for prof in proficiencies:
+        data.append({
+            'id': prof.id,
+            'skill': prof.skill.name,
+            'level': prof.level,
+            'last_updated': prof.last_updated.isoformat(),
+        })
+    return JsonResponse(data, safe=False, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_skills_for_subject(request, subject_id):
+    """
+    Returns a list of skills for a given subject.
+    The URL should pass the subject_id as part of the route.
+    """
+    # Example: filtering by a foreign key relation 'sport' (subject)
+    skills = Skill.objects.filter(sport__id=subject_id)
+    data = []
+    for skill in skills:
+        data.append({
+            'id': skill.id,
+            'name': skill.name,
+            'description': skill.description,
+            'sport': str(skill.sport) if skill.sport else None,
+        })
+    return JsonResponse(data, safe=False, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def update_skill_proficiency_level(request, student_id, proficiency_id):
+    """
+    Updates the level of a skill proficiency.
+    Expects a JSON body with a 'level' field.
+    """
+    level = request.data.get('level')
+    if level is None:
+        return JsonResponse({'error': 'Level not provided'}, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['post'])
-    def extend_deadline(self, request, pk=None):
-        """
-        Extends the target date of a goal.
-        Expects a 'new_date' in the request data formatted as YYYY-MM-DD.
-        """
-        goal = self.get_object()
-        new_date_str = request.data.get('new_date')
-        if not new_date_str:
-            return Response({'error': 'New date not provided'}, status=status.HTTP_400_BAD_REQUEST)
-        new_date = parse_date(new_date_str)
-        if not new_date:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-        if new_date <= goal.target_date:
-            return Response({'error': 'New date must be after the current target date'}, status=status.HTTP_400_BAD_REQUEST)
-        goal.extend_deadline(new_date)
-        serializer = self.get_serializer(goal)
-        return Response(serializer.data)
-
-
-class ProgressRecordViewSet(viewsets.ModelViewSet):
-    """
-    Provides CRUD operations for Progress Records.
-    """
-    queryset = ProgressRecord.objects.all()
-    serializer_class = ProgressRecordSerializer
-
-    @action(detail=True, methods=['post'])
-    def add_covered_skill(self, request, pk=None):
-        """
-        Adds a covered skill (by skill proficiency ID) to a progress record.
-        """
-        progress_record = self.get_object()
-        skill_proficiency_id = request.data.get('skill_proficiency_id')
-        if not skill_proficiency_id:
-            return Response({'error': 'skill_proficiency_id not provided'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            from .models import SkillProficiency  # In case not imported already
-            skill_proficiency = SkillProficiency.objects.get(pk=skill_proficiency_id)
-            progress_record.add_covered_skill(skill_proficiency)
-            serializer = self.get_serializer(progress_record)
-            return Response(serializer.data)
-        except SkillProficiency.DoesNotExist:
-            return Response({'error': 'Skill proficiency not found'}, status=status.HTTP_404_NOT_FOUND)
+    try:
+        level = int(level)
+        if not (1 <= level <= 5):
+            return JsonResponse({'error': 'Level must be between 1 and 5'}, status=status.HTTP_400_BAD_REQUEST)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid level provided'}, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['post'])
-    def update_notes(self, request, pk=None):
-        """
-        Updates the notes on a progress record.
-        """
-        progress_record = self.get_object()
-        new_notes = request.data.get('notes')
-        if new_notes is None:
-            return Response({'error': 'Notes not provided'}, status=status.HTTP_400_BAD_REQUEST)
-        progress_record.update_notes(new_notes)
-        serializer = self.get_serializer(progress_record)
-        return Response(serializer.data)
-
-
-class ProgressReportViewSet(viewsets.ModelViewSet):
-    """
-    Provides CRUD operations for Progress Reports.
-    """
-    queryset = ProgressReport.objects.all()
-    serializer_class = ProgressReportSerializer
-
-    @action(detail=False, methods=['post'])
-    def generate_report(self, request):
-        """
-        Custom endpoint to generate a progress report.
-        Expects 'student_id', 'start_date', and 'end_date' in the request data.
-        """
-        student_id = request.data.get('student_id')
-        start_date = request.data.get('start_date')
-        end_date = request.data.get('end_date')
-        if not student_id or not start_date or not end_date:
-            return Response(
-                {'error': 'student_id, start_date, and end_date are required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        try:
-            from users.models import Student
-            student = Student.objects.get(pk=student_id)
-        except Student.DoesNotExist:
-            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        report = ProgressReport.generate_report(student, start_date, end_date)
-        serializer = self.get_serializer(report)
-        return Response(serializer.data)
+    # Ensure the proficiency belongs to the student.
+    proficiency = get_object_or_404(SkillProficiency, pk=proficiency_id, student__id=student_id)
+    proficiency.level = level
+    proficiency.last_updated = now()
+    proficiency.save()
     
-    @action(detail=False, methods=['get'])
-    def latest_report(self, request):
-        """
-        Returns the latest progress report for a student.
-        Expects 'student_id' as a query parameter.
-        """
-        student_id = request.query_params.get('student_id')
-        if not student_id:
-            return Response({'error': 'student_id is required as a query parameter'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            from users.models import Student
-            student = Student.objects.get(pk=student_id)
-        except Student.DoesNotExist:
-            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
-        report = ProgressReport.get_latest_report(student)
-        serializer = self.get_serializer(report)
-        return Response(serializer.data)
+    data = {
+        'id': proficiency.id,
+        'skill': proficiency.skill.name,
+        'level': proficiency.level,
+        'last_updated': proficiency.last_updated.isoformat(),
+    }
+    return JsonResponse(data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def create_skill(request):
+    """
+    Creates a new skill.
+    Expects a JSON body with 'name', 'description' (optional), and 'sport_id' (optional).
+    """
+    name = request.data.get('name')
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    description = request.data.get('description', '')
+    sport_id = request.data.get('sport_id')
+    
+    skill = Skill(name=name, description=description)
+    if sport_id:
+        from sports.models import Sport
+        skill.sport = get_object_or_404(Sport, pk=sport_id)
+    try:
+        skill.save()
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to create skill: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = {
+        'id': skill.id,
+        'name': skill.name,
+        'description': skill.description,
+        'sport': str(skill.sport) if skill.sport else None,
+    }
+    return JsonResponse(data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+def create_goal(request):
+    """
+    Creates a new goal.
+    Expects a JSON body with 'student_id', 'skill_id', 'description', and 'target_date' (YYYY-MM-DD).
+    """
+    student_id = request.data.get('student_id')
+    skill_id = request.data.get('skill_id')
+    description = request.data.get('description', '')
+    target_date_str = request.data.get('target_date')
+    
+    if not (student_id and skill_id and target_date_str):
+        return JsonResponse({'error': 'student_id, skill_id, and target_date are required'},
+                            status=status.HTTP_400_BAD_REQUEST)
+    
+    student = get_object_or_404(Student, pk=student_id)
+    skill = get_object_or_404(Skill, pk=skill_id)
+    target_date = parse_date(target_date_str)
+    if not target_date:
+        return JsonResponse({'error': 'Invalid date format. Use YYYY-MM-DD.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+    
+    goal = Goal(student=student, skill=skill, description=description, target_date=target_date)
+    try:
+        goal.save()
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to create goal: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = {
+        'id': goal.id,
+        'student': goal.student.id,
+        'skill': goal.skill.name,
+        'description': goal.description,
+        'target_date': goal.target_date.isoformat(),
+        'is_completed': goal.is_completed,
+    }
+    return JsonResponse(data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+def create_progress_record(request):
+    """
+    Creates a new progress record.
+    Expects a JSON body with 'student_id', and optionally 'lesson_id' and 'notes'.
+    """
+    student_id = request.data.get('student_id')
+    if not student_id:
+        return JsonResponse({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    student = get_object_or_404(Student, pk=student_id)
+    lesson_id = request.data.get('lesson_id')
+    notes = request.data.get('notes', '')
+    
+    progress_record = ProgressRecord(student=student, notes=notes)
+    if lesson_id:
+        from lessons.models import Lesson
+        progress_record.lesson = get_object_or_404(Lesson, pk=lesson_id)
+    
+    try:
+        progress_record.save()
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to create progress record: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = {
+        'id': progress_record.id,
+        'student': progress_record.student.id,
+        'lesson': progress_record.lesson.id if progress_record.lesson else None,
+        'date': progress_record.date.isoformat(),
+        'notes': progress_record.notes,
+    }
+    return JsonResponse(data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT'])
+def update_progress_record(request, record_id):
+    """
+    Updates an existing progress record.
+    Expects a JSON body with fields to update such as 'notes'.
+    """
+    progress_record = get_object_or_404(ProgressRecord, pk=record_id)
+    
+    notes = request.data.get('notes')
+    if notes is not None:
+        progress_record.notes = notes
+    
+    # You can add updates for other fields as needed.
+    try:
+        progress_record.save()
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to update progress record: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = {
+        'id': progress_record.id,
+        'student': progress_record.student.id,
+        'lesson': progress_record.lesson.id if progress_record.lesson else None,
+        'date': progress_record.date.isoformat(),
+        'notes': progress_record.notes,
+    }
+    return JsonResponse(data, status=status.HTTP_200_OK)

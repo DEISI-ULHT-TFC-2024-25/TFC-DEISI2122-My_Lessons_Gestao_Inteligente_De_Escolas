@@ -80,34 +80,6 @@ class _CreateNewSkillPageState extends State<CreateNewSkillPage> {
                           ? 'Please enter the skill name'
                           : null,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<dynamic>(
-                      decoration: const InputDecoration(
-                        labelText: 'Sport',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: sports
-                          .map((sport) => DropdownMenuItem(
-                                value: sport,
-                                child: Text(sport['name']),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedSport = value;
-                        });
-                      },
-                      // Sport selection is optional.
-                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: _saveSkill,

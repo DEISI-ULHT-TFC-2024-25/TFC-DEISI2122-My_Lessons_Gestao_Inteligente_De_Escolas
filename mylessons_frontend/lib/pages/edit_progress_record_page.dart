@@ -2,51 +2,82 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/api_service.dart' as ApiService;
+import 'progress_hub_page.dart';
+import '../modals/progress_goal_modal.dart';
 
-class EditProgressRecordPage extends StatefulWidget {
-  final dynamic record; // The record object passed from the previous screen
-
-  const EditProgressRecordPage({Key? key, required this.record})
+class NewProgressRecordPage extends StatefulWidget {
+  final dynamic student; // Pass the selected student
+  const NewProgressRecordPage({Key? key, required this.student})
       : super(key: key);
 
   @override
-  _EditProgressRecordPageState createState() => _EditProgressRecordPageState();
+  _NewProgressRecordPageState createState() => _NewProgressRecordPageState();
 }
 
-class _EditProgressRecordPageState extends State<EditProgressRecordPage> {
+class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Dummy data for lessons and skills; replace with API data as needed.
+  // Dummy lesson data; replace with API data as needed.
   List<dynamic> lessons = [
     {'id': 1, 'name': 'Basketball Basics'},
     {'id': 2, 'name': 'Soccer Drills'},
   ];
-  List<dynamic> skills = [
-    {'id': 1, 'name': 'Dribbling'},
-    {'id': 2, 'name': 'Passing'},
-    {'id': 3, 'name': 'Shooting'},
-  ];
-
   dynamic selectedLesson;
-  late DateTime recordDate;
-  List<dynamic> selectedSkills = [];
-  late TextEditingController _notesController;
+  DateTime recordDate = DateTime.now();
+  final TextEditingController _notesController = TextEditingController();
   bool _isLoading = false;
+
+  // Active goals for the student.
+  List<dynamic> activeGoals = [];
+  // Map to store updated progression for each goal (goal id -> progress value)
+  final Map<int, int> goalProgress = {};
 
   @override
   void initState() {
     super.initState();
-    // Prepopulate fields with widget.record data.
-    selectedLesson = lessons.firstWhere(
-        (lesson) => lesson['id'] == widget.record['lesson_id'],
-        orElse: () => lessons.first);
-    recordDate = DateTime.tryParse(widget.record['date']) ?? DateTime.now();
-    // Assuming widget.record['skills'] is a list of skill objects.
-    selectedSkills = List<dynamic>.from(widget.record['skills'] ?? []);
-    _notesController = TextEditingController(text: widget.record['notes'] ?? '');
+    selectedLesson = lessons.first;
+    fetchActiveGoals();
   }
 
-  Future<void> _saveChanges() async {
+  // Fetch active goals for the student from the backend.
+  Future<void> fetchActiveGoals() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      // Replace with an API call as needed.
+      activeGoals = [
+        {'id': 1, 'description': 'Improve dribbling', 'progress': 2},
+        {'id': 2, 'description': 'Enhance passing', 'progress': 3},
+      ];
+      // Initialize goalProgress with fetched values.
+      for (var goal in activeGoals) {
+        goalProgress[goal['id']] = goal['progress'] ?? 0;
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error fetching goals: $e")),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Updates the progression for a goal.
+  void updateGoalProgress(int goalId, int change) {
+    setState(() {
+      int current = goalProgress[goalId] ?? 0;
+      // Only allow increment if current is less than 5.
+      if (change > 0 && current >= 5) return;
+      int updated = current + change;
+      if (updated < 0) updated = 0;
+      goalProgress[goalId] = updated;
+    });
+  }
+
+  Future<void> _saveRecord() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -54,18 +85,22 @@ class _EditProgressRecordPageState extends State<EditProgressRecordPage> {
       final payload = {
         'lesson_id': selectedLesson['id'],
         'date': DateFormat('yyyy-MM-dd').format(recordDate),
-        'skills_ids': selectedSkills.map((s) => s['id']).toList(),
         'notes': _notesController.text,
+        'student_id': widget.student['id'],
+        // Convert goalProgress map to a list of {goal_id, progress} items.
+        'goals': goalProgress.entries
+            .map((e) => {'goal_id': e.key, 'progress': e.value})
+            .toList(),
       };
       try {
-        await ApiService.updateProgressRecord(widget.record['id'], payload);
+        await ApiService.createProgressRecord(payload);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Progress record updated')),
+          const SnackBar(content: Text('Progress record saved')),
         );
         Navigator.pop(context);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating record: $e')),
+          SnackBar(content: Text('Error saving record: $e')),
         );
       } finally {
         setState(() {
@@ -75,20 +110,45 @@ class _EditProgressRecordPageState extends State<EditProgressRecordPage> {
     }
   }
 
-  Widget _buildSkillChip(dynamic skill) {
-    bool isSelected = selectedSkills.any((s) => s['id'] == skill['id']);
-    return FilterChip(
-      label: Text(skill['name']),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            selectedSkills.add(skill);
-          } else {
-            selectedSkills.removeWhere((s) => s['id'] == skill['id']);
-          }
-        });
-      },
+  Widget buildGoalCard(dynamic goal) {
+    int progress = goalProgress[goal['id']] ?? 0;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                goal['description'] ?? "No description",
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.remove, color: Colors.orange),
+              onPressed: () {
+                updateGoalProgress(goal['id'], -1);
+              },
+            ),
+            Text(
+              "$progress",
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              " / 5",
+              style: const TextStyle(fontSize: 16),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add, color: Colors.orange),
+              onPressed: progress < 5
+                  ? () {
+                      updateGoalProgress(goal['id'], 1);
+                    }
+                  : null,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -96,7 +156,7 @@ class _EditProgressRecordPageState extends State<EditProgressRecordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Progress Record'),
+        title: const Text('New Progress Record'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -110,79 +170,48 @@ class _EditProgressRecordPageState extends State<EditProgressRecordPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    DropdownButtonFormField<dynamic>(
-                      decoration: const InputDecoration(
-                        labelText: 'Class/Lesson',
-                        border: OutlineInputBorder(),
-                      ),
-                      value: selectedLesson,
-                      items: lessons
-                          .map((lesson) => DropdownMenuItem(
-                                value: lesson,
-                                child: Text(lesson['name']),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedLesson = value;
-                        });
-                      },
-                      validator: (value) => value == null
-                          ? 'Please select a lesson'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Date'),
-                      subtitle: Text(DateFormat('yyyy-MM-dd').format(recordDate)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.calendar_today),
+                    // Active Goals (no heading or extra sized box).
+                    activeGoals.isEmpty
+                        ? const Text("No active goals.")
+                        : Column(
+                            children: activeGoals.map(buildGoalCard).toList(),
+                          ),
+                    // Button to create a new goal.
+                    Align(
+                      alignment: Alignment.center,
+                      child: TextButton.icon(
                         onPressed: () async {
-                          final picked = await showDatePicker(
+                          // Open the Create New Goal modal.
+                          await showModalBottomSheet(
                             context: context,
-                            initialDate: recordDate,
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2100),
+                            isScrollControlled: true,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                            ),
+                            builder: (context) => ProgressGoalModal(student: widget.student),
                           );
-                          if (picked != null) {
-                            setState(() {
-                              recordDate = picked;
-                            });
-                          }
+                          // After closing the modal, refresh active goals.
+                          fetchActiveGoals();
                         },
+                        icon: const Icon(Icons.add, color: Colors.orange),
+                        label: const Text("Create New Goal", style: TextStyle(color: Colors.orange)),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Skills Covered'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: skills.map((skill) => _buildSkillChip(skill)).toList(),
-                    ),
-                    const SizedBox(height: 16),
+                    // Notes field.
                     TextFormField(
                       controller: _notesController,
                       decoration: const InputDecoration(
                         labelText: 'Notes',
+                        hintText: 'Enter quick notes here...',
                         border: OutlineInputBorder(),
                       ),
-                      maxLines: 3,
+                      maxLines: null,
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton(
-                          onPressed: _saveChanges,
-                          child: const Text('Save Changes'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-                          child: const Text('Discard Changes'),
-                        ),
-                      ],
+                    ElevatedButton(
+                      onPressed: _saveRecord,
+                      child: const Text('Save Record'),
                     ),
                   ],
                 ),

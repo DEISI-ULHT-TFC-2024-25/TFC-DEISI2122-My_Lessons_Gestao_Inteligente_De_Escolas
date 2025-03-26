@@ -8,8 +8,20 @@ class StudentsModal extends StatefulWidget {
   final int? lessonId;
   final int? packId;
   final int? schoolId; // added schoolId for full payload support
+  // Callback that notifies the parent how many students are selected.
+  final Function(int)? onSelectionUpdated;
+  // Optional manageProgress flag. When true, only "Select Existing" is shown
+  // and tapping a student returns that student immediately.
+  final bool manageProgress;
 
-  const StudentsModal({super.key, this.lessonId, this.packId, this.schoolId});
+  const StudentsModal({
+    super.key,
+    this.lessonId,
+    this.packId,
+    this.schoolId,
+    this.onSelectionUpdated,
+    this.manageProgress = false,
+  });
 
   @override
   _StudentsModalState createState() => _StudentsModalState();
@@ -34,7 +46,7 @@ class _StudentsModalState extends State<StudentsModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: widget.manageProgress ? 1 : 2, vsync: this);
     fetchStudents();
   }
 
@@ -67,30 +79,37 @@ class _StudentsModalState extends State<StudentsModal>
         final List<dynamic> allStudents = data["all_students"] ?? [];
         final List<dynamic> associatedStudents = data["associated_students"] ?? [];
 
-        // Mark each student as selected if its id appears in associatedStudents.
-        final Set<dynamic> associatedIds =
-            associatedStudents.map((s) => s["id"]).toSet();
+        if (widget.manageProgress) {
+          // In manageProgress mode, only show the lesson's associated students.
+          setState(() {
+            students = associatedStudents;
+          });
+        } else {
+          // Mark each student as selected if its id appears in associatedStudents.
+          final Set<dynamic> associatedIds =
+              associatedStudents.map((s) => s["id"]).toSet();
 
-        final List<dynamic> mergedStudents = allStudents.map((student) {
-          student["selected"] = associatedIds.contains(student["id"]);
-          return student;
-        }).toList();
+          final List<dynamic> mergedStudents = allStudents.map((student) {
+            student["selected"] = associatedIds.contains(student["id"]);
+            return student;
+          }).toList();
 
-        // Sort the list so that selected students appear first, then alphabetically.
-        mergedStudents.sort((a, b) {
-          String nameA =
-              "${a['first_name'] ?? ''} ${a['last_name'] ?? ''}".trim().toLowerCase();
-          String nameB =
-              "${b['first_name'] ?? ''} ${b['last_name'] ?? ''}".trim().toLowerCase();
-          if (a["selected"] == b["selected"]) {
-            return nameA.compareTo(nameB);
-          }
-          return a["selected"] ? -1 : 1;
-        });
+          // Sort the list so that selected students appear first, then alphabetically.
+          mergedStudents.sort((a, b) {
+            String nameA =
+                "${a['first_name'] ?? ''} ${a['last_name'] ?? ''}".trim().toLowerCase();
+            String nameB =
+                "${b['first_name'] ?? ''} ${b['last_name'] ?? ''}".trim().toLowerCase();
+            if (a["selected"] == b["selected"]) {
+              return nameA.compareTo(nameB);
+            }
+            return a["selected"] ? -1 : 1;
+          });
 
-        setState(() {
-          students = mergedStudents;
-        });
+          setState(() {
+            students = mergedStudents;
+          });
+        }
       }
     } catch (e) {
       print("Error fetching students: $e");
@@ -285,121 +304,144 @@ class _StudentsModalState extends State<StudentsModal>
             controller: _tabController,
             labelColor: Colors.black,
             indicatorColor: Colors.orange,
-            tabs: const [
-              Tab(text: "Select Existing"),
-              Tab(text: "Create New"),
-            ],
+            tabs: widget.manageProgress
+                ? const [Tab(text: "Select Existing")]
+                : const [
+                    Tab(text: "Select Existing"),
+                    Tab(text: "Create New"),
+                  ],
           ),
           const SizedBox(height: 8),
           // Tab Content.
           SizedBox(
             height: 300,
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // "Select Existing" Tab.
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          labelText: "Search Student",
-                          border: OutlineInputBorder(),
+            child: widget.manageProgress
+                ? ListView.builder(
+                    itemCount: students.length,
+                    itemBuilder: (context, index) {
+                      final student = students[index];
+                      // In manageProgress mode, tapping a student returns it immediately.
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 4, horizontal: 8),
+                        child: ListTile(
+                          title: Text(
+                              "${student['id']} - ${student['first_name']} ${student['last_name']}"),
+                          subtitle: Text("Birthday: ${student['birthday']}"),
+                          trailing: student["selected"] == true
+                              ? const Icon(Icons.check_circle, color: Colors.orange)
+                              : const Icon(Icons.arrow_forward, color: Colors.orange),
+                          onTap: () {
+                            Navigator.pop(context, student);
+                          },
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            searchQuery = value.toLowerCase();
-                          });
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : ListView(
-                              children: students.where((student) {
-                                String studentName =
-                                    "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}"
-                                        .trim();
-                                return studentName.toLowerCase().contains(searchQuery);
-                              }).map((student) {
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                      vertical: 4, horizontal: 8),
-                                  child: ListTile(
-                                    title: Text(
-                                        "${student['id']} - ${student['first_name']} ${student['last_name']}"),
-                                    subtitle: Text("Birthday: ${student['birthday']}"),
-                                    trailing: student["selected"] == true
-                                        ? const Icon(Icons.check_circle,
-                                            color: Colors.orange)
-                                        : const Icon(Icons.arrow_forward,
-                                            color: Colors.orange),
-                                    onTap: () => _toggleStudentSelection(student),
-                                  ),
-                                );
-                              }).toList(),
+                      );
+                    },
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // "Select Existing" Tab.
+                      Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                labelText: "Search Student",
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  searchQuery = value.toLowerCase();
+                                });
+                              },
                             ),
-                    ),
-                  ],
-                ),
-                // "Create New" Tab.
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _firstNameController,
-                          decoration: const InputDecoration(
-                            labelText: "First Name",
-                            border: OutlineInputBorder(),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _lastNameController,
-                          decoration: const InputDecoration(
-                            labelText: "Last Name",
-                            border: OutlineInputBorder(),
+                          Expanded(
+                            child: isLoading
+                                ? const Center(child: CircularProgressIndicator())
+                                : ListView(
+                                    children: students.where((student) {
+                                      String studentName =
+                                          "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}"
+                                              .trim();
+                                      return studentName.toLowerCase().contains(searchQuery);
+                                    }).map((student) {
+                                      return Card(
+                                        margin: const EdgeInsets.symmetric(
+                                            vertical: 4, horizontal: 8),
+                                        child: ListTile(
+                                          title: Text(
+                                              "${student['id']} - ${student['first_name']} ${student['last_name']}"),
+                                          subtitle: Text("Birthday: ${student['birthday']}"),
+                                          trailing: student["selected"] == true
+                                              ? const Icon(Icons.check_circle, color: Colors.orange)
+                                              : const Icon(Icons.arrow_forward, color: Colors.orange),
+                                          onTap: () => _toggleStudentSelection(student),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _birthdayController,
-                                readOnly: true,
+                        ],
+                      ),
+                      // "Create New" Tab.
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _firstNameController,
                                 decoration: const InputDecoration(
-                                  labelText: "Birthday",
+                                  labelText: "First Name",
                                   border: OutlineInputBorder(),
-                                  hintText: "Select a date",
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.calendar_today),
-                              onPressed: _showBirthdayPicker,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: _createStudent,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _lastNameController,
+                                decoration: const InputDecoration(
+                                  labelText: "Last Name",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _birthdayController,
+                                      readOnly: true,
+                                      decoration: const InputDecoration(
+                                        labelText: "Birthday",
+                                        border: OutlineInputBorder(),
+                                        hintText: "Select a date",
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.calendar_today),
+                                    onPressed: _showBirthdayPicker,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                onPressed: _createStudent,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text("Create Student"),
+                              ),
+                            ],
                           ),
-                          child: const Text("Create Student"),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
