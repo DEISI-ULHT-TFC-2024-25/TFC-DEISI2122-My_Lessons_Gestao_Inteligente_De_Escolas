@@ -3,12 +3,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+
 const String baseUrl = 'https://mylessons.pythonanywhere.com'; // hosting
 //const String baseUrl = 'http://127.0.0.1:8000'; // localhost
 //const String baseUrl = 'http://192.168.1.66:8000'; // net da sala
 //const String baseUrl = 'http://172.19.72.130:8000'; // freeulusofona
 //const String baseUrl = 'http://172.20.10.9:8000'; // hotspot
-
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
@@ -53,7 +53,6 @@ Future<Map<String, dynamic>> login(String email, String password) async {
   if (response.statusCode == 200) {
     if (data.containsKey('token')) {
       // Store the token securely.
-      final storage = const FlutterSecureStorage();
       await storage.write(key: 'auth_token', value: data['token']);
       return data;
     } else {
@@ -239,5 +238,91 @@ Future<int> fetchSchoolScheduleTimeLimit(schoolName) async {
   } else {
     // If an error occurs, default to 0 hours.
     return 0;
+  }
+}
+
+// ==================== New API Functions for Flutter Frontend ====================
+
+/// Fetches the list of skill proficiencies for the current user.
+Future<List<dynamic>> getSkillProficiencies() async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/skill-proficiencies/';
+  final response = await http.get(Uri.parse(url), headers: headers);
+  if (response.statusCode == 200) {
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data;
+  } else {
+    throw Exception("Failed to load skill proficiencies: ${response.statusCode}");
+  }
+}
+
+/// Updates a skill proficiency level.
+/// Sends a POST request to the custom action endpoint.
+Future<void> updateSkillProficiencyLevel(int proficiencyId, int newLevel) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/skill-proficiencies/$proficiencyId/update-level/';
+  final response = await http.post(
+    Uri.parse(url),
+    headers: headers,
+    body: jsonEncode({'level': newLevel}),
+  );
+  if (response.statusCode != 200) {
+    throw Exception("Failed to update skill proficiency level: ${response.statusCode}");
+  }
+}
+
+/// Creates a new skill.
+Future<void> createSkill(Map<String, dynamic> payload) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/skills/';
+  final response = await http.post(
+    Uri.parse(url),
+    headers: headers,
+    body: jsonEncode(payload),
+  );
+  if (response.statusCode != 201) {
+    throw Exception("Failed to create skill: ${response.statusCode}");
+  }
+}
+
+/// Creates a new goal.
+Future<void> createGoal(Map<String, dynamic> payload) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/goals/';
+  final response = await http.post(
+    Uri.parse(url),
+    headers: headers,
+    body: jsonEncode(payload),
+  );
+  if (response.statusCode != 201) {
+    throw Exception("Failed to create goal: ${response.statusCode}");
+  }
+}
+
+/// Creates a new progress record.
+Future<void> createProgressRecord(Map<String, dynamic> payload) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/progress-records/';
+  final response = await http.post(
+    Uri.parse(url),
+    headers: headers,
+    body: jsonEncode(payload),
+  );
+  if (response.statusCode != 201) {
+    throw Exception("Failed to create progress record: ${response.statusCode}");
+  }
+}
+
+/// Updates an existing progress record.
+Future<void> updateProgressRecord(int recordId, Map<String, dynamic> payload) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/progress-records/$recordId/';
+  final response = await http.put(
+    Uri.parse(url),
+    headers: headers,
+    body: jsonEncode(payload),
+  );
+  if (response.statusCode != 200) {
+    throw Exception("Failed to update progress record: ${response.statusCode}");
   }
 }
