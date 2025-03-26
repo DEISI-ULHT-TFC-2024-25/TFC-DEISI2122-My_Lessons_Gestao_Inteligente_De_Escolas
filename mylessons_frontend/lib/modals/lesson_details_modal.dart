@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/modals/instructors_modal.dart';
+import 'package:mylessons_frontend/pages/new_progress_record_page.dart';
 import '../services/api_service.dart';
 import 'students_modal.dart';
 import 'subject_modal.dart'; // Make sure this file exports SubjectModal
 import 'location_modal.dart'; // Make sure this file exports LocationModal
-import 'package:mylessons_frontend/pages/progress_hub_page.dart'; // NEW: Import the Progress Hub Page
-import 'package:mylessons_frontend/modals/student_selection_modal.dart'; // NEW: Import the Student Selection Modal
 
 class LessonDetailsModal extends StatefulWidget {
   final dynamic lesson;
@@ -526,7 +525,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => ProgressHubPage(
+                            builder: (context) => NewProgressRecordPage(
                               student: selectedStudent,
                               lesson: lesson,
                             ),

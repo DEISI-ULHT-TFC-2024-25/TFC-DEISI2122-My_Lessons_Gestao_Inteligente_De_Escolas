@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/api_service.dart' as ApiService;
-import 'progress_hub_page.dart';
 import '../modals/progress_goal_modal.dart';
 
 class NewProgressRecordPage extends StatefulWidget {
@@ -30,7 +29,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
 
   // Active goals for the student.
   List<dynamic> activeGoals = [];
-  // Map to store updated progression for each goal (goal id -> progress value)
+  // Map to store updated progression for each goal (goal id -> level value)
   final Map<int, int> goalProgress = {};
 
   @override
@@ -46,14 +45,10 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
       _isLoading = true;
     });
     try {
-      // Replace with an API call as needed.
-      activeGoals = [
-        {'id': 1, 'description': 'Improve dribbling', 'progress': 2},
-        {'id': 2, 'description': 'Enhance passing', 'progress': 3},
-      ];
-      // Initialize goalProgress with fetched values.
+      activeGoals = await ApiService.getActiveGoals(widget.student['id']);
+      // Initialize goalProgress with fetched levels.
       for (var goal in activeGoals) {
-        goalProgress[goal['id']] = goal['progress'] ?? 0;
+        goalProgress[goal['id']] = goal['level'] ?? 0;
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -83,17 +78,27 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
       setState(() {
         _isLoading = true;
       });
-      final payload = {
-        'lesson_id': selectedLesson['id'],
-        'date': DateFormat('yyyy-MM-dd').format(recordDate),
-        'notes': _notesController.text,
-        'student_id': widget.student['id'],
-        // Convert goalProgress map to a list of {goal_id, progress} items.
-        'goals': goalProgress.entries
-            .map((e) => {'goal_id': e.key, 'progress': e.value})
-            .toList(),
-      };
       try {
+        // For each goal, update the level if it has changed.
+        for (var goal in activeGoals) {
+          final int goalId = goal['id'];
+          final int originalLevel = goal['level'] ?? 0;
+          final int updatedLevel = goalProgress[goalId] ?? originalLevel;
+          if (updatedLevel != originalLevel) {
+            await ApiService.updateGoalLevel(goalId, updatedLevel);
+          }
+        }
+
+        final payload = {
+          'lesson_id': selectedLesson['id'],
+          'date': DateFormat('yyyy-MM-dd').format(recordDate),
+          'notes': _notesController.text,
+          'student_id': widget.student['id'],
+          // Convert goalProgress map to a list of {goal_id, progress} items.
+          'goals': goalProgress.entries
+              .map((e) => {'goal_id': e.key, 'progress': e.value})
+              .toList(),
+        };
         await ApiService.createProgressRecord(payload);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Progress record saved')),
@@ -121,7 +126,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
           children: [
             Expanded(
               child: Text(
-                goal['description'] ?? "No description",
+                goal['skill_name'] ?? "No description",
                 style: const TextStyle(fontSize: 16),
               ),
             ),
@@ -135,9 +140,9 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
               "$progress",
               style: const TextStyle(fontSize: 16),
             ),
-            Text(
+            const Text(
               " / 5",
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16),
             ),
             IconButton(
               icon: const Icon(Icons.add, color: Colors.orange),
@@ -171,7 +176,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    // Active Goals (no heading or extra sized box).
+                    // Active Goals section.
                     activeGoals.isEmpty
                         ? const Text("No active goals.")
                         : Column(
@@ -189,13 +194,15 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                             ),
-                            builder: (context) => ProgressGoalModal(student: widget.student, lesson: widget.lesson),
+                            builder: (context) => ProgressGoalModal(
+                                student: widget.student, lesson: widget.lesson),
                           );
                           // After closing the modal, refresh active goals.
                           fetchActiveGoals();
                         },
                         icon: const Icon(Icons.add, color: Colors.orange),
-                        label: const Text("Create New Goal", style: TextStyle(color: Colors.orange)),
+                        label: const Text("Create New Goal",
+                            style: TextStyle(color: Colors.orange)),
                       ),
                     ),
                     const SizedBox(height: 16),

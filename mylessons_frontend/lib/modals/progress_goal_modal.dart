@@ -66,10 +66,8 @@ class _CreateNewGoalModalContentState extends State<CreateNewGoalModalContent> {
       final payload = {
         'student_id': widget.student['id'],
         'skill_id': selectedSkill['id'],
-        'description': '', // Default description; update if needed.
-        'target_date': DateFormat('yyyy-MM-dd')
-            .format(DateTime.now()), // Using today's date.
       };
+      print(payload);
       try {
         await createGoal(payload); // Call the API to create the goal.
         ScaffoldMessenger.of(context).showSnackBar(
