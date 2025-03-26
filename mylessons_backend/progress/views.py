@@ -1,3 +1,4 @@
+import logging
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
@@ -8,6 +9,7 @@ from rest_framework import status
 from .models import Skill, Goal, ProgressRecord, ProgressReport
 from users.models import Student
 
+logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 def get_active_goals(request, student_id):
@@ -160,11 +162,14 @@ def create_progress_record(request):
       - optionally 'lesson_id' and 'notes'
       - 'goals': a list of dictionaries with 'goal_id' and 'progress'
     For each goal provided, if the new progress (i.e. new level) differs from the current level,
-    the view will update the level and, if needed, mark the goal as completed (if new level is 5)
-    or uncompleted (if new level changes from 5 to another value).
+    the view checks:
+      - If the level was not 5 and now is 5, mark as completed.
+      - If the level was 5 and now is not, mark as uncompleted.
+    Then, the goal is associated with the progress record.
     """
     student_id = request.data.get('student_id')
     if not student_id:
+        logger.debug("No student_id provided in request")
         return JsonResponse({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
     
     student = get_object_or_404(Student, pk=student_id)
@@ -179,7 +184,9 @@ def create_progress_record(request):
     
     try:
         progress_record.save()
+        logger.debug(f"ProgressRecord created with id: {progress_record.id}")
     except Exception as e:
+        logger.error(f"Failed to create progress record: {e}")
         return JsonResponse({'error': f'Failed to create progress record: {e}'}, status=status.HTTP_400_BAD_REQUEST)
     
     # Process and update goals if provided.
@@ -190,29 +197,37 @@ def create_progress_record(request):
             goal_id = goal_data.get('goal_id')
             new_level = goal_data.get('progress')
             if goal_id is None or new_level is None:
+                logger.debug("Skipping goal update due to missing goal_id or progress")
                 continue
             try:
                 goal_instance = Goal.objects.get(pk=goal_id)
                 new_level_int = int(new_level)
-                # Only update if there's an actual change.
-                if goal_instance.level != new_level_int:
-                    # If the new level is 5 and the old level isn't, mark as completed.
-                    if new_level_int == 5 and goal_instance.level != 5:
-                        goal_instance.level = new_level_int
+                old_level = goal_instance.level
+                logger.debug(f"Goal {goal_id}: old level = {old_level}, new level = {new_level_int}")
+                
+                if old_level != new_level_int:
+                    goal_instance.level = new_level_int
+                    goal_instance.last_updated = now()
+                    
+                    if old_level != 5 and new_level_int == 5:
+                        logger.debug(f"Goal {goal_id}: Level changed from {old_level} to 5. Marking as completed.")
                         goal_instance.mark_completed()
-                    # If the old level was 5 and the new level is not 5, mark as uncompleted.
-                    elif goal_instance.level == 5 and new_level_int != 5:
-                        goal_instance.level = new_level_int
+                    elif old_level == 5 and new_level_int != 5:
+                        logger.debug(f"Goal {goal_id}: Level changed from 5 to {new_level_int}. Marking as uncompleted.")
                         goal_instance.mark_uncompleted()
                     else:
-                        goal_instance.level = new_level_int
-                        goal_instance.last_updated = now()
+                        logger.debug(f"Goal {goal_id}: Level updated from {old_level} to {new_level_int} without completion change.")
                         goal_instance.save()
+                else:
+                    logger.debug(f"Goal {goal_id}: No change in level (remains {old_level}).")
+                    
                 goal_ids.append(goal_instance.id)
             except Goal.DoesNotExist:
+                logger.error(f"Goal with id {goal_id} does not exist. Skipping.")
                 continue
         # Associate the updated goals with the progress record.
         progress_record.goals.set(goal_ids)
+        logger.debug(f"Associated goals {goal_ids} with progress record {progress_record.id}")
     
     data = {
         'id': progress_record.id,
@@ -221,8 +236,8 @@ def create_progress_record(request):
         'date': progress_record.date.isoformat(),
         'notes': progress_record.notes,
     }
+    logger.debug("Progress record creation completed successfully.")
     return JsonResponse(data, status=status.HTTP_201_CREATED)
-
 
 @api_view(['PUT'])
 def update_progress_record(request, record_id):
