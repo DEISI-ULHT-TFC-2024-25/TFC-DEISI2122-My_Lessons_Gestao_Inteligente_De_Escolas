@@ -88,7 +88,7 @@ def get_lessons_data(user, date_lookup, is_done_flag):
             "type": lesson.type,
             "duration_in_minutes": lesson.duration_in_minutes,
             "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
-            "school": str(lesson.school) if lesson.school else ""
+            "school": str(lesson.school) if lesson.school else "",
             "subject_id": lesson.sport.id if lesson.sport else "Unknown",
         }
         for lesson in lessons
