@@ -1,5 +1,7 @@
 // main_layout.dart
 import 'dart:convert';
+import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart'; // Add this package
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'pages/home_page.dart';
@@ -33,11 +35,23 @@ class _MainScreenState extends State<MainScreen> {
   late List<Widget> _pages;
   late List<BottomNavigationBarItem> _navBarItems;
 
+  // Global key to show SnackBars
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex; // use initial index if provided
     _fetchUserRole();
+    // Listen for connectivity changes
+    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
+      if (result == ConnectivityResult.none) {
+        _scaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(
+              content: Text("No internet connection. Please check your connection.")),
+        );
+      }
+    });
   }
 
   Future<void> _fetchUserRole() async {
@@ -109,67 +123,70 @@ class _MainScreenState extends State<MainScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    return Scaffold(
-      body: _isCheckout
-          ? CheckoutPage(
-              onBack: () {
-                setState(() {
-                  _isCheckout = false;
-                });
-              },
-            )
-          : IndexedStack(
-              index: _currentIndex,
-              children: _pages,
-            ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Persistent Cart Button (shown only when not in checkout)
-          if (!_isCheckout)
-            ValueListenableBuilder<int>(
-              valueListenable: CartService().cartCount,
-              builder: (context, count, child) {
-                if (count > 0) {
-                  return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0, vertical: 4),
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _isCheckout = true;
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.shopping_cart,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          "Checkout Cart – $count ${count == 1 ? 'item' : 'items'}",
-                          style: const TextStyle(
+    return ScaffoldMessenger(
+      key: _scaffoldMessengerKey,
+      child: Scaffold(
+        body: _isCheckout
+            ? CheckoutPage(
+                onBack: () {
+                  setState(() {
+                    _isCheckout = false;
+                  });
+                },
+              )
+            : IndexedStack(
+                index: _currentIndex,
+                children: _pages,
+              ),
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Persistent Cart Button (shown only when not in checkout)
+            if (!_isCheckout)
+              ValueListenableBuilder<int>(
+                valueListenable: CartService().cartCount,
+                builder: (context, count, child) {
+                  if (count > 0) {
+                    return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 4),
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isCheckout = true;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.shopping_cart,
                             color: Colors.white,
-                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
-                        ),
-                      ));
-                } else {
-                  return const SizedBox.shrink();
-                }
-              },
+                          label: Text(
+                            "Checkout Cart – $count ${count == 1 ? 'item' : 'items'}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                        ));
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                },
+              ),
+            BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: _currentIndex,
+              selectedItemColor: Colors.orange,
+              unselectedItemColor: Colors.grey,
+              onTap: _onItemTapped,
+              items: _navBarItems,
             ),
-          BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            currentIndex: _currentIndex,
-            selectedItemColor: Colors.orange,
-            unselectedItemColor: Colors.grey,
-            onTap: _onItemTapped,
-            items: _navBarItems,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

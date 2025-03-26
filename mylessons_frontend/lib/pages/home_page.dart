@@ -12,6 +12,7 @@ import '../modals/profile_completion_modal.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
 import 'profile_page.dart';
+import 'package:mylessons_frontend/modals/schedule_lesson_modal.dart';
 
 class HomePage extends StatefulWidget {
   final List<dynamic> newBookedPacks;
@@ -106,8 +107,7 @@ class _HomePageState extends State<HomePage> {
 
 // Assuming the API returns a map with a key "unschedulable_lessons" that holds the list.
       setState(() {
-        unschedulableLessons =
-            List<String>.from(decodedResponse['lesson_ids']);
+        unschedulableLessons = List<String>.from(decodedResponse['lesson_ids']);
       });
       print(unschedulableLessons);
 
@@ -142,7 +142,10 @@ class _HomePageState extends State<HomePage> {
         });
 
         // Prompt profile completion if needed.
-        if (firstName.isEmpty || lastName.isEmpty || countryCode.isEmpty || phone.isEmpty) {
+        if (firstName.isEmpty ||
+            lastName.isEmpty ||
+            countryCode.isEmpty ||
+            phone.isEmpty) {
           _promptProfileCompletion();
         }
       }
@@ -349,42 +352,45 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       isScrollControlled: true,
       builder: (context) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.calendar_today, color: Colors.orange),
-              title: const Text("Schedule Lesson"),
-              onTap: () {
-                Navigator.pop(context);
-                if (lesson['type']?.toString().toLowerCase() == 'group') {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("Scheduling Unavailable"),
-                      content: const Text(
-                          "To change the schedule of a group lesson, please contact the school."),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text("OK"),
-                        )
-                      ],
-                    ),
-                  );
-                } else {
-                  _showScheduleLessonModal(lesson);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.more_vert, color: Colors.orange),
-              title: const Text("View Details"),
-              onTap: () {
-                Navigator.pop(context);
-                _showLessonDetailsModal(lesson);
-              },
-            ),
-          ],
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.calendar_today, color: Colors.orange),
+                title: const Text("Schedule Lesson"),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (lesson['type']?.toString().toLowerCase() == 'group') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Scheduling Unavailable"),
+                        content: const Text(
+                            "To change the schedule of a group lesson, please contact the school."),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          )
+                        ],
+                      ),
+                    );
+                  } else {
+                    _showScheduleLessonModal(lesson);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.more_vert, color: Colors.orange),
+                title: const Text("View Details"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showLessonDetailsModal(lesson);
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -397,43 +403,46 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       isScrollControlled: true,
       builder: (context) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.calendar_today, color: Colors.orange),
-              title: const Text("Schedule Lessons"),
-              onTap: () {
-                Navigator.pop(context);
-                if (pack['type'].toString().toLowerCase() == 'group') {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("Scheduling Unavailable"),
-                      content: const Text(
-                          "To change the schedule of a group lesson, please contact the school."),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text("OK"),
-                        )
-                      ],
-                    ),
-                  );
-                } else {
-                  _showScheduleMultipleLessonsModal(
-                      pack['lessons'], pack["expiration_date"]);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.more_vert, color: Colors.orange),
-              title: const Text("View Details"),
-              onTap: () {
-                Navigator.pop(context);
-                _showPackDetailsModal(pack);
-              },
-            ),
-          ],
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.calendar_today, color: Colors.orange),
+                title: const Text("Schedule Lessons"),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (pack['type'].toString().toLowerCase() == 'group') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Scheduling Unavailable"),
+                        content: const Text(
+                            "To change the schedule of a group lesson, please contact the school."),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          )
+                        ],
+                      ),
+                    );
+                  } else {
+                    _showScheduleMultipleLessonsModal(
+                        pack['lessons'], pack["expiration_date"]);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.more_vert, color: Colors.orange),
+                title: const Text("View Details"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showPackDetailsModal(pack);
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -491,252 +500,22 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _showScheduleLessonModal(dynamic lesson) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
-    print(lessonId);
-    
-    DateTime? selectedDate;
-    int increment = 60;
-    List<String> availableTimes = [];
-    bool isLoading = false;
-    bool isScheduling = false;
     int schoolScheduleTimeLimit =
         await fetchSchoolScheduleTimeLimit(lesson["school"]);
-
-    final parentContext = context;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext modalContext) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      child: SfDateRangePicker(
-                        view: DateRangePickerView.month,
-                        todayHighlightColor: Colors.orange,
-                        selectionColor: Colors.orange,
-                        rangeSelectionColor: Colors.orange,
-                        startRangeSelectionColor: const Color(0xFFFF9800),
-                        endRangeSelectionColor: Colors.orange,
-                        selectionMode: DateRangePickerSelectionMode.single,
-                        showActionButtons: true,
-                        initialDisplayDate: currentRole == "Parent"
-                            ? DateTime.now().add(
-                                Duration(hours: schoolScheduleTimeLimit),
-                              )
-                            : null,
-                        minDate: currentRole == "Parent"
-                            ? DateTime.now().add(
-                                Duration(hours: schoolScheduleTimeLimit),
-                              )
-                            : null,
-                        maxDate: lesson['expiration_date'] != "None"
-                            ? DateTime.parse(lesson['expiration_date'])
-                            : null,
-                        onSelectionChanged:
-                            (DateRangePickerSelectionChangedArgs args) {
-                          if (args.value is DateTime) {
-                            setModalState(() {
-                              selectedDate = args.value;
-                              availableTimes = [];
-                              isLoading = true;
-                            });
-                            _fetchAvailableTimes(
-                                    lessonId, selectedDate!, increment)
-                                .then((times) {
-                              setModalState(() {
-                                availableTimes = times;
-                                isLoading = false;
-                              });
-                            });
-                          }
-                        },
-                        monthViewSettings:
-                            const DateRangePickerMonthViewSettings(
-                          firstDayOfWeek: 1,
-                          showTrailingAndLeadingDates: true,
-                        ),
-                        headerStyle: const DateRangePickerHeaderStyle(
-                          textAlign: TextAlign.center,
-                          textStyle: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        children: [
-                          const Text("Increment: "),
-                          DropdownButton<int>(
-                            value: increment,
-                            items: [15, 30, 60].map((value) {
-                              return DropdownMenuItem<int>(
-                                value: value,
-                                child: Text("$value minutes"),
-                              );
-                            }).toList(),
-                            onChanged: (newValue) {
-                              if (newValue != null) {
-                                setModalState(() {
-                                  increment = newValue;
-                                  if (selectedDate != null) {
-                                    isLoading = true;
-                                    availableTimes = [];
-                                  }
-                                });
-                                if (selectedDate != null) {
-                                  _fetchAvailableTimes(
-                                          lessonId, selectedDate!, increment)
-                                      .then((times) {
-                                    setModalState(() {
-                                      availableTimes = times;
-                                      isLoading = false;
-                                    });
-                                  });
-                                }
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isLoading) const CircularProgressIndicator(),
-                    if (!isLoading && availableTimes.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 2,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
-                          itemCount: availableTimes.length,
-                          itemBuilder: (context, index) {
-                            String timeStr = availableTimes[index];
-                            return InkWell(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext dialogContext) {
-                                    return StatefulBuilder(
-                                      builder: (BuildContext dialogContext,
-                                          StateSetter setDialogState) {
-                                        return AlertDialog(
-                                          title:
-                                              const Text("Confirm Reschedule"),
-                                          content: SizedBox(
-                                            height: 80,
-                                            child: Center(
-                                              child: isScheduling
-                                                  ? const CircularProgressIndicator()
-                                                  : Text(
-                                                      "Reschedule lesson to ${DateFormat('d MMM yyyy').format(selectedDate!).toLowerCase()} at $timeStr?",
-                                                    ),
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: isScheduling
-                                                  ? null
-                                                  : () => Navigator.of(
-                                                          dialogContext)
-                                                      .pop(),
-                                              child: const Text("Cancel"),
-                                            ),
-                                            TextButton(
-                                              onPressed: isScheduling
-                                                  ? null
-                                                  : () {
-                                                      setDialogState(() {
-                                                        isScheduling = true;
-                                                      });
-                                                      _schedulePrivateLesson(
-                                                              lessonId,
-                                                              selectedDate!,
-                                                              timeStr)
-                                                          .then((errorMessage) {
-                                                        setDialogState(() {
-                                                          isScheduling = false;
-                                                        });
-                                                        if (errorMessage ==
-                                                            null) {
-                                                          Navigator.of(
-                                                                  dialogContext)
-                                                              .pop();
-                                                          Navigator.of(context)
-                                                              .pop();
-                                                          fetchData();
-                                                          ScaffoldMessenger.of(
-                                                                  parentContext)
-                                                              .showSnackBar(
-                                                                  const SnackBar(
-                                                                      content: Text(
-                                                                          "Lesson successfully scheduled")));
-                                                        } else {
-                                                          Navigator.of(
-                                                                  dialogContext)
-                                                              .pop();
-                                                          ScaffoldMessenger.of(
-                                                                  parentContext)
-                                                              .showSnackBar(SnackBar(
-                                                                  content: Text(
-                                                                      errorMessage)));
-                                                        }
-                                                      });
-                                                    },
-                                              child: isScheduling
-                                                  ? const SizedBox(
-                                                      width: 20,
-                                                      height: 20,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                              strokeWidth: 2),
-                                                    )
-                                                  : const Text("Confirm"),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    );
-                                  },
-                                );
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  timeStr,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            );
+        return ScheduleLessonModal(
+          lessonId: lessonId,
+          expirationDate: lesson['expiration_date'],
+          schoolScheduleTimeLimit: schoolScheduleTimeLimit,
+          currentRole: currentRole,
+          fetchAvailableTimes: _fetchAvailableTimes,
+          schedulePrivateLesson: _schedulePrivateLesson,
+          onScheduleConfirmed: () {
+            fetchData();
           },
         );
       },
@@ -1127,7 +906,8 @@ class _HomePageState extends State<HomePage> {
               // Wrap the calendar icon in its own InkWell.
               InkWell(
                 onTap: () {
-                  if (unschedulableLessons.contains(lesson['lesson_id'].toString())) {
+                  if (unschedulableLessons
+                      .contains(lesson['lesson_id'].toString())) {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -1544,29 +1324,68 @@ class _HomePageState extends State<HomePage> {
     // Build the Lessons tab using custom toggle buttons.
     Widget lessonsTab = Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildToggleButton(
-              label: "Active",
-              isActive: _lessonsActiveTabIndex == 0,
-              onPressed: () {
+        // Replace the two ElevatedButtons with a ToggleButtons widget.
+        // Lessons Toggle Buttons
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ToggleButtons(
+              borderRadius: BorderRadius.circular(16),
+              isSelected: [
+                _lessonsActiveTabIndex == 0,
+                _lessonsActiveTabIndex == 1,
+              ],
+              onPressed: (int index) {
                 setState(() {
-                  _lessonsActiveTabIndex = 0;
+                  _lessonsActiveTabIndex = index;
                 });
               },
+              selectedColor: Colors.white,
+              fillColor: Colors.orange,
+              color: Colors.orange,
+              borderColor: Colors.orange,
+              borderWidth: 2.0,
+              selectedBorderColor: Colors.orange,
+              constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_lessonsActiveTabIndex == 0)
+                        const Icon(Icons.check, color: Colors.black, size: 16),
+                      if (_lessonsActiveTabIndex == 0) const SizedBox(width: 4),
+                      const Text(
+                        "Active",
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_lessonsActiveTabIndex == 1)
+                        const Icon(Icons.check, color: Colors.black, size: 16),
+                      if (_lessonsActiveTabIndex == 1) const SizedBox(width: 4),
+                      const Text(
+                        "History",
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            _buildToggleButton(
-              label: "History",
-              isActive: _lessonsActiveTabIndex == 1,
-              onPressed: () {
-                setState(() {
-                  _lessonsActiveTabIndex = 1;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 8),
         Expanded(
@@ -1688,32 +1507,70 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    // Build the Packs tab using custom toggle buttons.
+    // Build the Packs tab using ToggleButtons.
     Widget packsTab = Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildToggleButton(
-              label: "Active",
-              isActive: _packsActiveTabIndex == 0,
-              onPressed: () {
+        // Packs Toggle Buttons
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ToggleButtons(
+              borderRadius: BorderRadius.circular(16),
+              isSelected: [
+                _packsActiveTabIndex == 0,
+                _packsActiveTabIndex == 1,
+              ],
+              onPressed: (int index) {
                 setState(() {
-                  _packsActiveTabIndex = 0;
+                  _packsActiveTabIndex = index;
                 });
               },
+              selectedColor: Colors.white,
+              fillColor: Colors.orange,
+              color: Colors.orange,
+              borderColor: Colors.orange,
+              borderWidth: 2.0,
+              selectedBorderColor: Colors.orange,
+              constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_packsActiveTabIndex == 0)
+                        const Icon(Icons.check, color: Colors.black, size: 16),
+                      if (_packsActiveTabIndex == 0) const SizedBox(width: 4),
+                      const Text(
+                        "Active",
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_packsActiveTabIndex == 1)
+                        const Icon(Icons.check, color: Colors.black, size: 16),
+                      if (_packsActiveTabIndex == 1) const SizedBox(width: 4),
+                      const Text(
+                        "History",
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            _buildToggleButton(
-              label: "History",
-              isActive: _packsActiveTabIndex == 1,
-              onPressed: () {
-                setState(() {
-                  _packsActiveTabIndex = 1;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 8),
         Expanded(
@@ -1831,7 +1688,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
-
     // Stats tab remains unchanged.
     Widget statsTab = (currentRole == "Admin" || currentRole == "Instructor")
         ? _isLoading

@@ -1,12 +1,9 @@
+# progress/urls.py
 from django.urls import path
-from .views import (
-    ProgressRecordListCreateAPIView,
-    ProgressReportLatestAPIView,
-    ProgressReportGenerateAPIView
-)
+from .views import progress_record_detail, progress_records_list, progress_reports_list
 
 urlpatterns = [
-    path('records/', ProgressRecordListCreateAPIView.as_view(), name='progress-records'),
-    path('reports/latest/', ProgressReportLatestAPIView.as_view(), name='progress-report-latest'),
-    path('reports/generate/', ProgressReportGenerateAPIView.as_view(), name='progress-report-generate'),
+    path('record/<int:lesson_id>/', progress_record_detail, name='progress-record-detail'),
+    path('records/', progress_records_list, name='progress-records-list'),
+    path('reports/', progress_reports_list, name='progress-reports-list'),
 ]

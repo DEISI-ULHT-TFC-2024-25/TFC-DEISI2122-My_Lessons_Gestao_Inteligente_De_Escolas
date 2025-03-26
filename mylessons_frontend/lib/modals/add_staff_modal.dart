@@ -81,7 +81,6 @@ class _AddStaffModalState extends State<AddStaffModal> {
       );
       if (response.statusCode == 200) {
         print("Staff added successfully");
-        // Close the modal and return true so that the parent can refresh the school details.
         Navigator.pop(context, true);
       } else {
         print("Error adding staff: ${utf8.decode(response.bodyBytes)}");
@@ -93,14 +92,10 @@ class _AddStaffModalState extends State<AddStaffModal> {
 
   @override
   Widget build(BuildContext context) {
+    // Note: The outer widget (in showAddStaffModal) adds keyboard padding,
+    // so here we use fixed padding.
     return Padding(
-      // Extra padding around the entire modal.
-      padding: EdgeInsets.only(
-        left: 32.0,
-        right: 32.0,
-        top: 32.0,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 32.0,
-      ),
+      padding: const EdgeInsets.all(32.0),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min, // Wraps content height
@@ -148,14 +143,15 @@ class _AddStaffModalState extends State<AddStaffModal> {
                     children: [
                       Text("${foundUser!['email']}"),
                       const SizedBox(height: 8),
-                      Text("${foundUser!['first_name']} ${foundUser!['last_name']}"),
+                      Text(
+                          "${foundUser!['first_name']} ${foundUser!['last_name']}"),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Role selection checkboxes (no "Roles:" label).
+              // Role selection checkboxes.
               CheckboxListTile(
                 title: const Text("Admin"),
                 value: isAdmin,
@@ -194,7 +190,8 @@ class _AddStaffModalState extends State<AddStaffModal> {
                 style: ElevatedButton.styleFrom(
                   shape: const StadiumBorder(),
                   backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
                 ),
                 child: const Text("Add Staff",
                     style: TextStyle(color: Colors.black, fontSize: 16)),
@@ -215,36 +212,41 @@ Future<dynamic> showAddStaffModal(BuildContext context) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (BuildContext context) {
-      return DraggableScrollableSheet(
-        // The modal will start at 50% of screen height,
-        // can shrink to 30% and expand to a maximum of 90%.
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // The little draggable handle, now in orange.
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.orange,
-                      borderRadius: BorderRadius.circular(2),
+      // Wrap the draggable sheet in a Padding that uses viewInsets.bottom.
+      return Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: DraggableScrollableSheet(
+          // The modal will start at 50% of the screen height,
+          // can shrink to 30% and expand to a maximum of 90%.
+          initialChildSize: 0.9,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // The little draggable handle, now in orange.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const AddStaffModal(),
-              ],
-            ),
-          );
-        },
+                  const AddStaffModal(),
+                ],
+              ),
+            );
+          },
+        ),
       );
     },
   );
