@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../pages/create_new_skill_page.dart';
+import "../services/api_service.dart";
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 /// A modified goal creation content widget without the target date field,
 /// for use inside the progress modal.
@@ -9,37 +12,66 @@ class CreateNewGoalModalContent extends StatefulWidget {
   final dynamic student;
   final VoidCallback? onSwitchToSkill;
   final dynamic lesson;
-  const CreateNewGoalModalContent({Key? key, required this.student, this.onSwitchToSkill, required this.lesson}) : super(key: key);
+  const CreateNewGoalModalContent({
+    Key? key,
+    required this.student,
+    this.onSwitchToSkill,
+    required this.lesson,
+  }) : super(key: key);
 
   @override
-  _CreateNewGoalModalContentState createState() => _CreateNewGoalModalContentState();
+  _CreateNewGoalModalContentState createState() =>
+      _CreateNewGoalModalContentState();
 }
 
 class _CreateNewGoalModalContentState extends State<CreateNewGoalModalContent> {
   final _formKey = GlobalKey<FormState>();
 
-  // Dummy list of skills; replace with API data if needed.
-  final List<dynamic> skills = [
-    {'id': 1, 'name': 'Dribbling'},
-    {'id': 2, 'name': 'Passing'},
-  ];
+  List<dynamic> skills = [];
+  bool isLoadingSkills = true;
   dynamic selectedSkill;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchSkills();
+  }
+
+  Future<void> fetchSkills() async {
+    try {
+      // Assuming widget.lesson contains a "subject_id" key.
+      int subjectId = widget.lesson["subject_id"];
+      final fetchedSkills = await getSkillForASubject(subjectId);
+      setState(() {
+        skills = fetchedSkills;
+        isLoadingSkills = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingSkills = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching skills: $e')),
+      );
+    }
+  }
 
   Future<void> _saveGoal() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
-      // Build payload WITHOUT target date.
+      // Build payload with required fields.
       final payload = {
         'student_id': widget.student['id'],
         'skill_id': selectedSkill['id'],
+        'description': '', // Default description; update if needed.
+        'target_date': DateFormat('yyyy-MM-dd')
+            .format(DateTime.now()), // Using today's date.
       };
       try {
-        // Call API to create goal.
-        await Future.delayed(const Duration(seconds: 1)); // Dummy delay
-        // Replace with actual API call.
+        await createGoal(payload); // Call the API to create the goal.
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Goal created successfully')),
         );
@@ -62,6 +94,10 @@ class _CreateNewGoalModalContentState extends State<CreateNewGoalModalContent> {
 
   @override
   Widget build(BuildContext context) {
+    // Show a loading spinner while fetching skills.
+    if (isLoadingSkills) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: _isLoading
@@ -90,7 +126,7 @@ class _CreateNewGoalModalContentState extends State<CreateNewGoalModalContent> {
                         value == null ? 'Please select a skill' : null,
                   ),
                   const SizedBox(height: 8),
-                  // New "Create New Skill" action as text.
+                  // "Create New Skill" action as text.
                   Align(
                     alignment: Alignment.center,
                     child: TextButton.icon(
@@ -119,7 +155,9 @@ class _CreateNewGoalModalContentState extends State<CreateNewGoalModalContent> {
 class ProgressGoalModal extends StatefulWidget {
   final dynamic student;
   final dynamic lesson;
-  const ProgressGoalModal({Key? key, required this.student, required this.lesson}) : super(key: key);
+  const ProgressGoalModal(
+      {Key? key, required this.student, required this.lesson})
+      : super(key: key);
 
   @override
   _ProgressGoalModalState createState() => _ProgressGoalModalState();
@@ -163,8 +201,8 @@ class _ProgressGoalModalState extends State<ProgressGoalModal> {
                   },
                 )
               : CreateNewSkillPage(
-                lesson: widget.lesson,
-              ),
+                  lesson: widget.lesson,
+                ),
         ),
       ),
     );

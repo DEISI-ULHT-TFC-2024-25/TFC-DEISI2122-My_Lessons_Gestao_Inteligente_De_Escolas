@@ -5,32 +5,32 @@ from django.utils.timezone import now
 from rest_framework.decorators import api_view
 from rest_framework import status
 
-from .models import Skill, SkillProficiency, Goal, ProgressRecord, ProgressReport
+from .models import Skill, Goal, ProgressRecord, ProgressReport
 from users.models import Student
 
+
 @api_view(['GET'])
-def get_skill_proficiencies(request):
+def get_active_goals(request, student_id):
     """
-    Returns a list of skill proficiencies for the provided student.
-    Expects a 'student_id' query parameter.
+    Returns a list of skills for a given subject.
+    The URL should pass the subject_id as part of the route.
     """
-    student_id = request.query_params.get('student_id')
-    if not student_id:
-        return JsonResponse({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    student = get_object_or_404(Student, pk=student_id)
-    proficiencies = SkillProficiency.objects.filter(student=student)
-    
+    if student_id is None:
+        return JsonResponse({'error': 'student_id not provided'}, status=status.HTTP_400_BAD_REQUEST)
+    # Example: filtering by a foreign key relation 'sport' (subject)
+    goals = Goal.objects.filter(student__id=student_id)
     data = []
-    for prof in proficiencies:
+    for goal in goals:
         data.append({
-            'id': prof.id,
-            'skill': prof.skill.name,
-            'level': prof.level,
-            'last_updated': prof.last_updated.isoformat(),
+            'id': goal.id,
+            'skill_name': goal.skill.name,
+            'skill_id': goal.skill.id,
+            'subject': str(goal.skill.sport) if goal.skill.sport else None,
+            'level': goal.level,
+            'start_datetime': str(goal.start_datetime),
+            'last_updated': (goal.last_updated) if goal.last_updated else None,
         })
     return JsonResponse(data, safe=False, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 def get_skills_for_subject(request, subject_id):
@@ -52,9 +52,9 @@ def get_skills_for_subject(request, subject_id):
 
 
 @api_view(['POST'])
-def update_skill_proficiency_level(request, student_id, proficiency_id):
+def update_goal_level(request, goal_id):
     """
-    Updates the level of a skill proficiency.
+    Updates the level of a goal.
     Expects a JSON body with a 'level' field.
     """
     level = request.data.get('level')
@@ -69,16 +69,16 @@ def update_skill_proficiency_level(request, student_id, proficiency_id):
         return JsonResponse({'error': 'Invalid level provided'}, status=status.HTTP_400_BAD_REQUEST)
     
     # Ensure the proficiency belongs to the student.
-    proficiency = get_object_or_404(SkillProficiency, pk=proficiency_id, student__id=student_id)
-    proficiency.level = level
-    proficiency.last_updated = now()
-    proficiency.save()
+    goal = get_object_or_404(Goal, pk=goal_id)
+    goal.level = level
+    goal.last_updated = now()
+    goal.save()
     
     data = {
-        'id': proficiency.id,
-        'skill': proficiency.skill.name,
-        'level': proficiency.level,
-        'last_updated': proficiency.last_updated.isoformat(),
+        'id': goal.id,
+        'skill': goal.skill.name,
+        'level': goal.level,
+        'last_updated': goal.last_updated.isoformat(),
     }
     return JsonResponse(data, status=status.HTTP_200_OK)
 
@@ -122,21 +122,17 @@ def create_goal(request):
     """
     student_id = request.data.get('student_id')
     skill_id = request.data.get('skill_id')
-    description = request.data.get('description', '')
-    target_date_str = request.data.get('target_date')
     
-    if not (student_id and skill_id and target_date_str):
+    
+    if not (student_id and skill_id):
         return JsonResponse({'error': 'student_id, skill_id, and target_date are required'},
                             status=status.HTTP_400_BAD_REQUEST)
     
     student = get_object_or_404(Student, pk=student_id)
     skill = get_object_or_404(Skill, pk=skill_id)
-    target_date = parse_date(target_date_str)
-    if not target_date:
-        return JsonResponse({'error': 'Invalid date format. Use YYYY-MM-DD.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+   
     
-    goal = Goal(student=student, skill=skill, description=description, target_date=target_date)
+    goal = Goal(student=student, skill=skill, level=0)
     try:
         goal.save()
     except Exception as e:
@@ -146,9 +142,8 @@ def create_goal(request):
         'id': goal.id,
         'student': goal.student.id,
         'skill': goal.skill.name,
-        'description': goal.description,
-        'target_date': goal.target_date.isoformat(),
         'is_completed': goal.is_completed,
+        'level': goal.level,
     }
     return JsonResponse(data, status=status.HTTP_201_CREATED)
 

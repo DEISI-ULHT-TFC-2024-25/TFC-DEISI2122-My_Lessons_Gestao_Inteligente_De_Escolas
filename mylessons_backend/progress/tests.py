@@ -5,7 +5,7 @@ from schools.models import School
 from users.models import Instructor, Student, UserAccount
 from lessons.models import Lesson
 from sports.models import Sport
-from .models import Skill, SkillProficiency, Goal, ProgressRecord, ProgressReport
+from .models import Skill, Goal, ProgressRecord, ProgressReport
 
 class SkillModelTests(TestCase):
 
@@ -17,20 +17,6 @@ class SkillModelTests(TestCase):
         self.assertEqual(self.skill.name, "Ollie")
         self.assertEqual(self.skill.sport, self.sport)
         self.assertEqual(self.skill.description, "Jump with the skateboard.")
-
-class SkillProficiencyTests(TestCase):
-
-    def setUp(self):
-        user = UserAccount.objects.create(username="test_student")
-        self.student = Student.objects.create(user=user, level=1, birthday=date(2000, 1, 1))
-        self.sport = Sport.objects.create(name="Skateboarding")
-        self.skill = Skill.objects.create(name="Ollie", sport=self.sport)
-        self.proficiency = SkillProficiency.objects.create(student=self.student, skill=self.skill, level=2)
-
-    def test_update_level(self):
-        self.proficiency.update_level(4)
-        self.assertEqual(self.proficiency.level, 4)
-        self.assertAlmostEqual(self.proficiency.last_updated, now().date())
 
 class GoalTests(TestCase):
 
@@ -68,7 +54,7 @@ class ProgressRecordTests(TestCase):
         self.student = Student.objects.create(user=user, level=1, birthday=date(2000, 1, 1))
         self.sport = Sport.objects.create(name="Skateboarding")
         self.skill = Skill.objects.create(name="Manual", sport=self.sport)
-        self.proficiency = SkillProficiency.objects.create(student=self.student, skill=self.skill)
+        self.goasl = Goal.objects.create(student=self.student, skill=self.skill)
         self.private_class = Lesson.objects.create(
             date=date(2025,1,2),
             start_time=time(12, 0),
@@ -83,8 +69,8 @@ class ProgressRecordTests(TestCase):
         self.record = ProgressRecord.objects.create(student=self.student, lesson=self.private_class)
 
     def test_add_covered_skill(self):
-        self.record.add_covered_skill(self.proficiency)
-        self.assertIn(self.proficiency, self.record.skills.all())
+        self.record.add_covered_skill(self.goal)
+        self.assertIn(self.goal, self.record.skills.all())
 
     def test_update_notes(self):
         notes = "Improved balance and control."

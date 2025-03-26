@@ -12,26 +12,15 @@ class Skill(models.Model):
     def __str__(self):
         return f"{self.name} ({self.sport})"
 
-class SkillProficiency(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="skill_proficiencies")
-    skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name="proficiencies")
-    level = models.PositiveIntegerField(default=1)  # Example: 1 = Beginner, 5 = Expert
-    last_updated = models.DateField(auto_now=True)
-
-    def update_level(self, level):
-        self.level = level
-        self.last_updated = now()
-        self.save()
-
-    def __str__(self):
-        return f"{self.student} - {self.skill.name}: Level {self.level}"
 
 class Goal(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="goals")
     skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name="goals")
     description = models.TextField()
-    start_date = models.DateField(auto_now_add=True, null=True, blank=True)
+    start_datetime = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     target_date = models.DateField()
+    level = models.PositiveIntegerField(default=1)  # Example: 1 = Beginner, 5 = Expert
+    last_updated = models.DateTimeField(auto_now=True)
     is_completed = models.BooleanField(default=False)
     completed_date = models.DateField(null=True, blank=True)
 
@@ -49,6 +38,12 @@ class Goal(models.Model):
         if new_date > self.target_date:
             self.target_date = new_date
             self.save()
+            
+    def update_level(self, level):
+        self.level = level
+        self.last_updated = now()
+        self.save()
+
 
     @classmethod
     def get_active_goals(cls, student):
@@ -68,7 +63,7 @@ class ProgressRecord(models.Model):
         blank=True
     )
     date = models.DateField(auto_now_add=True)
-    skills = models.ManyToManyField(SkillProficiency, related_name="progress_records", blank=True)
+    goals = models.ManyToManyField(Goal, related_name="progress_records", blank=True)
     notes = models.TextField(blank=True, null=True)
 
     def add_covered_skill(self, skill):

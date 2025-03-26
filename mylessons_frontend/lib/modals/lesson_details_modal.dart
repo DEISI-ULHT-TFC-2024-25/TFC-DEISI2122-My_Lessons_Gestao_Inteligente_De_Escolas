@@ -128,6 +128,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
         final location = details['location_name'] ?? '';
         final activity = details['subject'] ?? '';
         final isDone = details['is_done'];
+        final lesson = details;
 
         List<Map<String, dynamic>> gridItems = [];
         Map<String, IconData> leftIconMapping = {};
@@ -527,7 +528,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                           MaterialPageRoute(
                             builder: (context) => ProgressHubPage(
                               student: selectedStudent,
-                              lesson: widget.lesson,
+                              lesson: lesson,
                             ),
                           ),
                         );

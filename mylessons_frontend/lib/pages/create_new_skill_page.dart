@@ -32,10 +32,8 @@ class _CreateNewSkillPageState extends State<CreateNewSkillPage> {
       final payload = {
         'name': _skillNameController.text,
         'description': _descriptionController.text,
-        'sport_id': widget.lesson?["subject_id"],
+        'sport_id': widget.lesson["subject_id"],
       };
-      print(payload);
-      print(widget.lesson);
       try {
         await ApiService.createSkill(payload);
         ScaffoldMessenger.of(context).showSnackBar(
