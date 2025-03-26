@@ -8,14 +8,13 @@ import '../services/api_service.dart';
 import 'students_modal.dart';
 import 'subject_modal.dart'; // Make sure this file exports SubjectModal
 import 'location_modal.dart'; // Make sure this file exports LocationModal
-
-// Import the Class Progress Page.
-import 'package:mylessons_frontend/pages/progress_class_page.dart';
+import 'package:mylessons_frontend/pages/progress_hub_page.dart'; // NEW: Import the Progress Hub Page
 
 class LessonDetailsModal extends StatefulWidget {
   final dynamic lesson;
   final String currentRole;
-  final Future<void> Function() fetchData; // Callback to refresh the whole home page
+  final Future<void> Function()
+      fetchData; // Callback to refresh the whole home page
 
   const LessonDetailsModal({
     super.key,
@@ -106,8 +105,8 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             ),
           );
         }
-
         final details = snapshot.data!;
+
         // Compute merged/simplified values.
         final date = details['date'] ?? '';
         final startTime = details['start_time'] ?? '';
@@ -148,6 +147,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             {'label': 'School', 'value': school},
             {'label': 'Location', 'value': location},
           ];
+
           leftIconMapping = {
             'Date': Icons.calendar_today,
             'Time': Icons.access_time,
@@ -160,6 +160,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'School': Icons.school,
             'Location': Icons.location_on,
           };
+
           labelsWithAction = ['Extras', 'Instructors', 'School', 'Location'];
           actionIconMapping = {
             'Extras': Icons.edit,
@@ -188,6 +189,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             {'label': 'School', 'value': school},
             {'label': 'Location', 'value': location},
           ];
+
           leftIconMapping = {
             'Date': Icons.calendar_today,
             'Time': Icons.access_time,
@@ -201,6 +203,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'School': Icons.school,
             'Location': Icons.location_on,
           };
+
           labelsWithAction = [
             'Is Done',
             'Students',
@@ -221,6 +224,7 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
             'School': Icons.phone,
             'Location': Icons.edit,
           };
+
           actionNoteMapping = {
             'Date': 'Edit date',
             'Time': 'Edit time',
@@ -478,30 +482,69 @@ class _LessonDetailsModalState extends State<LessonDetailsModal> {
                   },
                 ),
                 const SizedBox(height: 16),
-                // ----------------- New Button to view Class Progress -----------------
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ClassProgressPage(lesson: widget.lesson, currentRole: widget.currentRole,),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                // NEW: Manage Progress Card
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text("View Class Progress",
-                      style: GoogleFonts.lato(color: Colors.white)),
+                  child: ListTile(
+                    leading: const Icon(Icons.dashboard, color: Colors.orange),
+                    title: Text(
+                      "Manage Progress",
+                      style: GoogleFonts.lato(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: const Text("Update progress, skills, and goals"),
+                    onTap: () async {
+                      // Retrieve a list of students from the lesson details.
+                      // Here we assume details has a field 'students_list'.
+                      List<dynamic> studentsList = details['students_list'] ?? [];
+                      if (studentsList.isEmpty) {
+                        // If no proper list, fallback to use the 'students' string.
+                        studentsList = [
+                          {'id': 1, 'name': students.toString()}
+                        ];
+                      }
+                      dynamic selectedStudent;
+                      if (studentsList.length > 1) {
+                        selectedStudent = await showDialog(
+                          context: context,
+                          builder: (context) {
+                            return SimpleDialog(
+                              title: const Text("Select a Student"),
+                              children: studentsList
+                                  .map((student) => SimpleDialogOption(
+                                        onPressed: () {
+                                          Navigator.pop(context, student);
+                                        },
+                                        child: Text(student['name']),
+                                      ))
+                                  .toList(),
+                            );
+                          },
+                        );
+                      } else {
+                        selectedStudent = studentsList.first;
+                      }
+                      if (selectedStudent != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProgressHubPage(
+                              student: selectedStudent,
+                              lesson: widget.lesson,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child:
-                        const Text("Close", selectionColor: Colors.orange),
+                    child: const Text("Close", selectionColor: Colors.orange),
                   ),
                 ),
               ],
