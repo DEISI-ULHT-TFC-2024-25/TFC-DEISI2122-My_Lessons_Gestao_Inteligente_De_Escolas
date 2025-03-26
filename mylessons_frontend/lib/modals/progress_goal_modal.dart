@@ -8,7 +8,8 @@ import '../pages/create_new_skill_page.dart';
 class CreateNewGoalModalContent extends StatefulWidget {
   final dynamic student;
   final VoidCallback? onSwitchToSkill;
-  const CreateNewGoalModalContent({Key? key, required this.student, this.onSwitchToSkill}) : super(key: key);
+  final dynamic lesson;
+  const CreateNewGoalModalContent({Key? key, required this.student, this.onSwitchToSkill, required this.lesson}) : super(key: key);
 
   @override
   _CreateNewGoalModalContentState createState() => _CreateNewGoalModalContentState();
@@ -117,7 +118,8 @@ class _CreateNewGoalModalContentState extends State<CreateNewGoalModalContent> {
 /// and creating a new skill.
 class ProgressGoalModal extends StatefulWidget {
   final dynamic student;
-  const ProgressGoalModal({Key? key, required this.student}) : super(key: key);
+  final dynamic lesson;
+  const ProgressGoalModal({Key? key, required this.student, required this.lesson}) : super(key: key);
 
   @override
   _ProgressGoalModalState createState() => _ProgressGoalModalState();
@@ -132,7 +134,7 @@ class _ProgressGoalModalState extends State<ProgressGoalModal> {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: Container(
-        height: MediaQuery.of(context).size.height * 0.5,
+        height: MediaQuery.of(context).size.height * 0.9,
         child: Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
@@ -153,13 +155,16 @@ class _ProgressGoalModalState extends State<ProgressGoalModal> {
           body: showGoalContent
               ? CreateNewGoalModalContent(
                   student: widget.student,
+                  lesson: widget.lesson,
                   onSwitchToSkill: () {
                     setState(() {
                       showGoalContent = false;
                     });
                   },
                 )
-              : const CreateNewSkillPage(),
+              : CreateNewSkillPage(
+                lesson: widget.lesson,
+              ),
         ),
       ),
     );

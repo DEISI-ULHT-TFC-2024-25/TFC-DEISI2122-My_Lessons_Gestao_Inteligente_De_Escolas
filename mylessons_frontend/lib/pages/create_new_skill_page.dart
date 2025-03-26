@@ -5,7 +5,8 @@ import '../services/api_service.dart';
 import '../services/api_service.dart' as ApiService;
 
 class CreateNewSkillPage extends StatefulWidget {
-  const CreateNewSkillPage({Key? key}) : super(key: key);
+  final dynamic lesson;
+  const CreateNewSkillPage({Key? key, this.lesson}) : super(key: key);
 
   @override
   _CreateNewSkillPageState createState() => _CreateNewSkillPageState();
@@ -21,7 +22,6 @@ class _CreateNewSkillPageState extends State<CreateNewSkillPage> {
     {'id': 1, 'name': 'Basketball'},
     {'id': 2, 'name': 'Soccer'},
   ];
-  dynamic selectedSport;
   bool _isLoading = false;
 
   Future<void> _saveSkill() async {
@@ -32,8 +32,9 @@ class _CreateNewSkillPageState extends State<CreateNewSkillPage> {
       final payload = {
         'name': _skillNameController.text,
         'description': _descriptionController.text,
-        'sport_id': selectedSport != null ? selectedSport['id'] : null,
+        'sport_id': widget.lesson?["subject_id"],
       };
+      print(payload);
       try {
         await ApiService.createSkill(payload);
         ScaffoldMessenger.of(context).showSnackBar(

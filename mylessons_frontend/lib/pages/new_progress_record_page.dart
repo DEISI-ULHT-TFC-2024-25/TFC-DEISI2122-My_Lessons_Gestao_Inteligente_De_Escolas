@@ -7,7 +7,8 @@ import '../modals/progress_goal_modal.dart';
 
 class NewProgressRecordPage extends StatefulWidget {
   final dynamic student; // Pass the selected student
-  const NewProgressRecordPage({Key? key, required this.student})
+  final dynamic lesson;
+  const NewProgressRecordPage({Key? key, required this.student, required this.lesson})
       : super(key: key);
 
   @override
@@ -188,7 +189,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                             ),
-                            builder: (context) => ProgressGoalModal(student: widget.student),
+                            builder: (context) => ProgressGoalModal(student: widget.student, lesson: widget.lesson),
                           );
                           // After closing the modal, refresh active goals.
                           fetchActiveGoals();

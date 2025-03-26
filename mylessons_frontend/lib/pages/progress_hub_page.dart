@@ -55,7 +55,7 @@ class ProgressHubPage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => NewProgressRecordPage(student: student),
+                  builder: (context) => NewProgressRecordPage(student: student, lesson: lesson),
                 ),
               );
             },

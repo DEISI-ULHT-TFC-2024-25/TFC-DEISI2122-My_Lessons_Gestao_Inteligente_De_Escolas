@@ -283,6 +283,7 @@ def lesson_details(request, id):
             "school_id": lesson.school.id if lesson.school else "Unknown",
             "pack_id": lesson.pack.id if lesson.pack else "Unknown",
             "subject": lesson.sport.name if lesson.sport else "Unknown",
+            "subject_id": lesson.sport.id if lesson.sport else "Unknown",
         }
     return Response(data)
 
