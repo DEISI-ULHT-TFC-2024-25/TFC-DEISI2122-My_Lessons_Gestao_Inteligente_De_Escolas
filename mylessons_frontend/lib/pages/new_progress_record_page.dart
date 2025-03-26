@@ -90,7 +90,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
         }
 
         final payload = {
-          'lesson_id': selectedLesson['id'],
+          'lesson_id': widget.lesson['lesson_id'],
           'date': DateFormat('yyyy-MM-dd').format(recordDate),
           'notes': _notesController.text,
           'student_id': widget.student['id'],
