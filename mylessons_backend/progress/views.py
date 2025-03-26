@@ -160,7 +160,8 @@ def create_progress_record(request):
       - optionally 'lesson_id' and 'notes'
       - 'goals': a list of dictionaries with 'goal_id' and 'progress'
     For each goal provided, if the new progress (i.e. new level) differs from the current level,
-    the goal’s update_level method is called, and the goal is linked to the progress record.
+    the view will update the level and, if needed, mark the goal as completed (if new level is 5)
+    or uncompleted (if new level changes from 5 to another value).
     """
     student_id = request.data.get('student_id')
     if not student_id:
@@ -173,7 +174,7 @@ def create_progress_record(request):
     # Create the progress record.
     progress_record = ProgressRecord(student=student, notes=notes)
     if lesson_id:
-        from lessons.models import Lesson
+        from lessons.models import Lesson  # Import Lesson model.
         progress_record.lesson = get_object_or_404(Lesson, pk=lesson_id)
     
     try:
@@ -184,7 +185,6 @@ def create_progress_record(request):
     # Process and update goals if provided.
     goals_data = request.data.get('goals')
     if goals_data:
-        from progress.models import Goal  # Import the Goal model.
         goal_ids = []
         for goal_data in goals_data:
             goal_id = goal_data.get('goal_id')
@@ -193,13 +193,25 @@ def create_progress_record(request):
                 continue
             try:
                 goal_instance = Goal.objects.get(pk=goal_id)
-                # Update the goal level if needed using the model's method.
-                if goal_instance.level != new_level:
-                    goal_instance.update_level(int(new_level))
+                new_level_int = int(new_level)
+                # Only update if there's an actual change.
+                if goal_instance.level != new_level_int:
+                    # If the new level is 5 and the old level isn't, mark as completed.
+                    if new_level_int == 5 and goal_instance.level != 5:
+                        goal_instance.level = new_level_int
+                        goal_instance.mark_completed()
+                    # If the old level was 5 and the new level is not 5, mark as uncompleted.
+                    elif goal_instance.level == 5 and new_level_int != 5:
+                        goal_instance.level = new_level_int
+                        goal_instance.mark_uncompleted()
+                    else:
+                        goal_instance.level = new_level_int
+                        goal_instance.last_updated = now()
+                        goal_instance.save()
                 goal_ids.append(goal_instance.id)
             except Goal.DoesNotExist:
                 continue
-        # Associate the goals with the progress record.
+        # Associate the updated goals with the progress record.
         progress_record.goals.set(goal_ids)
     
     data = {
@@ -210,7 +222,6 @@ def create_progress_record(request):
         'notes': progress_record.notes,
     }
     return JsonResponse(data, status=status.HTTP_201_CREATED)
-
 
 
 @api_view(['PUT'])
