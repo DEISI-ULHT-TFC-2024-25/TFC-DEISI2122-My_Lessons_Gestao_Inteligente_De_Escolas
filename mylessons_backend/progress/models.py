@@ -40,17 +40,24 @@ class Goal(models.Model):
             self.save()
             
     def update_level(self, new_level):
+        # Only proceed if the new level is different.
+        if new_level == self.level:
+            return
+
         old_level = self.level
         self.level = new_level
         self.last_updated = now()
+
+        # If the new level is 5 and the old level was not, mark as completed.
         if old_level != 5 and new_level == 5:
-            # Level changed to 5: mark goal as completed.
-            self.mark_completed()
+            self.is_completed = True
+            self.completed_date = now().date()
+        # If the old level was 5 and the new level is not 5, mark as uncompleted.
         elif old_level == 5 and new_level != 5:
-            # Level changed from 5: mark goal as uncompleted.
-            self.mark_uncompleted()
-        else:
-            self.save()
+            self.is_completed = False
+            self.completed_date = None
+
+        self.save()
 
 
     @classmethod
