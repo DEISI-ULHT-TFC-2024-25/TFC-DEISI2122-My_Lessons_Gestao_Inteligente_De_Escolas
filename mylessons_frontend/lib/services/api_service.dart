@@ -245,18 +245,19 @@ Future<int> fetchSchoolScheduleTimeLimit(schoolName) async {
 
 
 
+
 // ==================== New API Functions for Flutter Frontend ====================
 
 /// Fetches the list of skill proficiencies for the current user.
-Future<List<dynamic>> getSkillProficiencies() async {
+Future<List<dynamic>> getActiveGoals(int studentId) async {
   final headers = await getAuthHeaders();
-  final url = '$baseUrl/api/progress/skill-proficiencies/';
+  final url = '$baseUrl/api/progress/active_goals/$studentId/';
   final response = await http.get(Uri.parse(url), headers: headers);
   if (response.statusCode == 200) {
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data;
   } else {
-    throw Exception("Failed to load skill proficiencies: ${response.statusCode}");
+    throw Exception("Failed to load active goals: ${response.statusCode}");
   }
 }
 
@@ -274,16 +275,16 @@ Future<List<dynamic>> getSkillForASubject(int subjectId) async {
 
 /// Updates a skill proficiency level.
 /// Sends a POST request to the custom action endpoint.
-Future<void> updateSkillProficiencyLevel(int proficiencyId, int newLevel, int studentId) async {
+Future<void> updateGoalLevel(int goalId, int newLevel) async {
   final headers = await getAuthHeaders();
-  final url = '$baseUrl/api/progress/skill-proficiencies/$studentId/$proficiencyId/update-level/';
+  final url = '$baseUrl/api/progress/goal/$goalId/update-level/';
   final response = await http.post(
     Uri.parse(url),
     headers: headers,
     body: jsonEncode({'level': newLevel}),
   );
   if (response.statusCode != 200) {
-    throw Exception("Failed to update skill proficiency level: ${response.statusCode}");
+    throw Exception("Failed to update goal level: ${response.statusCode}");
   }
 }
 
@@ -304,7 +305,7 @@ Future<void> createSkill(Map<String, dynamic> payload) async {
 /// Creates a new goal.
 Future<void> createGoal(Map<String, dynamic> payload) async {
   final headers = await getAuthHeaders();
-  final url = '$baseUrl/api/progress/goals/';
+  final url = '$baseUrl/api/progress/create_goal/';
   final response = await http.post(
     Uri.parse(url),
     headers: headers,

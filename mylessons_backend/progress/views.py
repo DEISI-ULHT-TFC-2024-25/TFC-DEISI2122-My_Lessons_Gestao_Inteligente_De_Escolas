@@ -130,9 +130,12 @@ def create_goal(request):
     
     student = get_object_or_404(Student, pk=student_id)
     skill = get_object_or_404(Skill, pk=skill_id)
-   
     
-    goal = Goal(student=student, skill=skill, level=0)
+    if not (student and skill):
+        return JsonResponse({'error': 'student or skill not found'},
+                            status=status.HTTP_400_BAD_REQUEST)
+   
+    goal = Goal(student=student, skill=skill)
     try:
         goal.save()
     except Exception as e:
