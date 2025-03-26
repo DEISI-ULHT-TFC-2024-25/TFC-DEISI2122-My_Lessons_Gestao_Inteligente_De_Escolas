@@ -7,7 +7,8 @@ import '../modals/progress_goal_modal.dart';
 class NewProgressRecordPage extends StatefulWidget {
   final dynamic student; // Pass the selected student
   final dynamic lesson;
-  const NewProgressRecordPage({Key? key, required this.student, required this.lesson})
+  const NewProgressRecordPage(
+      {Key? key, required this.student, required this.lesson})
       : super(key: key);
 
   @override
@@ -90,15 +91,15 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
         }
 
         final payload = {
-          'lesson_id': widget.lesson['lesson_id'],
-          'date': DateFormat('yyyy-MM-dd').format(recordDate),
-          'notes': _notesController.text,
           'student_id': widget.student['id'],
-          // Convert goalProgress map to a list of {goal_id, progress} items.
+          'lesson_id': widget
+              .lesson['id'], // Ensure this key exists in your lesson object.
+          'notes': _notesController.text,
           'goals': goalProgress.entries
               .map((e) => {'goal_id': e.key, 'progress': e.value})
               .toList(),
         };
+
         await ApiService.createProgressRecord(payload);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Progress record saved')),
@@ -192,7 +193,8 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                             context: context,
                             isScrollControlled: true,
                             shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                              borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(16)),
                             ),
                             builder: (context) => ProgressGoalModal(
                                 student: widget.student, lesson: widget.lesson),
