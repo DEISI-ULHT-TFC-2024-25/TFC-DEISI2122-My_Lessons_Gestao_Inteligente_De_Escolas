@@ -46,7 +46,8 @@ class _StudentsModalState extends State<StudentsModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: widget.manageProgress ? 1 : 2, vsync: this);
+    _tabController = TabController(
+        length: widget.manageProgress ? 1 : 2, vsync: this);
     fetchStudents();
   }
 
@@ -84,6 +85,10 @@ class _StudentsModalState extends State<StudentsModal>
           setState(() {
             students = associatedStudents;
           });
+          // If there's only one student, automatically return it.
+          if (students.length == 1) {
+            Navigator.pop(context, students[0]);
+          }
         } else {
           // Mark each student as selected if its id appears in associatedStudents.
           final Set<dynamic> associatedIds =
@@ -285,38 +290,33 @@ class _StudentsModalState extends State<StudentsModal>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Modal Header.
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Select or Create Student",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // TabBar.
-          TabBar(
-            controller: _tabController,
-            labelColor: Colors.black,
-            indicatorColor: Colors.orange,
-            tabs: widget.manageProgress
-                ? const [Tab(text: "Select Existing")]
-                : const [
-                    Tab(text: "Select Existing"),
-                    Tab(text: "Create New"),
+          widget.manageProgress
+              ? Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: const Text(
+                    "Select Student",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Select or Create Student",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ],
-          ),
+                ),
           const SizedBox(height: 8),
-          // Tab Content.
-          SizedBox(
-            height: 300,
-            child: widget.manageProgress
-                ? ListView.builder(
+          // If not in manageProgress mode, display TabBar and TabBarView.
+          widget.manageProgress
+              ? SizedBox(
+                  height: 300,
+                  child: ListView.builder(
                     itemCount: students.length,
                     itemBuilder: (context, index) {
                       final student = students[index];
@@ -337,112 +337,131 @@ class _StudentsModalState extends State<StudentsModal>
                         ),
                       );
                     },
-                  )
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // "Select Existing" Tab.
-                      Column(
+                  ),
+                )
+              : Column(
+                  children: [
+                    // TabBar.
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: Colors.black,
+                      indicatorColor: Colors.orange,
+                      tabs: const [
+                        Tab(text: "Select Existing"),
+                        Tab(text: "Create New"),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Tab Content.
+                    SizedBox(
+                      height: 300,
+                      child: TabBarView(
+                        controller: _tabController,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: TextField(
-                              decoration: const InputDecoration(
-                                labelText: "Search Student",
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (value) {
-                                setState(() {
-                                  searchQuery = value.toLowerCase();
-                                });
-                              },
-                            ),
-                          ),
-                          Expanded(
-                            child: isLoading
-                                ? const Center(child: CircularProgressIndicator())
-                                : ListView(
-                                    children: students.where((student) {
-                                      String studentName =
-                                          "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}"
-                                              .trim();
-                                      return studentName.toLowerCase().contains(searchQuery);
-                                    }).map((student) {
-                                      return Card(
-                                        margin: const EdgeInsets.symmetric(
-                                            vertical: 4, horizontal: 8),
-                                        child: ListTile(
-                                          title: Text(
-                                              "${student['id']} - ${student['first_name']} ${student['last_name']}"),
-                                          subtitle: Text("Birthday: ${student['birthday']}"),
-                                          trailing: student["selected"] == true
-                                              ? const Icon(Icons.check_circle, color: Colors.orange)
-                                              : const Icon(Icons.arrow_forward, color: Colors.orange),
-                                          onTap: () => _toggleStudentSelection(student),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                          ),
-                        ],
-                      ),
-                      // "Create New" Tab.
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: SingleChildScrollView(
-                          child: Column(
+                          // "Select Existing" Tab.
+                          Column(
                             children: [
-                              TextField(
-                                controller: _firstNameController,
-                                decoration: const InputDecoration(
-                                  labelText: "First Name",
-                                  border: OutlineInputBorder(),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: TextField(
+                                  decoration: const InputDecoration(
+                                    labelText: "Search Student",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      searchQuery = value.toLowerCase();
+                                    });
+                                  },
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _lastNameController,
-                                decoration: const InputDecoration(
-                                  labelText: "Last Name",
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _birthdayController,
-                                      readOnly: true,
-                                      decoration: const InputDecoration(
-                                        labelText: "Birthday",
-                                        border: OutlineInputBorder(),
-                                        hintText: "Select a date",
+                              Expanded(
+                                child: isLoading
+                                    ? const Center(child: CircularProgressIndicator())
+                                    : ListView(
+                                        children: students.where((student) {
+                                          String studentName =
+                                              "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}"
+                                                  .trim();
+                                          return studentName.toLowerCase().contains(searchQuery);
+                                        }).map((student) {
+                                          return Card(
+                                            margin: const EdgeInsets.symmetric(
+                                                vertical: 4, horizontal: 8),
+                                            child: ListTile(
+                                              title: Text(
+                                                  "${student['id']} - ${student['first_name']} ${student['last_name']}"),
+                                              subtitle: Text("Birthday: ${student['birthday']}"),
+                                              trailing: student["selected"] == true
+                                                  ? const Icon(Icons.check_circle, color: Colors.orange)
+                                                  : const Icon(Icons.arrow_forward, color: Colors.orange),
+                                              onTap: () => _toggleStudentSelection(student),
+                                            ),
+                                          );
+                                        }).toList(),
                                       ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.calendar_today),
-                                    onPressed: _showBirthdayPicker,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: _createStudent,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text("Create Student"),
                               ),
                             ],
                           ),
-                        ),
+                          // "Create New" Tab.
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  TextField(
+                                    controller: _firstNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: "First Name",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _lastNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: "Last Name",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _birthdayController,
+                                          readOnly: true,
+                                          decoration: const InputDecoration(
+                                            labelText: "Birthday",
+                                            border: OutlineInputBorder(),
+                                            hintText: "Select a date",
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.calendar_today),
+                                        onPressed: _showBirthdayPicker,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: _createStudent,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text("Create Student"),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-          ),
+                    ),
+                  ],
+                ),
         ],
       ),
     );

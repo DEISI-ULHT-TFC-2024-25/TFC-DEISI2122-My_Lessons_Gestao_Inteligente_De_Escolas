@@ -131,15 +131,25 @@ def all_schools(request):
                 {'id': location.id, 'name': location.name}
                 for location in school.locations.all()
             ],
-            'list_of_activities': [
-                {'id': sport.id, 'name': sport.name}
-                for sport in school.sports.all()
-            ],
             'isFavorite': True if request.user.schools.exists() and school in request.user.schools.all() else False,
             'services': school.services,
-            'currency': school.currency if school.currency else "EUR"
+            'currency': school.currency if school.currency else "EUR",
+            'subjects': [{
+                'id': subject.id,
+                'name': subject.name,
+                'locations': [{
+                    'id': location.id,
+                    'name': location.name,
+                    'address': location.address if location.address else "",
+                    'instructors': [{
+                        'id': instructor.id,
+                        'name': str(instructor),
+                    } for instructor in subject.instructors.filter(id__in=location.instructors.all())],
+                } for location in school.locations.all()]
+            } for subject in school.sports.all()]
         })
     return Response(data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

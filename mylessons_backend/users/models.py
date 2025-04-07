@@ -161,7 +161,10 @@ class Student(models.Model):
 class Instructor(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name='instructor_profile')
-
+    subjects = models.ManyToManyField('sports.Sport', related_name="instructors", blank=True)
+    locations = models.ManyToManyField('locations.Location', related_name="instructors", blank=True)
+    # TODO add subject to list of subjects
+    
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name}"
     

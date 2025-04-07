@@ -1,12 +1,17 @@
-// File: create_new_skill_page.dart
-
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/api_service.dart' as ApiService;
 
 class CreateNewSkillPage extends StatefulWidget {
   final dynamic lesson;
-  const CreateNewSkillPage({Key? key, this.lesson}) : super(key: key);
+  // Callback that returns the newly created skill map.
+  final Function(Map<String, dynamic> newSkill) onSkillCreated;
+
+  const CreateNewSkillPage({
+    Key? key,
+    required this.lesson,
+    required this.onSkillCreated,
+  }) : super(key: key);
 
   @override
   _CreateNewSkillPageState createState() => _CreateNewSkillPageState();
@@ -15,13 +20,7 @@ class CreateNewSkillPage extends StatefulWidget {
 class _CreateNewSkillPageState extends State<CreateNewSkillPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _skillNameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
 
-  // Dummy list of sports; replace with your API data if available.
-  List<dynamic> sports = [
-    {'id': 1, 'name': 'Basketball'},
-    {'id': 2, 'name': 'Soccer'},
-  ];
   bool _isLoading = false;
 
   Future<void> _saveSkill() async {
@@ -30,16 +29,18 @@ class _CreateNewSkillPageState extends State<CreateNewSkillPage> {
         _isLoading = true;
       });
       final payload = {
-        'name': _skillNameController.text,
-        'description': _descriptionController.text,
-        'sport_id': widget.lesson["subject_id"],
+        'name': _skillNameController.text.trim(),
+        'sport_id': widget.lesson["subject_id"], // e.g. the subject or sport ID
       };
       try {
-        await ApiService.createSkill(payload);
+        // This createSkill method should return the new skill's JSON
+        // (including 'id', 'name', etc.)
+        final newSkill = await ApiService.createSkill(payload);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Skill created successfully')),
         );
-        Navigator.pop(context);
+        // Return to the parent via the callback:
+        widget.onSkillCreated(newSkill);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error creating skill: $e')),

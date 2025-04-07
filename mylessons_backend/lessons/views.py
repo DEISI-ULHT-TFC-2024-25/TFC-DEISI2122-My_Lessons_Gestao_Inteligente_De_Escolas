@@ -83,13 +83,14 @@ def get_lessons_data(user, date_lookup, is_done_flag):
             "date": lesson.date.strftime("%d %b %Y") if lesson.date else "None",
             "start_time": lesson.start_time.strftime("%H:%M") if lesson.start_time else "None",
             "lesson_number": lesson.class_number if lesson.class_number else "None",  # TODO: fix for group lessons
-            "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None",  # TODO: fix for group lessons
+            "number_of_lessons": lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else "None",  # TODO: fix for group lessons
             "students_name": lesson.get_students_name(),
             "type": lesson.type,
             "duration_in_minutes": lesson.duration_in_minutes,
-            "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
+            "expiration_date": lesson.packs.all()[0].expiration_date if lesson.packs.exists() and lesson.packs.all()[0].expiration_date else "None",
             "school": str(lesson.school) if lesson.school else "",
             "subject_id": lesson.sport.id if lesson.sport else "Unknown",
+            "is_done": lesson.is_done,
         }
         for lesson in lessons
     ]
@@ -118,9 +119,9 @@ def get_packs_data(user, is_done_flag):
                                     is_done=is_done_flag,
                                     ).order_by("-date_time").distinct()
     elif current_role == "Instructor":
-        packs = Pack.objects.filter(lessons__instructors__in=[user.instructor_profile],
+        packs = Pack.objects.filter(lessons_many__instructors__in=[user.instructor_profile],
                                     is_done=is_done_flag,
-                                    ).order_by("-date_time").distinct() # TODO combile those filters with pack.instructors__in=[user.instructor_profile]
+                                    ).order_by("-date_time").distinct() # TODO combine those filters with pack.instructors__in=[user.instructor_profile]
     elif current_role == "Admin":
         packs = Pack.objects.filter(school__in=user.school_admins.all(),
                                     is_done=is_done_flag,
@@ -137,12 +138,18 @@ def get_packs_data(user, is_done_flag):
                                 "lesson_str": str(lesson),
                                 "school": str(lesson.school) if lesson.school else "",
                             }
-                            for lesson in pack.lessons.all()
+                            for lesson in pack.lessons_many.all()
                         ],
             "lessons_remaining": pack.number_of_classes_left,
             "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
             "days_until_expiration": pack.handle_expiration_date(),
             "students_name": pack.get_students_name(),
+            "students": [{
+                "id" : str(student.id),
+                "name": str(student),
+            }
+            for student in pack.students.all()
+            ],
             "type": pack.type,
             "expiration_date": str(pack.expiration_date),
         }
@@ -231,6 +238,42 @@ def pack_details(request, id):
         "is_paid": pack.is_paid,
         "is_suspended": pack.is_suspended,
         "debt": str(pack.debt),
+        "lessons": [{
+          "lesson_id": lesson.id,
+            "date": lesson.date.strftime("%d %b %Y") if lesson.date else "None",
+            "start_time": lesson.start_time.strftime("%H:%M") if lesson.start_time else "None",
+            "lesson_number": lesson.class_number if lesson.class_number else "None",  # TODO: fix for group lessons
+            "number_of_lessons": lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else "None",  # TODO: fix for group lessons
+            "students_name": lesson.get_students_name(),
+            "type": lesson.type,
+            "duration_in_minutes": lesson.duration_in_minutes,
+            "expiration_date": lesson.packs.all()[0].expiration_date if lesson.packs.exists() and lesson.packs.all()[0].expiration_date else "None",
+            "school": str(lesson.school) if lesson.school else "",
+            "subject_id": lesson.sport.id if lesson.sport else "Unknown",  
+            "is_done": lesson.is_done,
+        } for lesson in pack.lessons_many.all()],
+        "students": [{
+                        "id" : str(student.id),
+                        "name": str(student),
+                    }
+                    for student in pack.students.all()
+                ],
+        "parents": [
+                        {
+                            "id" : str(parent.id),
+                            "name": str(parent),
+                            "email": parent.email,
+                            "country_code" : parent.country_code,
+                            "phone" : parent.phone,
+                            "students": [{
+                                    "id" : str(student.id),
+                                    "name": str(student),
+                                }
+                                for student in parent.students.all()
+                            ],
+                        }
+                        for parent in pack.parents.all()
+                    ],
         "students_name": pack.get_students_name(),
         "students_ids": pack.get_students_ids(),
         "instructors_name": pack.get_instructors_name() if pack.instructors.exists() else "",
@@ -266,7 +309,7 @@ def lesson_details(request, id):
             "end_time": lesson.end_time.strftime("%H:%M") if lesson.end_time else "None",
             "duration_in_minutes": lesson.duration_in_minutes,
             "lesson_number": lesson.class_number,
-            "number_of_lessons": lesson.pack.number_of_classes if lesson.pack else "None",
+            "number_of_lessons": lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else "None",
             "price": lesson.price,
             "is_done": lesson.is_done,
             "extras": lesson.extras,
@@ -282,9 +325,53 @@ def lesson_details(request, id):
             "maximum_number_of_students": lesson.maximum_number_of_students,
             "school_name": str(lesson.school) if lesson.school else "Unknown",
             "school_id": lesson.school.id if lesson.school else "Unknown",
-            "pack_id": lesson.pack.id if lesson.pack else "Unknown",
+            "pack_id": lesson.packs.all()[0].id if lesson.packs.exists() else "Unknown",
             "subject": lesson.sport.name if lesson.sport else "Unknown",
             "subject_id": lesson.sport.id if lesson.sport else "Unknown",
+            "is_done": lesson.is_done,
+            "packs" :
+                [
+                    {
+                        "pack_id": pack.id,
+                        "lessons": [
+                                        {
+                                            "lesson_id" : str(lesson.id),
+                                            "lesson_str": str(lesson),
+                                            "school": str(lesson.school) if lesson.school else "",
+                                        }
+                                        for lesson in pack.lessons_many.all()
+                                    ],
+                        "lessons_remaining": pack.number_of_classes_left,
+                        "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
+                        "days_until_expiration": pack.handle_expiration_date(),
+                        "students_name": pack.get_students_name(),
+                        "parents": [
+                            {
+                                "id" : str(parent.id),
+                                "name": str(parent),
+                                "email": parent.email,
+                                "country_code" : parent.country_code,
+                                "phone" : parent.phone,
+                                "students": [{
+                                        "id" : str(student.id),
+                                        "name": str(student),
+                                    }
+                                    for student in parent.students.all()
+                                ],
+                            }
+                            for parent in pack.parents.all()
+                        ],
+                        "students": [{
+                            "id" : str(student.id),
+                            "name": str(student),
+                        }
+                        for student in pack.students.all()
+                        ],
+                        "type": pack.type,
+                        "expiration_date": str(pack.expiration_date),
+                    }
+                    for pack in lesson.packs.all()
+                ]    
         }
     return Response(data)
 
@@ -313,7 +400,7 @@ def todays_lessons(request):
                 "lesson_id": lesson.id,
                 "start_time": lesson.start_time.strftime("%I:%M %p") if lesson.start_time else "None",
                 "lesson_number": lesson.class_number,
-                "number_of_lessons": lesson.pack.number_of_classes,
+                "number_of_lessons": lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else "None",
                 "students_name": lesson.get_students_name(),
                 "location_name": lesson.location.name if lesson.location else "None",
             }
@@ -336,9 +423,6 @@ def todays_lessons(request):
             }
             for lesson in lessons
         ]
-    
-    
-    
     
     return Response(lessons_data)
 
@@ -448,7 +532,7 @@ def schedule_private_lesson(request):
         return Response({"error": "Aula não encontrada."}, status=status.HTTP_404_NOT_FOUND)
 
     # Verifica se o utilizador pode reagendar esta aula (somente pais da pack ou instrutores ou admins)
-    if not lesson.pack.parents.filter(id=user.id).exists() and not lesson.instructors.filter(user=user).exists():
+    if not lesson.packs.all()[0].parents.filter(id=user.id).exists() and not lesson.instructors.filter(user=user).exists():
         return Response({"error": "Não tem permissão para agendar esta aula."},
                         status=status.HTTP_403_FORBIDDEN)
 
@@ -459,8 +543,6 @@ def schedule_private_lesson(request):
     except ValueError:
         return Response({"error": "Formato de data ou hora inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
-
-    # Verifica se ainda é possível reagendar esta aula
 
     # Verifica se ainda é possível reagendar esta aula
 
@@ -639,7 +721,7 @@ def schedule_multiple_lessons(request):
             weekday_out = candidate_date.strftime("%A")
             old_date_str = lesson.date.strftime("%Y-%m-%d") if lesson.date else ""
             old_time_str = lesson.start_time.strftime("%H:%M") if lesson.start_time else ""
-            lesson_str = f"{lesson.get_students_name()} lesson number {lesson.class_number}/{lesson.pack.number_of_classes}"
+            lesson_str = f"{lesson.get_students_name()} lesson number {lesson.class_number}/{lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else 'None'}"
             scheduled_results[lesson.id] = {
                 "lesson_id": str(lesson.id),
                 "lesson_str": lesson_str,
@@ -658,7 +740,7 @@ def schedule_multiple_lessons(request):
     for lesson in unscheduled_lessons:
         old_date_str = lesson.date.strftime("%Y-%m-%d") if lesson.date else ""
         old_time_str = lesson.start_time.strftime("%H:%M") if lesson.start_time else ""
-        lesson_str = f"{lesson.get_students_name()} lesson number {lesson.class_number}/{lesson.pack.number_of_classes}"
+        lesson_str = f"{lesson.get_students_name()} lesson number {lesson.class_number}/{lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else 'None'}"
         scheduled_results[lesson.id] = {
             "lesson_id": str(lesson.id),
             "lesson_str": lesson_str,
@@ -765,7 +847,7 @@ def edit_subject(request):
         if action == 'add':
             subject = Sport.objects.create(name=subject_id)
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.sport = subject
                     lesson.save()
@@ -777,7 +859,7 @@ def edit_subject(request):
         elif action == 'change':
             subject = get_object_or_404(Sport, id=subject_id)
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.sport = subject
                     lesson.save()
@@ -849,7 +931,7 @@ def edit_students(request):
             pack.students.add(student)
             
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.students.add(student)
                     lesson.save()
@@ -860,7 +942,7 @@ def edit_students(request):
             student = get_object_or_404(Student, id=student_id)
             pack.students.remove(student)
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.students.remove(student)
                     lesson.save()
@@ -940,7 +1022,7 @@ def edit_instructors(request):
             pack.instructors.add(instructor)
             
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.instructors.add(instructor)
                     lesson.save()
@@ -951,7 +1033,7 @@ def edit_instructors(request):
             instructor = get_object_or_404(Instructor, id=instructor_id)
             pack.instructors.remove(instructor)
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.instructors.remove(instructor)
                     lesson.save()
@@ -1009,7 +1091,7 @@ def edit_location(request):
             pack.locations.add(location)
             pack.school.locations.add(location)
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.location = location
                     lesson.save()
@@ -1023,7 +1105,7 @@ def edit_location(request):
                 return Response({"error": "location_id is required"}, status=400)
             location = get_object_or_404(Location, id=location_id)
             if pack.type == 'private':
-                lessons = Lesson.objects.filter(pack=pack)
+                lessons = pack.lessons_many.all()
                 for lesson in lessons:
                     lesson.location = location
                     lesson.save()
@@ -1145,7 +1227,7 @@ def edit_pack_students(request):
             student = get_object_or_404(Student, id=student_id)
         pack.students.add(student)
         # Also add the student to every lesson in the pack.
-        for lesson in pack.lessons.all():
+        for lesson in pack.lessons_many.all():
             lesson.students.add(student)
         pack.school.students.add(student)
         status_msg = "student added"
@@ -1154,7 +1236,7 @@ def edit_pack_students(request):
         student_id = request.data.get('student_id')
         student = get_object_or_404(Student, id=student_id)
         pack.students.remove(student)
-        for lesson in pack.lessons.all():
+        for lesson in pack.lessons_many.all():
             lesson.students.remove(student)
         status_msg = "student removed"
     else:
@@ -1188,7 +1270,7 @@ def edit_pack_instructors(request):
             instructor_id = request.data.get('instructor_id')
             instructor = get_object_or_404(Instructor, id=instructor_id)
         pack.instructors.add(instructor)
-        for lesson in pack.lessons.all():
+        for lesson in pack.lessons_many.all():
             lesson.instructors.add(instructor)
         pack.school.instructors.add(instructor)
         status_msg = "instructor added"
@@ -1197,7 +1279,7 @@ def edit_pack_instructors(request):
         instructor_id = request.data.get('instructor_id')
         instructor = get_object_or_404(Instructor, id=instructor_id)
         pack.instructors.remove(instructor)
-        for lesson in pack.lessons.all():
+        for lesson in pack.lessons_many.all():
             lesson.instructors.remove(instructor)
         status_msg = "instructor removed"
     else:
@@ -1231,7 +1313,7 @@ def edit_pack_subject(request):
             subject_id = request.data.get('subject_id')
             sport = get_object_or_404(Sport, id=subject_id, school=pack.school)
         pack.subjects.add(sport)
-        for lesson in pack.lessons.all():
+        for lesson in pack.lessons_many.all():
             lesson.subjects.add(sport)
         status_msg = "subject added"
         
@@ -1239,7 +1321,7 @@ def edit_pack_subject(request):
         subject_id = request.data.get('subject_id')
         sport = get_object_or_404(Sport, id=subject_id, school=pack.school)
         pack.subjects.remove(sport)
-        for lesson in pack.lessons.all():
+        for lesson in pack.lessons_many.all():
             lesson.subjects.remove(sport)
         status_msg = "subject removed"
     else:
@@ -1276,3 +1358,81 @@ def unschedulable_lessons(request):
         "lesson_ids": lesson_ids,
     }
     return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_group_packs_from_a_lesson(request):
+    # Expect a query parameter "lesson_id"
+    lesson_id = request.query_params.get("lesson_id")
+    today = now().date()
+    if not lesson_id:
+        return Response({"error": "Missing 'lesson_id' parameter."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    
+    # Ensure the lesson is a group lesson.
+    if lesson.type != "group":
+        return Response({"error": "The lesson is not of type 'group'."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Build response data.
+    packs_data = [
+        {
+            "pack_id": pack.id,
+        "date": pack.date,
+        "type": pack.type,
+        "number_of_classes": pack.number_of_classes,
+        "lessons_remaining": pack.number_of_classes_left,
+        "unscheduled_lessons": pack.get_number_of_unscheduled_lessons(),
+        "days_until_expiration": (pack.expiration_date - today).days if pack.expiration_date else None,
+        "expiration_date": pack.expiration_date,
+        "duration_in_minutes": pack.duration_in_minutes,
+        "price": str(pack.price),
+        "is_done": pack.is_done,
+        "is_paid": pack.is_paid,
+        "is_suspended": pack.is_suspended,
+        "debt": str(pack.debt),
+        "lessons": [{
+          "lesson_id": lesson.id,
+            "date": lesson.date.strftime("%d %b %Y") if lesson.date else "None",
+            "start_time": lesson.start_time.strftime("%H:%M") if lesson.start_time else "None",
+            "lesson_number": lesson.class_number if lesson.class_number else "None",  # TODO: fix for group lessons
+            "number_of_lessons": lesson.packs.all()[0].number_of_classes if lesson.packs.exists() else "None",  # TODO: fix for group lessons
+            "students_name": lesson.get_students_name(),
+            "type": lesson.type,
+            "duration_in_minutes": lesson.duration_in_minutes,
+            "expiration_date": lesson.packs.all()[0].expiration_date if lesson.packs.exists() and lesson.packs.all()[0].expiration_date else "None",
+            "school": str(lesson.school) if lesson.school else "",
+            "subject_id": lesson.sport.id if lesson.sport else "Unknown",  
+            "is_done": lesson.is_done,
+        } for lesson in pack.lessons_many.all()],
+        "students": [{
+                        "id" : str(student.id),
+                        "name": str(student),
+                    }
+                    for student in pack.students.all()
+                ],
+        "parents": [
+                        {
+                            "id" : str(parent.id),
+                            "name": str(parent),
+                            "email": parent.email,
+                            "country_code" : parent.country_code,
+                            "phone" : parent.phone,
+                        }
+                        for parent in pack.parents.all()
+                    ],
+        "students_name": pack.get_students_name(),
+        "students_ids": pack.get_students_ids(),
+        "instructors_name": pack.get_instructors_name() if pack.instructors.exists() else "",
+        "instructors_ids": pack.get_instructors_ids() if pack.instructors.exists() else "",
+        "finished_date": pack.finished_date,
+        "school_name": str(pack.school) if pack.school else "",
+        "school_id": pack.school.id if pack.school else "",
+        "subject": pack.sport.name if pack.sport else None,
+        }
+        for pack in lesson.packs.all()
+    ]
+    
+    return Response({"packs": packs_data}, status=status.HTTP_200_OK)
+

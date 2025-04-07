@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mylessons_frontend/pages/register_landing_page.dart';
+import 'package:mylessons_frontend/providers/lessons_modal_provider.dart';
+import 'package:mylessons_frontend/providers/pack_details_provider.dart';
+import 'package:mylessons_frontend/providers/school_provider.dart';
+import 'package:provider/provider.dart';
 import 'pages/email_login_page.dart';
 import 'pages/landing_page.dart';
 import 'pages/login_page.dart';
@@ -31,7 +35,17 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   debugPaintSizeEnabled = false;
-  runApp(const MyApp());
+ 
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SchoolProvider()),
+        ChangeNotifierProvider(create: (_) => LessonModalProvider()),
+        ChangeNotifierProvider(create: (_) => PackDetailsProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {

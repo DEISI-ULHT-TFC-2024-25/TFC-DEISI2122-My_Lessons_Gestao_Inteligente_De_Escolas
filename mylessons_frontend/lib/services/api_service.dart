@@ -105,23 +105,21 @@ Future<List<Map<String, dynamic>>> fetchSchools() async {
         'image': 'https://via.placeholder.com/150',
         'description': '',
         'rating': 0.0,
-        'sports': (jsonSchool['list_of_activities'] as List<dynamic>?)
-                ?.map((act) => act['name'].toString())
-                .toList() ??
-            [],
         'locations': (jsonSchool['list_of_locations'] as List<dynamic>?)
                 ?.map((loc) => loc['name'].toString())
                 .toList() ??
             [],
         'isFavorite': jsonSchool['isFavorite'],
         'lastPurchases': [],
-        'services': jsonSchool['services'] ?? []
+        'services': jsonSchool['services'] ?? [],
+        'subjects': (jsonSchool['subjects'] as List<dynamic>?)?.toList() ?? [],
       };
     }).toList();
   } else {
     throw Exception('Failed to load schools');
   }
 }
+
 
 Future<Map<String, dynamic>?> fetchLessonDetails(int lessonId) async {
   final headers = await getAuthHeaders();
@@ -288,8 +286,7 @@ Future<void> updateGoalLevel(int goalId, int newLevel) async {
   }
 }
 
-/// Creates a new skill.
-Future<void> createSkill(Map<String, dynamic> payload) async {
+Future<Map<String, dynamic>> createSkill(Map<String, dynamic> payload) async {
   final headers = await getAuthHeaders();
   final url = '$baseUrl/api/progress/skills/';
   final response = await http.post(
@@ -297,10 +294,14 @@ Future<void> createSkill(Map<String, dynamic> payload) async {
     headers: headers,
     body: jsonEncode(payload),
   );
-  if (response.statusCode != 201) {
+  if (response.statusCode == 201) {
+    return jsonDecode(response.body);
+  } else {
     throw Exception("Failed to create skill: ${response.statusCode}");
   }
 }
+
+
 
 /// Creates a new goal.
 Future<void> createGoal(Map<String, dynamic> payload) async {
@@ -341,5 +342,21 @@ Future<void> updateProgressRecord(int recordId, Map<String, dynamic> payload) as
   );
   if (response.statusCode != 200) {
     throw Exception("Failed to update progress record: ${response.statusCode}");
+  }
+}
+
+Future<dynamic> getProgressRecord(int studentId, int lessonId) async {
+  final headers = await getAuthHeaders();
+  final url = '$baseUrl/api/progress/progress-record/?student_id=$studentId&lesson_id=$lessonId';
+  final response = await http.get(Uri.parse(url), headers: headers);
+  
+  if (response.statusCode == 200) {
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data;
+  } else if (response.statusCode == 404) {
+    // Record not found, return null.
+    return null;
+  } else {
+    throw Exception("Failed to get progress record: ${response.statusCode}");
   }
 }

@@ -10,13 +10,16 @@ import '../pages/checkout_page.dart';
 
 class StudentSelectionModal extends StatefulWidget {
   final Map<String, dynamic> service;
-  final int? requiredCount; // Number of students required.
+  final int? requiredCount;
   final int? selectedDuration;
   final int? selectedClasses;
   final int? selectedPeople;
   final double? currentPrice;
   final int? currentTimeLimit;
-  // Callback that notifies the parent how many students are selected.
+  // NEW: Extra data parameters.
+  final Map<String, dynamic>? selectedSubject;
+  final Map<String, dynamic>? selectedLocation;
+  final Map<String, dynamic>? selectedInstructor;
   final Function(int)? onSelectionUpdated;
 
   const StudentSelectionModal({
@@ -28,12 +31,16 @@ class StudentSelectionModal extends StatefulWidget {
     this.selectedPeople,
     this.currentPrice,
     this.currentTimeLimit,
+    this.selectedSubject,
+    this.selectedLocation,
+    this.selectedInstructor,
     this.onSelectionUpdated,
   });
 
   @override
   _StudentSelectionModalState createState() => _StudentSelectionModalState();
 }
+
 
 class _StudentSelectionModalState extends State<StudentSelectionModal>
     with SingleTickerProviderStateMixin {
@@ -170,7 +177,6 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
     }
   }
 
-  /// Builds checkout details (if needed for cart/checkout operations).
   Map<String, dynamic> _buildCheckoutDetails() {
     return {
       'service_name': widget.service['name'] ?? 'N/A',
@@ -192,6 +198,25 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
       'duration': widget.selectedDuration,
       'classes': widget.selectedClasses,
       'time_limit': widget.currentTimeLimit,
+      // NEW: Pass along the extra details (as maps with id and name)
+      'subject': widget.selectedSubject != null
+          ? {
+              'id': widget.selectedSubject!['id'],
+              'name': widget.selectedSubject!['name'],
+            }
+          : null,
+      'location': widget.selectedLocation != null
+          ? {
+              'id': widget.selectedLocation!['id'],
+              'name': widget.selectedLocation!['name'],
+            }
+          : null,
+      'instructor': widget.selectedInstructor != null
+          ? {
+              'id': widget.selectedInstructor!['id'],
+              'name': widget.selectedInstructor!['name'],
+            }
+          : null,
     };
   }
 
@@ -209,9 +234,10 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
         }
 
         // Retrieve associated students from the fetched data.
-        final List<Map<String, dynamic>> associatedStudents = ((snapshot.data?["associated_students"] ?? []) as List)
-            .map((e) => e as Map<String, dynamic>)
-            .toList();
+        final List<Map<String, dynamic>> associatedStudents =
+            ((snapshot.data?["associated_students"] ?? []) as List)
+                .map((e) => e as Map<String, dynamic>)
+                .toList();
 
         return ConstrainedBox(
           constraints: BoxConstraints(
@@ -287,16 +313,24 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                 const SizedBox(height: 8),
                                 ElevatedButton(
                                   onPressed: () async {
-                                    if (_firstNameController.text.trim().isNotEmpty &&
-                                        _lastNameController.text.trim().isNotEmpty &&
+                                    if (_firstNameController.text
+                                            .trim()
+                                            .isNotEmpty &&
+                                        _lastNameController.text
+                                            .trim()
+                                            .isNotEmpty &&
                                         selectedBirthday != null) {
                                       try {
-                                        final createdStudent = await _createStudent(
+                                        final createdStudent =
+                                            await _createStudent(
                                           _firstNameController.text.trim(),
                                           _lastNameController.text.trim(),
                                           _dateFormat.format(selectedBirthday!),
                                         );
-                                        final newSelection = [..._selectedStudents, createdStudent];
+                                        final newSelection = [
+                                          ..._selectedStudents,
+                                          createdStudent
+                                        ];
                                         _updateSelection(newSelection);
                                         _firstNameController.clear();
                                         _lastNameController.clear();
@@ -306,8 +340,11 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                           _studentsFuture = _fetchStudents();
                                         });
                                       } catch (e) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text("Error creating student: $e")),
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  "Error creating student: $e")),
                                         );
                                       }
                                     }
@@ -341,23 +378,36 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                     itemCount: associatedStudents.length,
                                     itemBuilder: (context, index) {
                                       final student = associatedStudents[index];
-                                      final alreadySelected = _selectedStudents.any((s) => s['id'] == student['id']);
+                                      final alreadySelected = _selectedStudents
+                                          .any((s) => s['id'] == student['id']);
                                       return ListTile(
                                         title: Text(
                                           "${student['id']} - ${student['first_name']} ${student['last_name']}",
                                         ),
-                                        subtitle: Text("Birthday: ${student['birthday']}"),
+                                        subtitle: Text(
+                                            "Birthday: ${student['birthday']}"),
                                         trailing: alreadySelected
-                                            ? const Icon(Icons.check, color: Colors.green)
+                                            ? const Icon(Icons.check,
+                                                color: Colors.green)
                                             : null,
                                         onTap: () {
                                           if (!alreadySelected) {
-                                            if (_selectedStudents.length < (widget.requiredCount ?? 999999)) {
-                                              final newSelection = [..._selectedStudents, student];
+                                            if (_selectedStudents.length <
+                                                (widget.requiredCount ??
+                                                    999999)) {
+                                              final newSelection = [
+                                                ..._selectedStudents,
+                                                student
+                                              ];
                                               _updateSelection(newSelection);
                                             }
                                           } else {
-                                            final newSelection = _selectedStudents.where((s) => s['id'] != student['id']).toList();
+                                            final newSelection =
+                                                _selectedStudents
+                                                    .where((s) =>
+                                                        s['id'] !=
+                                                        student['id'])
+                                                    .toList();
                                             _updateSelection(newSelection);
                                           }
                                         },
@@ -389,12 +439,15 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                             children: [
                                               Expanded(
                                                 child: TextField(
-                                                  controller: _birthdayController,
+                                                  controller:
+                                                      _birthdayController,
                                                   onTap: _showBirthdayPicker,
                                                   readOnly: true,
-                                                  decoration: const InputDecoration(
+                                                  decoration:
+                                                      const InputDecoration(
                                                     labelText: "Birthday",
-                                                    border: OutlineInputBorder(),
+                                                    border:
+                                                        OutlineInputBorder(),
                                                   ),
                                                 ),
                                               ),
@@ -410,33 +463,50 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                                           const SizedBox(height: 8),
                                           ElevatedButton(
                                             onPressed: () async {
-                                              if (_firstNameController.text.trim().isNotEmpty &&
-                                                  _lastNameController.text.trim().isNotEmpty &&
+                                              if (_firstNameController.text
+                                                      .trim()
+                                                      .isNotEmpty &&
+                                                  _lastNameController.text
+                                                      .trim()
+                                                      .isNotEmpty &&
                                                   selectedBirthday != null) {
                                                 try {
-                                                  final createdStudent = await _createStudent(
-                                                    _firstNameController.text.trim(),
-                                                    _lastNameController.text.trim(),
-                                                    _dateFormat.format(selectedBirthday!),
+                                                  final createdStudent =
+                                                      await _createStudent(
+                                                    _firstNameController.text
+                                                        .trim(),
+                                                    _lastNameController.text
+                                                        .trim(),
+                                                    _dateFormat.format(
+                                                        selectedBirthday!),
                                                   );
-                                                  final newSelection = [..._selectedStudents, createdStudent];
-                                                  _updateSelection(newSelection);
+                                                  final newSelection = [
+                                                    ..._selectedStudents,
+                                                    createdStudent
+                                                  ];
+                                                  _updateSelection(
+                                                      newSelection);
                                                   _firstNameController.clear();
                                                   _lastNameController.clear();
                                                   _birthdayController.clear();
                                                   selectedBirthday = null;
                                                   setState(() {
-                                                    _studentsFuture = _fetchStudents();
+                                                    _studentsFuture =
+                                                        _fetchStudents();
                                                   });
                                                   _tabController.animateTo(0);
                                                 } catch (e) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(content: Text("Error creating student: $e")),
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                        content: Text(
+                                                            "Error creating student: $e")),
                                                   );
                                                 }
                                               }
                                             },
-                                            child: const Text("Register Student"),
+                                            child:
+                                                const Text("Register Student"),
                                           ),
                                         ],
                                       ),
@@ -449,44 +519,88 @@ class _StudentSelectionModalState extends State<StudentSelectionModal>
                         ),
                 ),
                 if (_isSelectionComplete)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          final checkoutDetails = _buildCheckoutDetails();
-                          final serviceWithCheckout = Map<String, dynamic>.from(widget.service)
-                            ..['checkout_details'] = checkoutDetails;
-                          CartService().addToCart(serviceWithCheckout, _selectedStudents, currentPrice);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Added to cart")),
-                          );
-                          Navigator.of(context, rootNavigator: true).pop();
-                        },
-                        child: const Text("Add to Cart"),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          final checkoutDetails = _buildCheckoutDetails();
-                          final serviceWithCheckout = Map<String, dynamic>.from(widget.service)
-                            ..['checkout_details'] = checkoutDetails;
-                          CartService().addToCart(serviceWithCheckout, _selectedStudents, currentPrice);
-                          navigatorKey.currentState!.pop();
-                          Future.delayed(const Duration(milliseconds: 100), () {
-                            navigatorKey.currentState!.push(
-                              MaterialPageRoute(
-                                builder: (_) => CheckoutPage(
-                                  onBack: () => navigatorKey.currentState!.pop(),
-                                ),
-                              ),
-                            );
-                          });
-                        },
-                        child: const Text("Buy Now"),
-                      ),
-                    ],
-                  ),
-              ],
+  Row(
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      ElevatedButton(
+        onPressed: () {
+          final checkoutDetails = _buildCheckoutDetails();
+          final serviceWithCheckout = Map<String, dynamic>.from(widget.service)
+            ..['checkout_details'] = checkoutDetails;
+          CartService().addToCart(
+            serviceWithCheckout,
+            _selectedStudents,
+            currentPrice,
+            subjectId: widget.selectedSubject != null
+                ? widget.selectedSubject!['id'] as int
+                : null,
+            subjectName: widget.selectedSubject != null
+                ? widget.selectedSubject!['name'] as String
+                : null,
+            locationId: widget.selectedLocation != null
+                ? widget.selectedLocation!['id'] as int
+                : null,
+            locationName: widget.selectedLocation != null
+                ? widget.selectedLocation!['name'] as String
+                : null,
+            instructorId: widget.selectedInstructor != null
+                ? widget.selectedInstructor!['id'] as int
+                : null,
+            instructorName: widget.selectedInstructor != null
+                ? widget.selectedInstructor!['name'] as String
+                : null,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Added to cart")),
+          );
+          Navigator.of(context, rootNavigator: true).pop();
+        },
+        child: const Text("Add to Cart"),
+      ),
+      ElevatedButton(
+        onPressed: () {
+          final checkoutDetails = _buildCheckoutDetails();
+          final serviceWithCheckout = Map<String, dynamic>.from(widget.service)
+            ..['checkout_details'] = checkoutDetails;
+          CartService().addToCart(
+            serviceWithCheckout,
+            _selectedStudents,
+            currentPrice,
+            subjectId: widget.selectedSubject != null
+                ? widget.selectedSubject!['id'] as int
+                : null,
+            subjectName: widget.selectedSubject != null
+                ? widget.selectedSubject!['name'] as String
+                : null,
+            locationId: widget.selectedLocation != null
+                ? widget.selectedLocation!['id'] as int
+                : null,
+            locationName: widget.selectedLocation != null
+                ? widget.selectedLocation!['name'] as String
+                : null,
+            instructorId: widget.selectedInstructor != null
+                ? widget.selectedInstructor!['id'] as int
+                : null,
+            instructorName: widget.selectedInstructor != null
+                ? widget.selectedInstructor!['name'] as String
+                : null,
+          );
+          navigatorKey.currentState!.pop();
+          Future.delayed(const Duration(milliseconds: 100), () {
+            navigatorKey.currentState!.push(
+              MaterialPageRoute(
+                builder: (_) => CheckoutPage(
+                  onBack: () => navigatorKey.currentState!.pop(),
+                ),
+              ),
+            );
+          });
+        },
+        child: const Text("Buy Now"),
+      ),
+    ],
+  ),
+],
             ),
           ),
         );

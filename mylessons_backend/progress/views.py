@@ -1,4 +1,3 @@
-import logging
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
@@ -9,7 +8,6 @@ from rest_framework import status
 from .models import Skill, Goal, ProgressRecord, ProgressReport
 from users.models import Student
 
-logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 def get_active_goals(request, student_id):
@@ -20,7 +18,7 @@ def get_active_goals(request, student_id):
     if student_id is None:
         return JsonResponse({'error': 'student_id not provided'}, status=status.HTTP_400_BAD_REQUEST)
     # Example: filtering by a foreign key relation 'sport' (subject)
-    goals = Goal.objects.filter(student__id=student_id)
+    goals = Goal.objects.filter(student__id=student_id, is_completed=False)
     data = []
     for goal in goals:
         data.append({
@@ -162,14 +160,10 @@ def create_progress_record(request):
       - optionally 'lesson_id' and 'notes'
       - 'goals': a list of dictionaries with 'goal_id' and 'progress'
     For each goal provided, if the new progress (i.e. new level) differs from the current level,
-    the view checks:
-      - If the level was not 5 and now is 5, mark as completed.
-      - If the level was 5 and now is not, mark as uncompleted.
-    Then, the goal is associated with the progress record.
+    the goal’s update_level method is called, and the goal is linked to the progress record.
     """
     student_id = request.data.get('student_id')
     if not student_id:
-        logger.debug("No student_id provided in request")
         return JsonResponse({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
     
     student = get_object_or_404(Student, pk=student_id)
@@ -179,55 +173,34 @@ def create_progress_record(request):
     # Create the progress record.
     progress_record = ProgressRecord(student=student, notes=notes)
     if lesson_id:
-        from lessons.models import Lesson  # Import Lesson model.
+        from lessons.models import Lesson
         progress_record.lesson = get_object_or_404(Lesson, pk=lesson_id)
     
     try:
         progress_record.save()
-        logger.debug(f"ProgressRecord created with id: {progress_record.id}")
     except Exception as e:
-        logger.error(f"Failed to create progress record: {e}")
         return JsonResponse({'error': f'Failed to create progress record: {e}'}, status=status.HTTP_400_BAD_REQUEST)
     
     # Process and update goals if provided.
     goals_data = request.data.get('goals')
     if goals_data:
+        from progress.models import Goal  # Import the Goal model.
         goal_ids = []
         for goal_data in goals_data:
             goal_id = goal_data.get('goal_id')
             new_level = goal_data.get('progress')
             if goal_id is None or new_level is None:
-                logger.debug("Skipping goal update due to missing goal_id or progress")
                 continue
             try:
                 goal_instance = Goal.objects.get(pk=goal_id)
-                new_level_int = int(new_level)
-                old_level = goal_instance.level
-                logger.debug(f"Goal {goal_id}: old level = {old_level}, new level = {new_level_int}")
-                
-                if old_level != new_level_int:
-                    goal_instance.level = new_level_int
-                    goal_instance.last_updated = now()
-                    
-                    if old_level != 5 and new_level_int == 5:
-                        logger.debug(f"Goal {goal_id}: Level changed from {old_level} to 5. Marking as completed.")
-                        goal_instance.mark_completed()
-                    elif old_level == 5 and new_level_int != 5:
-                        logger.debug(f"Goal {goal_id}: Level changed from 5 to {new_level_int}. Marking as uncompleted.")
-                        goal_instance.mark_uncompleted()
-                    else:
-                        logger.debug(f"Goal {goal_id}: Level updated from {old_level} to {new_level_int} without completion change.")
-                        goal_instance.save()
-                else:
-                    logger.debug(f"Goal {goal_id}: No change in level (remains {old_level}).")
-                    
+                # Update the goal level if needed using the model's method.
+                if goal_instance.level != new_level:
+                    goal_instance.update_level(int(new_level))
                 goal_ids.append(goal_instance.id)
             except Goal.DoesNotExist:
-                logger.error(f"Goal with id {goal_id} does not exist. Skipping.")
                 continue
-        # Associate the updated goals with the progress record.
+        # Associate the goals with the progress record.
         progress_record.goals.set(goal_ids)
-        logger.debug(f"Associated goals {goal_ids} with progress record {progress_record.id}")
     
     data = {
         'id': progress_record.id,
@@ -236,26 +209,68 @@ def create_progress_record(request):
         'date': progress_record.date.isoformat(),
         'notes': progress_record.notes,
     }
-    logger.debug("Progress record creation completed successfully.")
     return JsonResponse(data, status=status.HTTP_201_CREATED)
+
+
 
 @api_view(['PUT'])
 def update_progress_record(request, record_id):
     """
     Updates an existing progress record.
-    Expects a JSON body with fields to update such as 'notes'.
+    Expects a JSON body with:
+      - 'student_id' (required)
+      - optionally 'lesson_id' and 'notes'
+      - 'goals': a list of dictionaries with 'goal_id' and 'progress'
+    For each goal provided, if the new progress (i.e. new level) differs from the current level,
+    the view checks:
+      - If the level was not 5 and now is 5, mark as completed.
+      - If the level was 5 and now is not, mark as uncompleted.
+    Then, the goal is linked to the progress record.
     """
     progress_record = get_object_or_404(ProgressRecord, pk=record_id)
     
+    # Update notes and optionally lesson.
     notes = request.data.get('notes')
     if notes is not None:
         progress_record.notes = notes
+    lesson_id = request.data.get('lesson_id')
+    if lesson_id:
+        from lessons.models import Lesson
+        progress_record.lesson = get_object_or_404(Lesson, pk=lesson_id)
     
-    # You can add updates for other fields as needed.
     try:
         progress_record.save()
     except Exception as e:
-        return JsonResponse({'error': f'Failed to update progress record: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse({'error': f'Failed to update progress record: {e}'},
+                            status=status.HTTP_400_BAD_REQUEST)
+    
+    # Process and update goals if provided.
+    goals_data = request.data.get('goals')
+    if goals_data:
+        from progress.models import Goal  # Import the Goal model.
+        goal_ids = []
+        for goal_data in goals_data:
+            goal_id = goal_data.get('goal_id')
+            new_level = goal_data.get('progress')
+            if goal_id is None or new_level is None:
+                continue
+            try:
+                goal_instance = Goal.objects.get(pk=goal_id)
+                new_level_int = int(new_level)
+                old_level = goal_instance.level
+                if old_level != new_level_int:
+                    goal_instance.level = new_level_int
+                    goal_instance.last_updated = now()
+                    if old_level != 5 and new_level_int == 5:
+                        goal_instance.mark_completed()
+                    elif old_level == 5 and new_level_int != 5:
+                        goal_instance.mark_uncompleted()
+                    else:
+                        goal_instance.save()
+                goal_ids.append(goal_instance.id)
+            except Goal.DoesNotExist:
+                continue
+        progress_record.goals.set(goal_ids)
     
     data = {
         'id': progress_record.id,
@@ -265,3 +280,38 @@ def update_progress_record(request, record_id):
         'notes': progress_record.notes,
     }
     return JsonResponse(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_progress_record(request):
+    """
+    Returns the progress record for a given student and lesson, if it exists.
+    Expects query parameters: student_id and lesson_id.
+    The response includes a list of goals linked to the record.
+    """
+    student_id = request.query_params.get('student_id')
+    lesson_id = request.query_params.get('lesson_id')
+    if not student_id or not lesson_id:
+        return JsonResponse({'error': 'student_id and lesson_id are required'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+    try:
+        progress_record = ProgressRecord.objects.get(student__id=student_id, lesson__id=lesson_id)
+        data = {
+            'id': progress_record.id,
+            'student': progress_record.student.id,
+            'lesson': progress_record.lesson.id if progress_record.lesson else None,
+            'date': progress_record.date.isoformat(),
+            'notes': progress_record.notes,
+            'goals': [
+                {
+                    'id': goal.id,
+                    'skill_name': goal.skill.name,
+                    'level': goal.level,
+                    'is_completed': goal.is_completed,
+                }
+                for goal in progress_record.goals.all()
+            ]
+        }
+        return JsonResponse(data, status=status.HTTP_200_OK)
+    except ProgressRecord.DoesNotExist:
+        return JsonResponse({'error': 'Progress record not found'}, status=status.HTTP_404_NOT_FOUND)

@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, time
 import json
 from django.contrib.auth import authenticate, get_user_model
 from events.models import Activity
+from locations.models import Location
+from sports.models import Sport
 from payments.models import Payment
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -647,8 +649,16 @@ def book_pack_view(request):
                 final_type = raw_type.get('pack')
             elif isinstance(raw_type, str):
                 final_type = raw_type
+                
+            subject_id = pack_req.get('subject')["id"]
+            location_id = pack_req.get('location')["id"]
+            subject = None
+            location = None
+            if subject_id:
+                subject = Sport.objects.get(pk=subject_id)
+            if location_id:
+                location = Location.objects.get(pk=location_id)
 
-            # Book the pack using your Pack model's custom method.
             new_pack = Pack.book_new_pack(
                 students=students,
                 school=school_obj,
@@ -661,6 +671,8 @@ def book_pack_view(request):
                 discount_id=pack_req.get('discount_id'),
                 type=final_type,
                 expiration_date=expiration_date if expiration_date else None,
+                subject=subject,
+                location=location,
             )
             booked_packs.append({
                 "pack_id": new_pack.id,
@@ -669,9 +681,9 @@ def book_pack_view(request):
                         "lesson_id": lesson.id,
                         "lesson_str": str(lesson),
                         "school": str(lesson.school) if lesson.school else "",
-                        "expiration_date": lesson.pack.expiration_date if lesson.pack and lesson.pack.expiration_date else "None",
+                        "expiration_date": lesson.packs.all()[0].expiration_date if lesson.packs.exists() and lesson.packs.all()[0].expiration_date else "None",
                     }
-                    for lesson in new_pack.lessons.all()
+                    for lesson in new_pack.lessons_many.all()
                 ],
                 "lessons_remaining": str(new_pack.number_of_classes_left),
                 "unscheduled_lessons": str(new_pack.get_number_of_unscheduled_lessons()),
