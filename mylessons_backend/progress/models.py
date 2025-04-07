@@ -39,10 +39,18 @@ class Goal(models.Model):
             self.target_date = new_date
             self.save()
             
-    def update_level(self, level):
-        self.level = level
-        self.last_updated = now()    
-        self.save()
+    def update_level(self, new_level):
+        old_level = self.level
+        self.level = new_level
+        self.last_updated = now()
+        if old_level != 5 and new_level == 5:
+            # Level changed to 5: mark goal as completed.
+            self.mark_completed()
+        elif old_level == 5 and new_level != 5:
+            # Level changed from 5: mark goal as uncompleted.
+            self.mark_uncompleted()
+        else:
+            self.save()
 
 
     @classmethod

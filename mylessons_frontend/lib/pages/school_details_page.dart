@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:mylessons_frontend/providers/school_provider.dart';
+import 'package:provider/provider.dart';
 
 class SchoolDetailsContent extends StatefulWidget {
   final Map<String, dynamic> school;
-  final Function(Map<String, dynamic>) onServiceSelected;
   const SchoolDetailsContent({
     Key? key,
     required this.school,
-    required this.onServiceSelected,
   }) : super(key: key);
 
   @override
@@ -214,7 +214,8 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
                     onTap: () {
                       final updatedService = Map<String, dynamic>.from(service);
                       updatedService['school_name'] = widget.school['name'] ?? 'N/A';
-                      widget.onServiceSelected(updatedService);
+                      Provider.of<SchoolProvider>(context, listen: false).selectService(updatedService);
+
                     },
                   ),
                 );

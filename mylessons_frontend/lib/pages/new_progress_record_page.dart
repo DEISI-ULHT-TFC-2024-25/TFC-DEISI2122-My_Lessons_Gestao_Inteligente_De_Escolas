@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../services/api_service.dart';
 import '../services/api_service.dart' as ApiService;
 import '../modals/progress_goal_modal.dart';
 
+// TODO when updating a record there should be an option to add a new goal even if the goal isnt linked wit hthat lesson as well
+
 class NewProgressRecordPage extends StatefulWidget {
-  final dynamic student; // Pass the selected student
-  final dynamic lesson;
-  const NewProgressRecordPage(
-      {Key? key, required this.student, required this.lesson})
+  final dynamic student; // The selected student.
+  final dynamic lesson;  // The current lesson.
+  const NewProgressRecordPage({Key? key, required this.student, required this.lesson})
       : super(key: key);
 
   @override
@@ -18,29 +17,51 @@ class NewProgressRecordPage extends StatefulWidget {
 class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Dummy lesson data; replace with API data as needed.
-  List<dynamic> lessons = [
-    {'id': 1, 'name': 'Basketball Basics'},
-    {'id': 2, 'name': 'Soccer Drills'},
-  ];
-  dynamic selectedLesson;
   DateTime recordDate = DateTime.now();
   final TextEditingController _notesController = TextEditingController();
   bool _isLoading = false;
 
-  // Active goals for the student.
+  // List of goals to display on the page.
   List<dynamic> activeGoals = [];
-  // Map to store updated progression for each goal (goal id -> level value)
+  // Map to store updated progression for each goal (goal id -> level value).
   final Map<int, int> goalProgress = {};
+  int? recordId; // Existing progress record ID (if one exists).
 
   @override
   void initState() {
     super.initState();
-    selectedLesson = lessons.first;
-    fetchActiveGoals();
+    // Try to fetch an existing progress record first.
+    fetchExistingProgressRecord();
   }
 
-  // Fetch active goals for the student from the backend.
+  /// Fetch an existing progress record based on student_id and lesson_id.
+  Future<void> fetchExistingProgressRecord() async {
+    try {
+      // Use 'lesson_id' from widget.lesson as required.
+      final record = await ApiService.getProgressRecord(
+          widget.student['id'], widget.lesson['lesson_id']);
+      if (record != null && record['id'] != null) {
+        setState(() {
+          recordId = record['id'];
+          _notesController.text = record['notes'] ?? "";
+          // Use the goals linked to this record (all goals, even completed).
+          activeGoals = record['goals'] ?? [];
+          // Update goalProgress map with the levels from the record.
+          for (var goal in activeGoals) {
+            goalProgress[goal['id']] = goal['level'] ?? 0;
+          }
+        });
+      } else {
+        // If no record exists, fetch active (uncompleted) goals.
+        await fetchActiveGoals();
+      }
+    } catch (e) {
+      // If record not found or error occurs, assume create mode.
+      await fetchActiveGoals();
+    }
+  }
+
+  /// In create mode, fetch only the active (uncompleted) goals.
   Future<void> fetchActiveGoals() async {
     setState(() {
       _isLoading = true;
@@ -62,7 +83,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
     }
   }
 
-  // Updates the progression for a goal.
+  // Updates the progression for a goal by adding the change value.
   void updateGoalProgress(int goalId, int change) {
     setState(() {
       int current = goalProgress[goalId] ?? 0;
@@ -80,30 +101,27 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
         _isLoading = true;
       });
       try {
-        // For each goal, update the level if it has changed.
-        for (var goal in activeGoals) {
-          final int goalId = goal['id'];
-          final int originalLevel = goal['level'] ?? 0;
-          final int updatedLevel = goalProgress[goalId] ?? originalLevel;
-          if (updatedLevel != originalLevel) {
-            await ApiService.updateGoalLevel(goalId, updatedLevel);
-          }
-        }
-
         final payload = {
           'student_id': widget.student['id'],
-          'lesson_id': widget
-              .lesson['lesson_id'], // Ensure this key exists in your lesson object.
+          'lesson_id': widget.lesson['lesson_id'], // Ensure this key exists.
           'notes': _notesController.text,
           'goals': goalProgress.entries
               .map((e) => {'goal_id': e.key, 'progress': e.value})
               .toList(),
         };
-
-        await ApiService.createProgressRecord(payload);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Progress record saved')),
-        );
+        if (recordId != null) {
+          // Update existing record.
+          await ApiService.updateProgressRecord(recordId!, payload);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Progress record updated')),
+          );
+        } else {
+          // Create new record.
+          await ApiService.createProgressRecord(payload);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Progress record saved')),
+          );
+        }
         Navigator.pop(context);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -117,6 +135,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
     }
   }
 
+  // Build a card widget for a given goal.
   Widget buildGoalCard(dynamic goal) {
     int progress = goalProgress[goal['id']] ?? 0;
     return Card(
@@ -163,7 +182,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Progress Record'),
+        title: Text(recordId != null ? 'Update Progress Record' : 'New Progress Record'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -177,15 +196,17 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    // Active Goals section.
-                    activeGoals.isEmpty
-                        ? const Text("No active goals.")
-                        : Column(
-                            children: activeGoals.map(buildGoalCard).toList(),
-                          ),
+                    // Display the goals section.
+                    Center(
+                      child: activeGoals.isEmpty
+                          ? const Text("No active goals.")
+                          : Column(
+                              children: activeGoals.map(buildGoalCard).toList(),
+                            ),
+                    ),
                     // Button to create a new goal.
                     Align(
-                      alignment: Alignment.centerRight,
+                      alignment: Alignment.center,
                       child: TextButton.icon(
                         onPressed: () async {
                           // Open the Create New Goal modal.
@@ -193,22 +214,20 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                             context: context,
                             isScrollControlled: true,
                             shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(16)),
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                             ),
                             builder: (context) => ProgressGoalModal(
                                 student: widget.student, lesson: widget.lesson),
                           );
-                          // After closing the modal, refresh active goals.
-                          fetchActiveGoals();
+                          // After closing the modal, refresh the progress record.
+                          await fetchExistingProgressRecord();
                         },
                         icon: const Icon(Icons.add, color: Colors.orange),
-                        label: const Text("Create New Goal",
-                            style: TextStyle(color: Colors.orange)),
+                        label: const Text("Create New Goal", style: TextStyle(color: Colors.orange)),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Notes field.
+                    // Notes input field.
                     TextFormField(
                       controller: _notesController,
                       decoration: const InputDecoration(
@@ -221,7 +240,7 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: _saveRecord,
-                      child: const Text('Save Record'),
+                      child: Text(recordId != null ? 'Update Record' : 'Save Record'),
                     ),
                   ],
                 ),

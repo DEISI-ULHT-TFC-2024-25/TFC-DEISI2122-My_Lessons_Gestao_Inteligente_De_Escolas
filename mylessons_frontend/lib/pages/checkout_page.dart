@@ -108,6 +108,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         "number_of_classes": checkoutDetails['classes'],
         "duration_in_minutes": checkoutDetails['duration'],
         "instructors": packItem['service']['instructors'] ?? [],
+        "subject": checkoutDetails['subject'] ?? null, // new key for subject
+        "location": checkoutDetails['location'] ?? null, // new key for location
         "price": checkoutDetails['price'],
         "payment": "cash",
         "discount_id": null,
@@ -286,8 +288,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  /// Build a details card using the checkout_details from the service.
-  /// The [index] is used to remove the item when the delete icon is tapped.
   Widget _buildDetailsCard(Map<String, dynamic> cartItem, int index) {
     final service = cartItem['service'] as Map<String, dynamic>? ?? {};
     final checkoutDetails =
@@ -324,6 +324,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   const SizedBox(height: 4),
                   Text(
                       "Time Limit: ${checkoutDetails['time_limit'] ?? 'N/A'} days"),
+                  const Divider(),
+                  // NEW: Add subject, location and instructor details if available.
+                  if (checkoutDetails['subject'] != null)
+                    Text("Subject: ${checkoutDetails['subject']?["name"]}",
+                        style: const TextStyle(fontSize: 14)),
+                  if (checkoutDetails['location'] != null)
+                    Text("Location: ${checkoutDetails['location']?["name"]}",
+                        style: const TextStyle(fontSize: 14)),
+                  if (checkoutDetails['instructor'] != null)
+                    Text(
+                        "Instructor: ${checkoutDetails['instructor']?["name"]}",
+                        style: const TextStyle(fontSize: 14)),
+                  const Divider(),
                   Text("Price: ${checkoutDetails['formatted_price'] ?? 'N/A'}"),
                   const SizedBox(height: 40),
                 ],

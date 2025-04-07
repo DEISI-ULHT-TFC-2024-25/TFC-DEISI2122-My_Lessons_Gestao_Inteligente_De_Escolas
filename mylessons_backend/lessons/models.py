@@ -41,7 +41,7 @@ class Pack(models.Model):
         if self.expiration_date < today:
             print(f"PACK IS EXPIRED: {str(self)}")
             if self.type == "private":
-                for lesson in self.lessons.filter(is_done=False):
+                for lesson in self.lessons_many.filter(is_done=False):
                     lesson.mark_as_given()
                 self.update_pack_status()
         days_until_expiration = None
@@ -68,7 +68,7 @@ class Pack(models.Model):
         today = now().date()
 
         if self.type == "private":
-            return self.lessons.filter(
+            return self.lessons_many.filter(
                 is_done=False
             ).filter(
                 Q(date__lt=today) |
@@ -77,11 +77,11 @@ class Pack(models.Model):
             ).count()
         elif self.type == "group":
             # If there are no lessons, return the total number of classes.
-            if not self.lessons.exists():
+            if not self.lessons_many.exists():
                 return self.number_of_classes
             
             # Count lessons that are considered scheduled (have both date and start_time).
-            scheduled_count = self.lessons.filter(
+            scheduled_count = self.lessons_many.filter(
                 date__isnull=False,
                 start_time__isnull=False
             ).count()
@@ -105,7 +105,7 @@ class Pack(models.Model):
         return get_instructors_ids(self.instructors.all())
     
     @classmethod
-    def book_new_pack(cls, students, school, date, number_of_classes, duration_in_minutes, instructors, price, payment, discount_id = None, type = None, expiration_date=None):
+    def book_new_pack(cls, students, school, date, number_of_classes, duration_in_minutes, instructors, price, payment, discount_id = None, type = None, expiration_date=None, subject=None, location=None):
         """
         Books a new private pack, creates the necessary associations, and sends notifications.
         """
@@ -130,7 +130,8 @@ class Pack(models.Model):
             price=price,
             debt=price, 
             type=type,
-            expiration_date=expiration_date
+            expiration_date=expiration_date,
+            sport=subject
         )
 
         pack.students.set(students)
@@ -143,7 +144,8 @@ class Pack(models.Model):
         pack.instructors.set(instructors)
 
         if type == "private":
-            pack.create_private_classes()
+            pack.create_private_classes(location)
+
 
         if payment:
             pack.update_debt(payment=payment)
@@ -214,18 +216,20 @@ class Pack(models.Model):
                 discount.delete()
         return pack
     
-    def create_private_classes(self):
+    def create_private_classes(self, location=None):
         for i in range(self.number_of_classes):
             private_class = Lesson.objects.create(
                 class_number=i + 1,
-                price=self.price/self.number_of_classes,
+                price=self.price / self.number_of_classes,
                 duration_in_minutes=self.duration_in_minutes,
                 school=self.school,
                 type=self.type,
+                sport=self.sport,
+                location=location,  # set location for the lesson
             )
             private_class.students.set(self.students.all())
             private_class.instructors.set(self.instructors.all())
-            self.lessons.add(private_class)
+            self.lessons_many.add(private_class)
         self.save()
 
     def update_debt(self, payment):
@@ -244,7 +248,7 @@ class Pack(models.Model):
 
     def add_class(self, lesson):
         if not self.is_done:
-            self.lessons.add(lesson)
+            self.lessons_many.add(lesson)
             self.save()
         else:
             raise ValueError("Cannot add classes to a completed pack.")
@@ -278,18 +282,19 @@ class Lesson(models.Model):
     location = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name="lessons")
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='lessons', blank=True, null=True)
     pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name='lessons', blank=True, null=True)
+    packs = models.ManyToManyField(Pack, related_name='lessons_many', blank=True)
     type = models.CharField(max_length=50, default='private')
     sport = models.ForeignKey('sports.Sport', related_name='lessons', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
         if self.date and self.start_time:
-            if self.pack != None and self.class_number != None:
-                return f"{self.get_students_name()} {self.type} lesson {self.class_number}/{self.pack.number_of_classes} on {self.date} at {self.start_time}"
+            if self.packs.all() and self.class_number != None:
+                return f"{self.get_students_name()} {self.type} lesson {self.class_number}/{self.packs.all()[0].number_of_classes} on {self.date} at {self.start_time}"
             else: 
                 return f"{self.get_students_name()} {self.type} lesson on {self.date} at {self.start_time}"
         else:
-            if self.pack != None and self.class_number != None:
-                return f"{self.get_students_name()} {self.type} lesson {self.class_number}/{self.pack.number_of_classes}"
+            if self.packs.all() and self.class_number != None:
+                return f"{self.get_students_name()} {self.type} lesson {self.class_number}/{self.packs.all()[0].number_of_classes}"
             else: 
                 return f"{self.get_students_name()} {self.type} lesson"
     
@@ -393,10 +398,11 @@ class Lesson(models.Model):
         self.is_done = True
         self.save(update_fields=["is_done"])
 
-        if self.pack:
-            self.pack.number_of_classes_left -= 1
-            self.pack.save(update_fields=["number_of_classes_left"])
-            self.pack.update_pack_status()
+        if self.packs.all():
+            pack_instance = self.packs.all()[0]
+            pack_instance.number_of_classes_left -= 1
+            pack_instance.save(update_fields=["number_of_classes_left"])
+            pack_instance.update_pack_status()
             
         for instructor in self.instructors.all():
             fixed_price = self.get_fixed_price(instructor=instructor) or 0
@@ -418,10 +424,11 @@ class Lesson(models.Model):
         self.is_done = False
         self.save(update_fields=["is_done"])
 
-        if self.pack:
-            self.pack.number_of_classes_left += 1
-            self.pack.save(update_fields=["number_of_classes_left"])
-            self.pack.update_pack_status()
+        if self.packs.all():
+            pack_instance = self.packs.all()[0]
+            pack_instance.number_of_classes_left += 1
+            pack_instance.save(update_fields=["number_of_classes_left"])
+            pack_instance.update_pack_status()
 
         for instructor in self.instructors.all():
 
@@ -714,7 +721,7 @@ class Lesson(models.Model):
             self.save()
             if self.school:
                 # Notify parents
-                for parent in self.pack.parents.all():
+                for parent in self.packs.all()[0].parents.all():
                     Notification.create_notification(
                         user=parent,
                         subject=self.school.get_notification_template(f"{self.type}_class_scheduled_subject_parent").format(
@@ -724,7 +731,7 @@ class Lesson(models.Model):
                             parent_name=parent.first_name,
                             students=self.get_students_name(),
                             class_number=self.class_number,
-                            number_of_classes=self.pack.number_of_classes,
+                            number_of_classes=self.packs.all()[0].number_of_classes,
                             date=date,
                             start_time=self.start_time,
                             duration_in_minutes=self.duration_in_minutes,
@@ -746,7 +753,7 @@ class Lesson(models.Model):
                             instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}",
                             students=self.get_students_name(),
                             class_number=self.class_number,
-                            number_of_classes=self.pack.number_of_classes,
+                            number_of_classes=self.packs.all()[0].number_of_classes,
                             date=date,
                             start_time=self.start_time,
                             duration_in_minutes=self.duration_in_minutes
@@ -766,7 +773,7 @@ class Lesson(models.Model):
                         message=self.school.get_notification_template(f"{self.type}_class_scheduled_message_admin").format(
                             students=self.get_students_name(),
                             class_number=self.class_number,
-                            number_of_classes=self.pack.number_of_classes,
+                            number_of_classes=self.packs.all()[0].number_of_classes,
                             date=date,
                             start_time=self.start_time,
                             duration_in_minutes=self.duration_in_minutes,

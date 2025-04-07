@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:mylessons_frontend/modals/lesson_details_modal.dart';
 import 'package:mylessons_frontend/modals/pack_details_modal.dart';
 import 'package:mylessons_frontend/modals/schedule_multiple_lessons_modal.dart';
+import 'package:mylessons_frontend/providers/pack_details_provider.dart';
+import 'package:mylessons_frontend/widgets/handle_lesson_report.dart';
+import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -22,7 +26,8 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   final storage = const FlutterSecureStorage();
   String firstName = '';
   String lastName = '';
@@ -41,6 +46,7 @@ class _HomePageState extends State<HomePage> {
   // State variables for inner toggle buttons.
   int _lessonsActiveTabIndex = 0; // 0 = Active, 1 = History
   int _packsActiveTabIndex = 0; // 0 = Active, 1 = History
+  double _headerHeight = 80;
 
   // Admin Metrics
   int schoolId = 0;
@@ -51,6 +57,17 @@ class _HomePageState extends State<HomePage> {
   double totalRevenue = 0.0;
   DateTime startDate = DateTime.now();
   DateTime endDate = DateTime.now();
+
+  // ------------------ NEW VARIABLES FOR ANIMATIONS & SCROLL ------------------
+  late AnimationController _headerAnimationController;
+  // We'll use the controller’s value (0.0–1.0) with two intervals for the two header states.
+  // Scroll controllers for lessons and packs lists:
+  final ScrollController _lessonsScrollController = ScrollController();
+  final ScrollController _packsScrollController = ScrollController();
+  // Variables to hide/show the header and the toggle row based on scroll:
+  bool _showToggleRow = true;
+  bool _showHeader = true;
+  // ---------------------------------------------------------------------------
 
   // Search and filter state for each tab.
   // Lessons
@@ -69,6 +86,61 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     setInitialDate();
     fetchData();
+    // Initialize header animation controller.
+    _headerAnimationController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 800));
+
+    // After a 2-second delay, start the slide/fade animation.
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        _headerAnimationController.forward().then((_) {
+          // If there are no notifications, collapse the header (set height to 0).
+          // If notifications exist, keep the header height (80) to display them.
+          if (notificationsCount == 0) {
+            setState(() {
+              _headerHeight = 0;
+            });
+          }
+        });
+      }
+    });
+
+    // Listen to scrolling in lessons tab.
+    _lessonsScrollController.addListener(() {
+      if (_lessonsScrollController.offset > 50 && _showToggleRow) {
+        setState(() {
+          _showToggleRow = false;
+          _showHeader = false;
+        });
+      } else if (_lessonsScrollController.offset <= 50 && !_showToggleRow) {
+        setState(() {
+          _showToggleRow = true;
+          _showHeader = true;
+        });
+      }
+    });
+    // Listen to scrolling in packs tab.
+    _packsScrollController.addListener(() {
+      if (_packsScrollController.offset > 50 && _showToggleRow) {
+        setState(() {
+          _showToggleRow = false;
+          _showHeader = false;
+        });
+      } else if (_packsScrollController.offset <= 50 && !_showToggleRow) {
+        setState(() {
+          _showToggleRow = true;
+          _showHeader = true;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _headerAnimationController.dispose();
+    _lessonsScrollController.dispose();
+    _packsScrollController.dispose();
+    super.dispose();
   }
 
   void setInitialDate() {
@@ -105,7 +177,7 @@ class _HomePageState extends State<HomePage> {
       final decodedResponse =
           json.decode(utf8.decode(unschedulableLessonsResponse.bodyBytes));
 
-// Assuming the API returns a map with a key "unschedulable_lessons" that holds the list.
+      // Assuming the API returns a map with a key "lesson_ids" that holds the list.
       setState(() {
         unschedulableLessons = List<String>.from(decodedResponse['lesson_ids']);
       });
@@ -333,7 +405,6 @@ class _HomePageState extends State<HomePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
-        // Instead of just calling fetchData(), we now push a new ProfilePage,
         await fetchData();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -345,7 +416,7 @@ class _HomePageState extends State<HomePage> {
 
   // ----------------- Modal Options for Cards -----------------
 
-  void _showLessonCardOptions(dynamic lesson) {
+  void showLessonCardOptions(dynamic lesson) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -377,7 +448,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     );
                   } else {
-                    _showScheduleLessonModal(lesson);
+                    showScheduleLessonModal(lesson);
                   }
                 },
               ),
@@ -386,7 +457,7 @@ class _HomePageState extends State<HomePage> {
                 title: const Text("View Details"),
                 onTap: () {
                   Navigator.pop(context);
-                  _showLessonDetailsModal(lesson);
+                  showLessonDetailsModal(lesson);
                 },
               ),
             ],
@@ -438,7 +509,7 @@ class _HomePageState extends State<HomePage> {
                 title: const Text("View Details"),
                 onTap: () {
                   Navigator.pop(context);
-                  _showPackDetailsModal(pack);
+                  showPackDetailsModal(pack);
                 },
               ),
             ],
@@ -450,30 +521,41 @@ class _HomePageState extends State<HomePage> {
 
   // ------------------- Existing Modal Methods -------------------
 
-  _showLessonDetailsModal(lesson) {
+  showLessonDetailsModal(lesson) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => LessonDetailsModal(
-        lesson: lesson,
-        currentRole: currentRole,
-        fetchData: fetchData,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: LessonDetailsModal(
+          lesson: lesson,
+          currentRole: currentRole,
+          fetchData: fetchData,
+        ),
       ),
     );
   }
 
-  void _showPackDetailsModal(dynamic pack) {
+  void showPackDetailsModal(dynamic pack) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => PackDetailsModal(
-        pack: pack,
-        currentRole: currentRole,
-        fetchData: fetchData,
+      builder: (context) => ChangeNotifierProvider(
+        create: (_) {
+          final provider = PackDetailsProvider();
+          provider.initialize(
+            pack: pack,
+            currentRole: currentRole,
+            fetchData: fetchData,
+            unschedulableLessons: unschedulableLessons,
+          );
+          return provider;
+        },
+        child: const PackDetailsModal(),
       ),
     );
   }
@@ -498,7 +580,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _showScheduleLessonModal(dynamic lesson) async {
+  Future<void> showScheduleLessonModal(dynamic lesson) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
     int schoolScheduleTimeLimit =
         await fetchSchoolScheduleTimeLimit(lesson["school"]);
@@ -523,8 +605,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _showNotificationsModal() async {
+    // Mark notifications as read and collapse the header.
     setState(() {
-      notificationsCount = 0; // remove badge
+      notificationsCount = 0;
+      // Collapse the header so that the tab bar moves up.
+      _headerHeight = 0;
     });
 
     showModalBottomSheet(
@@ -623,45 +708,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // ------------------- Filtering Bar Widget -------------------
-
-  // Filters the lessons list based on a search query and filters.
-  List<dynamic> _filterLessons(
-      List<dynamic> lessons, String query, List<Map<String, String>> filters) {
-    return lessons.where((lesson) {
-      final name = lesson['students_name'].toString();
-      final matchesQuery =
-          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
-      final appliedTypes = filters
-          .where((f) => f['type'] == 'lessonType')
-          .map((f) => f['value']!.toLowerCase())
-          .toList();
-      final lessonType = lesson['type']?.toString().toLowerCase() ?? '';
-      final matchesFilter =
-          appliedTypes.isEmpty || appliedTypes.contains(lessonType);
-      return matchesQuery && matchesFilter;
-    }).toList();
-  }
-
-// Filters the packs list based on a search query and filters.
-  List<dynamic> _filterPacks(
-      List<dynamic> packs, String query, List<Map<String, String>> filters) {
-    return packs.where((pack) {
-      final name = pack['students_name'].toString();
-      final matchesQuery =
-          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
-      final appliedTypes = filters
-          .where((f) => f['type'] == 'packType')
-          .map((f) => f['value']!.toLowerCase())
-          .toList();
-      final packType = pack['type']?.toString().toLowerCase() ?? '';
-      final matchesFilter =
-          appliedTypes.isEmpty || appliedTypes.contains(packType);
-      return matchesQuery && matchesFilter;
-    }).toList();
-  }
-
-// Shows a modal bottom sheet to filter lessons.
+  // Shows a modal bottom sheet to filter lessons.
   void _showLessonFilterModal(bool isUpcoming, List<dynamic> lessons) {
     const options = ['Group', 'Private'];
     // Use upcomingFilters or lastLessonsFilters based on isUpcoming.
@@ -798,56 +845,317 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSearchFilterBar({
-    required String hint,
-    required String query,
-    required Function(String) onQueryChanged,
-    required VoidCallback onFilterPressed,
-    required List<Map<String, String>> filters,
-    required VoidCallback onClearFilters,
-  }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: hint,
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8.0),
+  // ------------------- Filtering Methods -------------------
+
+  List<dynamic> _filterLessons(
+      List<dynamic> lessons, String query, List<Map<String, String>> filters) {
+    return lessons.where((lesson) {
+      final name = lesson['students_name'].toString();
+      final matchesQuery =
+          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
+      final appliedTypes = filters
+          .where((f) => f['type'] == 'lessonType')
+          .map((f) => f['value']!.toLowerCase())
+          .toList();
+      final lessonType = lesson['type']?.toString().toLowerCase() ?? '';
+      final matchesFilter =
+          appliedTypes.isEmpty || appliedTypes.contains(lessonType);
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  List<dynamic> _filterPacks(
+      List<dynamic> packs, String query, List<Map<String, String>> filters) {
+    return packs.where((pack) {
+      final name = pack['students_name'].toString();
+      final matchesQuery =
+          query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
+      final appliedTypes = filters
+          .where((f) => f['type'] == 'packType')
+          .map((f) => f['value']!.toLowerCase())
+          .toList();
+      final packType = pack['type']?.toString().toLowerCase() ?? '';
+      final matchesFilter =
+          appliedTypes.isEmpty || appliedTypes.contains(packType);
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  // ------------------- NEW WIDGETS FOR ANIMATED HEADER & TOGGLE/SEARCH ROW -------------------
+
+  Widget _buildHeader() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+      height: _headerHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: _headerHeight > 0
+          ? Stack(
+              alignment: Alignment.center,
+              children: [
+                // Welcome text and first name slide up and fade out.
+                SlideTransition(
+                  position: _headerAnimationController.drive(
+                    Tween<Offset>(begin: Offset.zero, end: const Offset(0, -1))
+                        .chain(CurveTween(curve: const Interval(0.0, 0.5))),
+                  ),
+                  child: FadeTransition(
+                    opacity: _headerAnimationController.drive(
+                      Tween<double>(begin: 1.0, end: 0.0)
+                          .chain(CurveTween(curve: const Interval(0.0, 0.5))),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Welcome back,",
+                          style: GoogleFonts.lato(
+                              fontSize: 18, color: Colors.orange),
+                          textAlign: TextAlign.center,
+                        ),
+                        Text(
+                          firstName,
+                          style: GoogleFonts.lato(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Notifications row (if any) appears in the second half of the animation.
+                if (notificationsCount > 0)
+                  SlideTransition(
+                    position: _headerAnimationController.drive(
+                      Tween<Offset>(
+                              begin: const Offset(0, -1), end: Offset.zero)
+                          .chain(CurveTween(curve: const Interval(0.5, 1.0))),
+                    ),
+                    child: FadeTransition(
+                      opacity: _headerAnimationController.drive(
+                        Tween<double>(begin: 0.0, end: 1.0)
+                            .chain(CurveTween(curve: const Interval(0.5, 1.0))),
+                      ),
+                      child: GestureDetector(
+                        onTap: _showNotificationsModal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.notifications_none,
+                                size: 28, color: Colors.orange),
+                            const SizedBox(width: 8),
+                            Text(
+                              "$notificationsCount new notifications",
+                              style: GoogleFonts.lato(
+                                  fontSize: 18, color: Colors.orange),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildToggleRowForLessons() {
+    return AnimatedOpacity(
+      opacity: _showToggleRow ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.search, color: Colors.orange),
+                onPressed: () {
+                  // Implement your search functionality here.
+                  print("Search pressed in lessons tab");
+                },
               ),
             ),
-            onChanged: onQueryChanged,
-          ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: onFilterPressed,
-                icon: const Icon(Icons.filter_list, color: Colors.black),
-                label: const Text('Filters',
-                    style: TextStyle(color: Colors.black)),
-              ),
-              const SizedBox(width: 4),
-              ...filters.map((filter) => Padding(
-                    padding: const EdgeInsets.only(right: 2.0),
-                    child: Chip(
-                      label: Text(filter['value']!),
-                      deleteIcon: const Icon(Icons.close, color: Colors.black),
-                      onDeleted: onClearFilters,
-                      backgroundColor: Colors.transparent,
-                      side: const BorderSide(color: Colors.transparent),
-                      labelStyle: const TextStyle(color: Colors.black),
+            Center(
+              child: ToggleButtons(
+                borderRadius: BorderRadius.circular(16),
+                isSelected: [
+                  _lessonsActiveTabIndex == 0,
+                  _lessonsActiveTabIndex == 1,
+                ],
+                onPressed: (int index) {
+                  setState(() {
+                    _lessonsActiveTabIndex = index;
+                  });
+                },
+                selectedColor: Colors.white,
+                fillColor: Colors.orange,
+                color: Colors.orange,
+                borderColor: Colors.orange,
+                borderWidth: 2.0,
+                selectedBorderColor: Colors.orange,
+                constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
+                children: [
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_lessonsActiveTabIndex == 0)
+                          const Icon(Icons.check,
+                              color: Colors.black, size: 16),
+                        if (_lessonsActiveTabIndex == 0)
+                          const SizedBox(width: 4),
+                        const Text(
+                          "Active",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
-                  )),
-            ],
-          ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_lessonsActiveTabIndex == 1)
+                          const Icon(Icons.check,
+                              color: Colors.black, size: 16),
+                        if (_lessonsActiveTabIndex == 1)
+                          const SizedBox(width: 4),
+                        const Text(
+                          "History",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.filter_list, color: Colors.orange),
+                onPressed: () {
+                  if (_lessonsActiveTabIndex == 0) {
+                    _showLessonFilterModal(true, upcomingLessons);
+                  } else {
+                    _showLessonFilterModal(false, lastLessons);
+                  }
+                },
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildToggleRowForPacks() {
+    return AnimatedOpacity(
+      opacity: _showToggleRow ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+        child: Stack(
+          children: [
+            // Left: Search Icon
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.search, color: Colors.orange),
+                onPressed: () {
+                  // Implement search functionality.
+                  print("Search pressed in packs tab");
+                },
+              ),
+            ),
+            // Center: Toggle Buttons.
+            Center(
+              child: ToggleButtons(
+                borderRadius: BorderRadius.circular(16),
+                isSelected: [
+                  _packsActiveTabIndex == 0,
+                  _packsActiveTabIndex == 1,
+                ],
+                onPressed: (int index) {
+                  setState(() {
+                    _packsActiveTabIndex = index;
+                  });
+                },
+                selectedColor: Colors.white,
+                fillColor: Colors.orange,
+                color: Colors.orange,
+                borderColor: Colors.orange,
+                borderWidth: 2.0,
+                selectedBorderColor: Colors.orange,
+                constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
+                children: [
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_packsActiveTabIndex == 0)
+                          const Icon(Icons.check,
+                              color: Colors.black, size: 16),
+                        if (_packsActiveTabIndex == 0) const SizedBox(width: 4),
+                        const Text(
+                          "Active",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_packsActiveTabIndex == 1)
+                          const Icon(Icons.check,
+                              color: Colors.black, size: 16),
+                        if (_packsActiveTabIndex == 1) const SizedBox(width: 4),
+                        const Text(
+                          "History",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Right: Filter Icon
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.filter_list, color: Colors.orange),
+                onPressed: () {
+                  if (_packsActiveTabIndex == 0) {
+                    _showPackFilterModal(true, activePacks);
+                  } else {
+                    _showPackFilterModal(false, lastPacks);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -894,7 +1202,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildLessonCard(dynamic lesson, {bool isLastLesson = false}) {
     final isGroup = lesson['type']?.toString().toLowerCase() == 'group';
     return InkWell(
-      onTap: () => _showLessonCardOptions(lesson),
+      onTap: () => showLessonCardOptions(lesson),
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -903,10 +1211,11 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               const SizedBox(width: 16),
-              // Wrap the calendar icon in its own InkWell.
               InkWell(
                 onTap: () {
-                  if (unschedulableLessons
+                  if (isLastLesson) {
+                    handleLessonReport(context, lesson);
+                  } else if (unschedulableLessons
                       .contains(lesson['lesson_id'].toString())) {
                     showDialog(
                       context: context,
@@ -922,10 +1231,8 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     );
-                  } else
-                  // Shortcut directly to scheduling modal.
-                  if (lesson['type']?.toString().toLowerCase() == 'group') {
-                    // For group lessons, show an alert if scheduling is unavailable.
+                  } else if (lesson['type']?.toString().toLowerCase() ==
+                      'group') {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -941,10 +1248,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                     );
                   } else {
-                    _showScheduleLessonModal(lesson);
+                    showScheduleLessonModal(lesson);
                   }
                 },
-                // Use InkWell to provide ripple feedback.
                 child: SizedBox(
                   width: 40,
                   height: 40,
@@ -983,10 +1289,9 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.grey,
                   ),
                   const SizedBox(width: 8),
-                  // Wrap the three dots icon in its own InkWell.
                   InkWell(
                     onTap: () {
-                      _showLessonDetailsModal(lesson);
+                      showLessonDetailsModal(lesson);
                     },
                     child: const Icon(Icons.more_vert,
                         size: 28, color: Colors.orange),
@@ -1013,7 +1318,6 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               const SizedBox(width: 16),
-              // Wrap the calendar icon in its own InkWell.
               InkWell(
                 onTap: () {
                   if (pack['type'].toString().toLowerCase() == 'group') {
@@ -1073,10 +1377,9 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.grey,
                   ),
                   const SizedBox(width: 8),
-                  // Wrap the three dots icon in its own InkWell.
                   InkWell(
                     onTap: () {
-                      _showPackDetailsModal(pack);
+                      showPackDetailsModal(pack);
                     },
                     child: const Icon(Icons.more_vert,
                         size: 28, color: Colors.orange),
@@ -1294,100 +1597,13 @@ class _HomePageState extends State<HomePage> {
 
   // ------------------- Build Method with Nested Tabs -------------------
 
-  Widget _buildToggleButton({
-    required String label,
-    required bool isActive,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size(0, 32),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        backgroundColor: Colors.orange, // always orange background
-        foregroundColor: Colors.white, // always white text
-        side: isActive
-            ? const BorderSide(width: 3, color: Colors.black)
-            : const BorderSide(width: 1, color: Colors.orange),
-        elevation: 0,
-      ),
-      child: Text(label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Build the Lessons tab using custom toggle buttons.
+    // Build the Lessons tab.
     Widget lessonsTab = Column(
       children: [
-        // Replace the two ElevatedButtons with a ToggleButtons widget.
-        // Lessons Toggle Buttons
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ToggleButtons(
-              borderRadius: BorderRadius.circular(16),
-              isSelected: [
-                _lessonsActiveTabIndex == 0,
-                _lessonsActiveTabIndex == 1,
-              ],
-              onPressed: (int index) {
-                setState(() {
-                  _lessonsActiveTabIndex = index;
-                });
-              },
-              selectedColor: Colors.white,
-              fillColor: Colors.orange,
-              color: Colors.orange,
-              borderColor: Colors.orange,
-              borderWidth: 2.0,
-              selectedBorderColor: Colors.orange,
-              constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_lessonsActiveTabIndex == 0)
-                        const Icon(Icons.check, color: Colors.black, size: 16),
-                      if (_lessonsActiveTabIndex == 0) const SizedBox(width: 4),
-                      const Text(
-                        "Active",
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_lessonsActiveTabIndex == 1)
-                        const Icon(Icons.check, color: Colors.black, size: 16),
-                      if (_lessonsActiveTabIndex == 1) const SizedBox(width: 4),
-                      const Text(
-                        "History",
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
+        // NEW: Use the new toggle row (with search and filter icons)
+        _buildToggleRowForLessons(),
         Expanded(
           child: _lessonsActiveTabIndex == 0
               ? RefreshIndicator(
@@ -1397,51 +1613,26 @@ class _HomePageState extends State<HomePage> {
                     await fetchData();
                   },
                   child: SingleChildScrollView(
+                    controller: _lessonsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildSearchFilterBar(
-                          hint: "Search lessons...",
-                          query: upcomingSearchQuery,
-                          onQueryChanged: (q) {
-                            setState(() {
-                              upcomingSearchQuery = q;
-                            });
-                          },
-                          onFilterPressed: () =>
-                              _showLessonFilterModal(true, upcomingLessons),
-                          filters: upcomingFilters,
-                          onClearFilters: () {
-                            setState(() {
-                              upcomingFilters.clear();
-                            });
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: _isLoading
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: _isLoading
+                          ? Column(
+                              children: List.generate(
+                                  3, (index) => _buildLoadingCard()),
+                            )
+                          : _filterLessons(upcomingLessons, upcomingSearchQuery,
+                                      upcomingFilters)
+                                  .isNotEmpty
                               ? Column(
-                                  children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
-                                )
-                              : _filterLessons(upcomingLessons,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: _filterLessons(upcomingLessons,
                                           upcomingSearchQuery, upcomingFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterLessons(
-                                              upcomingLessons,
-                                              upcomingSearchQuery,
-                                              upcomingFilters)
-                                          .map((lesson) =>
-                                              _buildLessonCard(lesson))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No active lessons")),
-                        ),
-                      ],
+                                      .map((lesson) => _buildLessonCard(lesson))
+                                      .toList(),
+                                )
+                              : const Center(child: Text("No active lessons")),
                     ),
                   ),
                 )
@@ -1452,54 +1643,30 @@ class _HomePageState extends State<HomePage> {
                     await fetchData();
                   },
                   child: SingleChildScrollView(
+                    controller: _lessonsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildSearchFilterBar(
-                          hint: "Search lessons...",
-                          query: lastLessonsSearchQuery,
-                          onQueryChanged: (q) {
-                            setState(() {
-                              lastLessonsSearchQuery = q;
-                            });
-                          },
-                          onFilterPressed: () =>
-                              _showLessonFilterModal(false, lastLessons),
-                          filters: lastLessonsFilters,
-                          onClearFilters: () {
-                            setState(() {
-                              lastLessonsFilters.clear();
-                            });
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: _isLoading
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: _isLoading
+                          ? Column(
+                              children: List.generate(
+                                  3, (index) => _buildLoadingCard()),
+                            )
+                          : _filterLessons(lastLessons, lastLessonsSearchQuery,
+                                      lastLessonsFilters)
+                                  .isNotEmpty
                               ? Column(
-                                  children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
-                                )
-                              : _filterLessons(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: _filterLessons(
                                           lastLessons,
                                           lastLessonsSearchQuery,
                                           lastLessonsFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterLessons(
-                                              lastLessons,
-                                              lastLessonsSearchQuery,
-                                              lastLessonsFilters)
-                                          .map((lesson) => _buildLessonCard(
-                                              lesson,
-                                              isLastLesson: true))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No historical lessons")),
-                        ),
-                      ],
+                                      .map((lesson) => _buildLessonCard(lesson,
+                                          isLastLesson: true))
+                                      .toList(),
+                                )
+                              : const Center(
+                                  child: Text("No historical lessons")),
                     ),
                   ),
                 ),
@@ -1507,72 +1674,10 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    // Build the Packs tab using ToggleButtons.
+    // Build the Packs tab.
     Widget packsTab = Column(
       children: [
-        // Packs Toggle Buttons
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ToggleButtons(
-              borderRadius: BorderRadius.circular(16),
-              isSelected: [
-                _packsActiveTabIndex == 0,
-                _packsActiveTabIndex == 1,
-              ],
-              onPressed: (int index) {
-                setState(() {
-                  _packsActiveTabIndex = index;
-                });
-              },
-              selectedColor: Colors.white,
-              fillColor: Colors.orange,
-              color: Colors.orange,
-              borderColor: Colors.orange,
-              borderWidth: 2.0,
-              selectedBorderColor: Colors.orange,
-              constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_packsActiveTabIndex == 0)
-                        const Icon(Icons.check, color: Colors.black, size: 16),
-                      if (_packsActiveTabIndex == 0) const SizedBox(width: 4),
-                      const Text(
-                        "Active",
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_packsActiveTabIndex == 1)
-                        const Icon(Icons.check, color: Colors.black, size: 16),
-                      if (_packsActiveTabIndex == 1) const SizedBox(width: 4),
-                      const Text(
-                        "History",
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
+        _buildToggleRowForPacks(),
         Expanded(
           child: _packsActiveTabIndex == 0
               ? RefreshIndicator(
@@ -1582,52 +1687,28 @@ class _HomePageState extends State<HomePage> {
                     await fetchData();
                   },
                   child: SingleChildScrollView(
+                    controller: _packsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildSearchFilterBar(
-                          hint: "Search packs...",
-                          query: activePacksSearchQuery,
-                          onQueryChanged: (q) {
-                            setState(() {
-                              activePacksSearchQuery = q;
-                            });
-                          },
-                          onFilterPressed: () =>
-                              _showPackFilterModal(true, activePacks),
-                          filters: activePacksFilters,
-                          onClearFilters: () {
-                            setState(() {
-                              activePacksFilters.clear();
-                            });
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: _isLoading
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: _isLoading
+                          ? Column(
+                              children: List.generate(
+                                  3, (index) => _buildLoadingCard()),
+                            )
+                          : _filterPacks(activePacks, activePacksSearchQuery,
+                                      activePacksFilters)
+                                  .isNotEmpty
                               ? Column(
-                                  children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
-                                )
-                              : _filterPacks(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: _filterPacks(
                                           activePacks,
                                           activePacksSearchQuery,
                                           activePacksFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterPacks(
-                                              activePacks,
-                                              activePacksSearchQuery,
-                                              activePacksFilters)
-                                          .map((pack) => _buildPackCard(pack))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No active packs")),
-                        ),
-                      ],
+                                      .map((pack) => _buildPackCard(pack))
+                                      .toList(),
+                                )
+                              : const Center(child: Text("No active packs")),
                     ),
                   ),
                 )
@@ -1638,56 +1719,36 @@ class _HomePageState extends State<HomePage> {
                     await fetchData();
                   },
                   child: SingleChildScrollView(
+                    controller: _packsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildSearchFilterBar(
-                          hint: "Search packs...",
-                          query: lastPacksSearchQuery,
-                          onQueryChanged: (q) {
-                            setState(() {
-                              lastPacksSearchQuery = q;
-                            });
-                          },
-                          onFilterPressed: () =>
-                              _showPackFilterModal(false, lastPacks),
-                          filters: lastPacksFilters,
-                          onClearFilters: () {
-                            setState(() {
-                              lastPacksFilters.clear();
-                            });
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: _isLoading
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: _isLoading
+                          ? Column(
+                              children: List.generate(
+                                  3, (index) => _buildLoadingCard()),
+                            )
+                          : _filterPacks(lastPacks, lastPacksSearchQuery,
+                                      lastPacksFilters)
+                                  .isNotEmpty
                               ? Column(
-                                  children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
-                                )
-                              : _filterPacks(lastPacks, lastPacksSearchQuery,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: _filterPacks(
+                                          lastPacks,
+                                          lastPacksSearchQuery,
                                           lastPacksFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterPacks(
-                                              lastPacks,
-                                              lastPacksSearchQuery,
-                                              lastPacksFilters)
-                                          .map((pack) => _buildPackCard(pack))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No historical packs")),
-                        ),
-                      ],
+                                      .map((pack) => _buildPackCard(pack))
+                                      .toList(),
+                                )
+                              : const Center(
+                                  child: Text("No historical packs")),
                     ),
                   ),
                 ),
         ),
       ],
     );
+
     // Stats tab remains unchanged.
     Widget statsTab = (currentRole == "Admin" || currentRole == "Instructor")
         ? _isLoading
@@ -1703,6 +1764,7 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Column(
             children: [
+              // NEW: Use the animated header
               _buildHeader(),
               Expanded(
                 child: DefaultTabController(
@@ -1742,88 +1804,5 @@ class _HomePageState extends State<HomePage> {
   // Simple message for roles with no stats.
   Widget _buildNoStats() {
     return const Center(child: Text("No stats available"));
-  }
-
-  Widget _buildHeader() {
-    if (_isLoading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(width: 150, height: 18, color: Colors.grey[300]),
-                const Spacer(),
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(width: 100, height: 28, color: Colors.grey[300]),
-            const SizedBox(height: 20),
-          ],
-        ),
-      );
-    } else {
-      String welcomeText = currentRole == "Admin"
-          ? 'Welcome back to $schoolName,'
-          : 'Welcome back,';
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    welcomeText,
-                    style: GoogleFonts.lato(fontSize: 18, color: Colors.grey),
-                  ),
-                ),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _showNotificationsModal,
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        const Icon(Icons.notifications_none,
-                            size: 28, color: Colors.orange),
-                        if (notificationsCount > 0)
-                          Positioned(
-                            right: 10,
-                            top: 10,
-                            child: CircleAvatar(
-                                radius: 8, backgroundColor: Colors.red),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              firstName,
-              style: GoogleFonts.lato(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      );
-    }
   }
 }

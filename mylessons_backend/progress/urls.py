@@ -10,4 +10,5 @@ urlpatterns = [
     path('create_goal/', create_goal, name='create_goal'),
     path('progress-records/', create_progress_record, name='create_progress_record'),
     path('progress-records/<int:record_id>/', update_progress_record, name='update_progress_record'),
+    path('progress-record/', get_progress_record, name='update_progress_record'),
 ]

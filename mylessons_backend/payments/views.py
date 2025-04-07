@@ -72,7 +72,7 @@ def new_payment(request):
             for pack_id in packs:
                 pack = Pack.objects.get(id=pack_id)
                 payment.packs.add(pack)
-                for lesson in pack.lessons.all():
+                for lesson in pack.lessons_many.all():
                     payment.lessons.add(lesson)
 
             # Process individual activities
