@@ -15,7 +15,7 @@ class OptionCard extends StatelessWidget {
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
-  
+
   const OptionCard({
     Key? key,
     required this.text,
@@ -23,7 +23,7 @@ class OptionCard extends StatelessWidget {
     required this.selected,
     required this.onTap,
   }) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -34,7 +34,7 @@ class OptionCard extends StatelessWidget {
         child: Card(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: selected 
+            side: selected
                 ? const BorderSide(color: Colors.orange, width: 2)
                 : BorderSide(color: Colors.grey.shade300, width: 1),
           ),
@@ -144,35 +144,33 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
   }
 
   void _showStudentSelectionModal() {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (context) {
-      return StudentSelectionModal(
-        service: _service,
-        requiredCount: selectedPeople,
-        selectedDuration: selectedDuration,
-        selectedClasses: selectedClasses,
-        selectedPeople: selectedPeople,
-        currentPrice: currentPrice,
-        currentTimeLimit: currentTimeLimit,
-        // Pass the extra data
-        selectedSubject: selectedSubject,
-        selectedLocation: selectedLocation,
-        selectedInstructor: selectedInstructor,
-        onSelectionUpdated: (count) {
-          setState(() {
-            _selectedStudentsCount = count;
-          });
-        },
-      );
-    },
-  );
-}
-
-
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return StudentSelectionModal(
+          service: _service,
+          requiredCount: selectedPeople,
+          selectedDuration: selectedDuration,
+          selectedClasses: selectedClasses,
+          selectedPeople: selectedPeople,
+          currentPrice: currentPrice,
+          currentTimeLimit: currentTimeLimit,
+          // Pass the extra data
+          selectedSubject: selectedSubject,
+          selectedLocation: selectedLocation,
+          selectedInstructor: selectedInstructor,
+          onSelectionUpdated: (count) {
+            setState(() {
+              _selectedStudentsCount = count;
+            });
+          },
+        );
+      },
+    );
+  }
 
   Widget _buildBookingStepContent() {
     // Define pricingOptions once for use in all cases.
@@ -192,7 +190,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
           children: [
             Text(
               "Step 1: Select Subject",
-              style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Column(
@@ -229,7 +228,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
           children: [
             Text(
               "Step 2: Select Duration",
-              style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Column(
@@ -253,16 +253,20 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
         break;
       case 2:
         // Step 3: Number of classes selection
-        final List<int> classesOptions = pricingOptions
+        final filteredOptionsForClasses = pricingOptions
+            .where((option) => option['duration'] == selectedDuration);
+        final List<int> classesOptions = filteredOptionsForClasses
             .map((e) => e['classes'] as int)
             .toSet()
             .toList()
           ..sort();
+
         stepContent = Column(
           children: [
             Text(
               "Step 3: Select Number of Classes",
-              style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Column(
@@ -283,19 +287,24 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
             ),
           ],
         );
-        break;
+
       case 3:
         // Step 4: Number of people selection
-        final List<int> peopleOptions = pricingOptions
+        final filteredOptionsForPeople = pricingOptions.where((option) =>
+            option['duration'] == selectedDuration &&
+            option['classes'] == selectedClasses);
+        final List<int> peopleOptions = filteredOptionsForPeople
             .map((e) => e['people'] as int)
             .toSet()
             .toList()
           ..sort();
+
         stepContent = Column(
           children: [
             Text(
               "Step 4: Select Number of People",
-              style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Column(
@@ -308,7 +317,7 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                   onTap: () {
                     setState(() {
                       selectedPeople = p;
-                      _currentStep = 4; // Move to location selection
+                      _currentStep = 4;
                     });
                   },
                 );
@@ -316,7 +325,6 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
             ),
           ],
         );
-        break;
       case 4:
         // Step 5: Preferred location selection
         final List<dynamic> locations = selectedSubject != null
@@ -326,7 +334,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
           children: [
             Text(
               "Step 5: Select Preferred Location",
-              style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             locations.isNotEmpty
@@ -370,13 +379,15 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
       case 5:
         // Step 6: Instructor selection (optional)
         // Use the instructors directly from the selected location.
-        final List<dynamic> instructors =
-            selectedLocation != null ? (selectedLocation!['instructors'] as List<dynamic>? ?? []) : [];
+        final List<dynamic> instructors = selectedLocation != null
+            ? (selectedLocation!['instructors'] as List<dynamic>? ?? [])
+            : [];
         stepContent = Column(
           children: [
             Text(
               "Step 6 (Optional): Select Instructor",
-              style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             instructors.isNotEmpty
@@ -415,7 +426,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(32),
                     ),
@@ -451,6 +463,11 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
           } else {
             currentPrice = null;
             currentTimeLimit = null;
+            print("didnt find matching price option");
+            print(pricingOptions);
+            print("selected duration $selectedDuration");
+            print("selected people $selectedPeople");
+            print("selected classes $selectedClasses");
           }
         }
         final String currencySymbol = getCurrencySymbol(currency!);
@@ -460,7 +477,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
             children: [
               Text(
                 "Step 7: Review Price",
-                style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -520,7 +538,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                 onPressed: _showStudentSelectionModal,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(32),
                   ),
@@ -563,7 +582,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
 
   @override
   Widget build(BuildContext context) {
-    final String description = _service['description'] ?? 'No description available.';
+    final String description =
+        _service['description'] ?? 'No description available.';
     List<Tab> tabs = const [
       Tab(text: 'Book Service'),
       Tab(text: 'Locations'),
@@ -626,22 +646,27 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: locations.isEmpty
-          ? Center(child: Text('No locations provided.', style: GoogleFonts.lato(fontSize: 14)))
+          ? Center(
+              child: Text('No locations provided.',
+                  style: GoogleFonts.lato(fontSize: 14)))
           : Column(
               children: locations.map((loc) {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Row(
                       children: [
-                        const Icon(Icons.location_on, size: 20, color: Colors.orange),
+                        const Icon(Icons.location_on,
+                            size: 20, color: Colors.orange),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(loc,
-                              style: GoogleFonts.lato(fontSize: 14, fontWeight: FontWeight.w500)),
+                              style: GoogleFonts.lato(
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
                         ),
                       ],
                     ),
@@ -660,13 +685,16 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: benefits.isEmpty
-          ? Center(child: Text('No benefits provided.', style: GoogleFonts.lato(fontSize: 14)))
+          ? Center(
+              child: Text('No benefits provided.',
+                  style: GoogleFonts.lato(fontSize: 14)))
           : Column(
               children: benefits.map((b) {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Row(
@@ -675,7 +703,8 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(b,
-                              style: GoogleFonts.lato(fontSize: 14, fontWeight: FontWeight.w500)),
+                              style: GoogleFonts.lato(
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
                         ),
                       ],
                     ),

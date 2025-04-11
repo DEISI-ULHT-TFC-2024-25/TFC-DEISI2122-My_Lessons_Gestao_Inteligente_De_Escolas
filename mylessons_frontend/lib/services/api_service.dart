@@ -111,6 +111,7 @@ Future<List<Map<String, dynamic>>> fetchSchools() async {
             [],
         'isFavorite': jsonSchool['isFavorite'],
         'lastPurchases': [],
+        'contacts': jsonSchool['contacts'] ?? [],
         'services': jsonSchool['services'] ?? [],
         'subjects': (jsonSchool['subjects'] as List<dynamic>?)?.toList() ?? [],
       };

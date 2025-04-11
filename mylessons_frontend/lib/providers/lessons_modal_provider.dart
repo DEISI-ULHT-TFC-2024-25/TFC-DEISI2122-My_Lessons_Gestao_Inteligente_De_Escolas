@@ -1,29 +1,44 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/modals/lesson_details_modal.dart';
 import 'package:mylessons_frontend/modals/schedule_lesson_modal.dart';
+import 'package:mylessons_frontend/providers/home_page_provider.dart';
 import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:mylessons_frontend/widgets/handle_lesson_report.dart';
+import 'package:provider/provider.dart';
 // Import your modals (replace these with your actual modal implementations)
 import '../modals/lessons_modal.dart';
 
 class LessonModalProvider with ChangeNotifier {
-  showLessonDetailsModal(BuildContext context, lesson, currentRole, fetchData) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (context) => Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      child: LessonDetailsModal(
-        lesson: lesson,
-        currentRole: currentRole,
-        fetchData: fetchData,
-      ),
-    ),
-  );
-}
+  /// Opens the lesson details modal using the provided BuildContext.
+  void showLessonDetailsModal(BuildContext context, dynamic lesson) {
+    Navigator.push(
+  context,
+  MaterialPageRoute(builder: (context) => LessonDetailsPage(lesson: lesson)),
+);
+
+  }
+
+  Future<Map<String, dynamic>?> toggleLessonCompletion(int lessonId) async {
+    final url = Uri.parse("$baseUrl/api/lessons/toggle_lesson_completion/");
+    final response = await http.post(
+      url,
+      headers: await getAuthHeaders(),
+      body: jsonEncode({'lesson_id': lessonId}),
+    );
+    final decodedResponse = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode == 200) {
+      return decodedResponse;
+    } else {
+      return {
+        "error": "Failed to toggle completion",
+        "details": decodedResponse
+      };
+    }
+  }
 
   Future<List<String>> _fetchAvailableTimes(
           int lessonId, DateTime date, int increment) =>
@@ -33,9 +48,13 @@ class LessonModalProvider with ChangeNotifier {
           int lessonId, DateTime newDate, String newTime) =>
       schedulePrivateLesson(lessonId, newDate, newTime);
 
-
-  Future<void> showScheduleLessonModal(BuildContext context, dynamic lesson, currentRole, fetchData) async {
+  /// Opens the schedule lesson modal.
+  Future<void> showScheduleLessonModal(BuildContext context, dynamic lesson) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
+    final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
+    final currentRole = homeProvider.currentRole;
+    // Ensure that fetchData is invoked as a function.
+    final Function fetchData = homeProvider.fetchData;
     int schoolScheduleTimeLimit =
         await fetchSchoolScheduleTimeLimit(lesson["school"]);
 
@@ -57,8 +76,9 @@ class LessonModalProvider with ChangeNotifier {
       },
     );
   }
-  
-  void showLessonCardOptions(BuildContext context, dynamic lesson, currentRole, fetchData) {
+
+  /// Shows available options for a lesson in a modal sheet.
+  void showLessonCardOptions(BuildContext context, dynamic lesson) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -90,7 +110,7 @@ class LessonModalProvider with ChangeNotifier {
                       ),
                     );
                   } else {
-                    showScheduleLessonModal(context, lesson, currentRole, fetchData);
+                    showScheduleLessonModal(context, lesson);
                   }
                 },
               ),
@@ -99,7 +119,7 @@ class LessonModalProvider with ChangeNotifier {
                 title: const Text("View Details"),
                 onTap: () {
                   Navigator.pop(context);
-                  showLessonDetailsModal(context, lesson, currentRole, fetchData);
+                  showLessonDetailsModal(context, lesson);
                 },
               ),
             ],
@@ -109,11 +129,12 @@ class LessonModalProvider with ChangeNotifier {
     );
   }
 
+  /// Builds and returns a card widget representing a lesson.
+  Widget buildLessonCard(BuildContext context, dynamic lesson, dynamic unschedulableLessons, {bool isLastLesson = false}) {
+    final bool isGroup = lesson['type']?.toString().toLowerCase() == 'group';
 
-  Widget _buildLessonCard(BuildContext context, dynamic lesson, currentRole, fetchData, unschedulableLessons, {bool isLastLesson = false}) {
-    final isGroup = lesson['type']?.toString().toLowerCase() == 'group';
     return InkWell(
-      onTap: () => showLessonCardOptions(context, lesson, currentRole, fetchData),
+      onTap: () => showLessonCardOptions(context, lesson),
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -122,19 +143,18 @@ class LessonModalProvider with ChangeNotifier {
           child: Row(
             children: [
               const SizedBox(width: 16),
-              // Wrap the calendar icon in its own InkWell.
+              // Calendar or report icon.
               InkWell(
                 onTap: () {
                   if (isLastLesson) {
+                    // Call your lesson report handler.
                     handleLessonReport(context, lesson);
-                  } else if (unschedulableLessons
-                      .contains(lesson['lesson_id'].toString())) {
+                  } else if ((unschedulableLessons ?? []).contains(lesson['lesson_id']?.toString() ?? '')) {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text("Reschedule Unavailable"),
-                        content:
-                            const Text("The reschedule period has passed!"),
+                        content: const Text("The reschedule period has passed!"),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
@@ -143,10 +163,8 @@ class LessonModalProvider with ChangeNotifier {
                         ],
                       ),
                     );
-                  } else
-                  // Shortcut directly to scheduling modal.
-                  if (lesson['type']?.toString().toLowerCase() == 'group') {
-                    // For group lessons, show an alert if scheduling is unavailable.
+                  } else if (lesson['type']?.toString().toLowerCase() == 'group') {
+                    // For group lessons, scheduling might be unavailable.
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -162,10 +180,9 @@ class LessonModalProvider with ChangeNotifier {
                       ),
                     );
                   } else {
-                    showScheduleLessonModal(context, lesson, currentRole, fetchData);
+                    showScheduleLessonModal(context, lesson);
                   }
                 },
-                // Use InkWell to provide ripple feedback.
                 child: SizedBox(
                   width: 40,
                   height: 40,
@@ -184,13 +201,17 @@ class LessonModalProvider with ChangeNotifier {
                     Text(
                       lesson['students_name'],
                       style: GoogleFonts.lato(
-                          fontWeight: FontWeight.bold, fontSize: 16),
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${lesson['date']} at ${lesson['start_time']}',
-                      style:
-                          GoogleFonts.lato(fontSize: 14, color: Colors.black54),
+                      style: GoogleFonts.lato(
+                        fontSize: 14, 
+                        color: Colors.black54,
+                      ),
                     ),
                   ],
                 ),
@@ -204,13 +225,16 @@ class LessonModalProvider with ChangeNotifier {
                     color: Colors.grey,
                   ),
                   const SizedBox(width: 8),
-                  // Wrap the three dots icon in its own InkWell.
+                  // Three dots icon to open details.
                   InkWell(
                     onTap: () {
-                      showLessonDetailsModal(lesson, context, currentRole, fetchData);
+                      showLessonDetailsModal(context, lesson);
                     },
-                    child: const Icon(Icons.more_vert,
-                        size: 28, color: Colors.orange),
+                    child: const Icon(
+                      Icons.more_vert,
+                      size: 28,
+                      color: Colors.orange,
+                    ),
                   ),
                 ],
               ),
@@ -221,5 +245,4 @@ class LessonModalProvider with ChangeNotifier {
       ),
     );
   }
-
 }

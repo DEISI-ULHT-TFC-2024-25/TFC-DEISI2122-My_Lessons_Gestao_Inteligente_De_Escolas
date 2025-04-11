@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:intl_phone_field/countries.dart';
 import 'package:mylessons_frontend/providers/school_provider.dart';
+import 'package:mylessons_frontend/widgets/contact_school_widget.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SchoolDetailsContent extends StatefulWidget {
   final Map<String, dynamic> school;
@@ -300,14 +304,6 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
     );
   }
 
-  /// Contacts Tab.
-  Widget _buildContactsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Center(child: Text('Contact details go here.', style: GoogleFonts.lato())),
-    );
-  }
-
   /// About Tab.
   Widget _buildAboutTab() {
     final description = widget.school['description']?.toString() ?? '';
@@ -338,7 +334,7 @@ class _SchoolDetailsContentState extends State<SchoolDetailsContent> {
     tabs.add(const Tab(text: 'Locations'));
     tabViews.add(_buildLocationsTab());
     tabs.add(const Tab(text: 'Contacts'));
-    tabViews.add(_buildContactsTab());
+    tabViews.add(ContactSchoolWidget(school: widget.school));
     tabs.add(const Tab(text: 'About'));
     tabViews.add(_buildAboutTab());
 

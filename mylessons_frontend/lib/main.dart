@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mylessons_frontend/pages/register_landing_page.dart';
+import 'package:mylessons_frontend/providers/home_page_provider.dart';
 import 'package:mylessons_frontend/providers/lessons_modal_provider.dart';
 import 'package:mylessons_frontend/providers/pack_details_provider.dart';
 import 'package:mylessons_frontend/providers/school_provider.dart';
@@ -42,6 +43,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => SchoolProvider()),
         ChangeNotifierProvider(create: (_) => LessonModalProvider()),
         ChangeNotifierProvider(create: (_) => PackDetailsProvider()),
+        ChangeNotifierProvider(create: (_) => HomePageProvider()),
       ],
       child: const MyApp(),
     ),

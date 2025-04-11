@@ -8,6 +8,56 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
+"""
+school.contacts
+{
+  "teams": [
+    {
+      "label": "skateboarding",
+      "emails": [
+        "skateboard.team@example.com",
+        "contact@skateboardinghub.com"
+      ],
+      "phones": [
+        {
+          "country_code": "1",
+          "number": "4151234567",
+          "capabilities": {
+            "call": true,
+            "text": true
+          }
+        },
+        {
+          "country_code": "1",
+          "number": "4159876543",
+          "capabilities": {
+            "call": true,
+            "text": false
+          }
+        }
+      ]
+    },
+    {
+      "label": "accounting",
+      "emails": [
+        "billing@accountingdept.com",
+        "accounts@example.com"
+      ],
+      "phones": [
+        {
+          "country_code": "44",
+          "number": "2071234567",
+          "capabilities": {
+            "call": true,
+            "text": true
+          }
+        }
+      ]
+    }
+  ]
+}
+"""
+
 def default_payment_types():
     """
     Returns a default payment types structure.
@@ -222,6 +272,7 @@ class Review(models.Model):
     rating = models.PositiveSmallIntegerField()  # 1-5 scale
     description = models.TextField(blank=True, null=True)
     is_verified = models.BooleanField(default=False)  # Verified indicates if it's an authenticated review.
+    instructors = models.ManyToManyField('users.Instructor', related_name='reviews', blank=True)
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='reviews', null=True, blank=True)
 
     def __str__(self):
@@ -246,6 +297,7 @@ class School(models.Model):
     monitors = models.ManyToManyField('users.Monitor', related_name='schools', blank=True)
     reschedule_time_limit = models.PositiveIntegerField(default=24)
     schedule_time_limit = models.PositiveIntegerField(default=24)
+    contacts = models.JSONField(default=dict, blank=True)
     currency = models.CharField(max_length=20, default='EUR')
     notification_templates = models.JSONField(
         default=default_notification_templates,
