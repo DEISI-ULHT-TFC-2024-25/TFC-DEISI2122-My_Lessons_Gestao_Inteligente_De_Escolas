@@ -319,6 +319,7 @@ def lesson_details(request, id):
             "instructors_name": lesson.get_instructors_name() if lesson.instructors.exists() else "Unknown",
             "instructors_ids": lesson.get_instructors_ids() if lesson.instructors.exists() else "Unknown",
             "location_name": lesson.location.name if lesson.location else "Unknown",
+            "location_address": lesson.location.address if lesson.location else "Unknown",
             "location_link": lesson.location.link if lesson.location else "Unknown",
             "minimum_age": lesson.minimum_age,
             "maximum_age": lesson.maximum_age,

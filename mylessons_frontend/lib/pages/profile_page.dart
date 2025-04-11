@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:provider/provider.dart';
 import '../../services/profile_service.dart';
+import '../providers/home_page_provider.dart';
 import 'manage_school.dart';
 import '../../main.dart'; // Ensure this imports your global routeObserver
 
@@ -133,6 +135,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
+      Provider.of<HomePageProvider>(context, listen: false).currentRole = newRole;
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     } catch (e) {
       ScaffoldMessenger.of(context)

@@ -1,3 +1,4 @@
+// home_page.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -13,10 +14,12 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../modals/profile_completion_modal.dart';
+import '../providers/lessons_modal_provider.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
 import 'profile_page.dart';
 import 'package:mylessons_frontend/modals/schedule_lesson_modal.dart';
+import '../providers/home_page_provider.dart';
 
 class HomePage extends StatefulWidget {
   final List<dynamic> newBookedPacks;
@@ -28,108 +31,68 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
-  final storage = const FlutterSecureStorage();
-  String firstName = '';
-  String lastName = '';
-  String phone = '';
-  String countryCode = '';
-  int notificationsCount = 0;
-  String currentRole = '';
-  List<dynamic> upcomingLessons = [];
-  List<dynamic> lastLessons = [];
-  List<dynamic> activePacks = [];
-  List<dynamic> lastPacks = [];
-  List<String> unschedulableLessons = [];
-  int numberOfActiveStudents = 0;
-  double currentBalance = 0.0;
-  bool _isLoading = true; // Loading flag
-  // State variables for inner toggle buttons.
-  int _lessonsActiveTabIndex = 0; // 0 = Active, 1 = History
-  int _packsActiveTabIndex = 0; // 0 = Active, 1 = History
-  double _headerHeight = 80;
-
-  // Admin Metrics
-  int schoolId = 0;
-  String schoolName = "";
-  int numberOfBookings = 0;
-  int numberOfStudents = 0;
-  int numberOfInstructors = 0;
-  double totalRevenue = 0.0;
-  DateTime startDate = DateTime.now();
-  DateTime endDate = DateTime.now();
-
-  // ------------------ NEW VARIABLES FOR ANIMATIONS & SCROLL ------------------
-  late AnimationController _headerAnimationController;
-  // We'll use the controller’s value (0.0–1.0) with two intervals for the two header states.
-  // Scroll controllers for lessons and packs lists:
-  final ScrollController _lessonsScrollController = ScrollController();
-  final ScrollController _packsScrollController = ScrollController();
-  // Variables to hide/show the header and the toggle row based on scroll:
-  bool _showToggleRow = true;
-  bool _showHeader = true;
-  // ---------------------------------------------------------------------------
-
-  // Search and filter state for each tab.
-  // Lessons
+  // Remove duplicated user/profile variables (now in provider).
+  // Retain UI-specific state (filters, tab index, animations, scroll controllers).
   String upcomingSearchQuery = "";
-  List<Map<String, String>> upcomingFilters = []; // For active lessons
+  List<Map<String, String>> upcomingFilters = [];
   String lastLessonsSearchQuery = "";
   List<Map<String, String>> lastLessonsFilters = [];
-  // Packs
   String activePacksSearchQuery = "";
   List<Map<String, String>> activePacksFilters = [];
   String lastPacksSearchQuery = "";
   List<Map<String, String>> lastPacksFilters = [];
 
+  int _lessonsActiveTabIndex = 0; // 0: Active lessons, 1: History
+  int _packsActiveTabIndex = 0; // 0: Active packs, 1: History
+
+  double _welcomeHeight = 80; // Controls only the welcome message area.
+  double _notificationHeight =
+      50; // Set this to a value (e.g., 50) that fits your notifications warning.
+
+  late AnimationController _headerAnimationController;
+  final ScrollController _lessonsScrollController = ScrollController();
+  final ScrollController _packsScrollController = ScrollController();
+  bool _showToggleRow = true;
+  bool _showHeader = true;
+
   @override
   void initState() {
     super.initState();
-    setInitialDate();
-    fetchData();
-    // Initialize header animation controller.
+
     _headerAnimationController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
 
-    // After a 2-second delay, start the slide/fade animation.
+    // Animate the welcome message (not the notifications area)
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _headerAnimationController.forward().then((_) {
-          // If there are no notifications, collapse the header (set height to 0).
-          // If notifications exist, keep the header height (80) to display them.
-          if (notificationsCount == 0) {
-            setState(() {
-              _headerHeight = 0;
-            });
-          }
+          setState(() {
+            // Collapse only the welcome part
+            _welcomeHeight = 0;
+          });
         });
       }
     });
 
-    // Listen to scrolling in lessons tab.
     _lessonsScrollController.addListener(() {
       if (_lessonsScrollController.offset > 50 && _showToggleRow) {
         setState(() {
           _showToggleRow = false;
-          _showHeader = false;
         });
       } else if (_lessonsScrollController.offset <= 50 && !_showToggleRow) {
         setState(() {
           _showToggleRow = true;
-          _showHeader = true;
         });
       }
     });
-    // Listen to scrolling in packs tab.
     _packsScrollController.addListener(() {
       if (_packsScrollController.offset > 50 && _showToggleRow) {
         setState(() {
           _showToggleRow = false;
-          _showHeader = false;
         });
       } else if (_packsScrollController.offset <= 50 && !_showToggleRow) {
         setState(() {
           _showToggleRow = true;
-          _showHeader = true;
         });
       }
     });
@@ -143,279 +106,7 @@ class _HomePageState extends State<HomePage>
     super.dispose();
   }
 
-  void setInitialDate() {
-    final now = DateTime.now();
-    startDate = DateTime(now.year, now.month, 1);
-    endDate = DateTime(now.year, now.month + 1, 0);
-  }
-
-  Future<void> fetchData() async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      final headers = await getAuthHeaders();
-
-      final profileResponse = await http.get(
-        Uri.parse('$baseUrl/api/users/profile/'),
-        headers: headers,
-      );
-      final roleResponse = await http.get(
-        Uri.parse('$baseUrl/api/users/current_role/'),
-        headers: headers,
-      );
-      final schoolResponse = await http.get(
-        Uri.parse('$baseUrl/api/users/current_school_id/'),
-        headers: headers,
-      );
-
-      final unschedulableLessonsResponse = await http.get(
-        Uri.parse('$baseUrl/api/lessons/unschedulable_lessons/'),
-        headers: headers,
-      );
-
-      final decodedResponse =
-          json.decode(utf8.decode(unschedulableLessonsResponse.bodyBytes));
-
-      // Assuming the API returns a map with a key "lesson_ids" that holds the list.
-      setState(() {
-        unschedulableLessons = List<String>.from(decodedResponse['lesson_ids']);
-      });
-      print(unschedulableLessons);
-
-      if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
-        final decodedProfile = utf8.decode(profileResponse.bodyBytes);
-        final decodedRole = utf8.decode(roleResponse.bodyBytes);
-        final profileData = json.decode(decodedProfile);
-        final roleData = json.decode(decodedRole);
-
-        setState(() {
-          firstName = (profileData['first_name'] ?? '').toString();
-          lastName = (profileData['last_name'] ?? '').toString();
-          phone = (profileData['phone'] ?? '').toString();
-          countryCode = (profileData['country_code'] ?? 'PT').toString();
-          notificationsCount = int.tryParse(
-                  (profileData['notifications_count'] ?? '0').toString()) ??
-              0;
-          currentRole = roleData['current_role'].toString();
-          schoolId = schoolResponse.statusCode == 200
-              ? int.tryParse(json
-                      .decode(utf8.decode(schoolResponse.bodyBytes))[
-                          'current_school_id']
-                      .toString()) ??
-                  0
-              : 0;
-          schoolName = schoolResponse.statusCode == 200
-              ? json
-                  .decode(utf8.decode(schoolResponse.bodyBytes))[
-                      'current_school_name']
-                  .toString()
-              : "";
-        });
-
-        // Prompt profile completion if needed.
-        if (firstName.isEmpty ||
-            lastName.isEmpty ||
-            countryCode.isEmpty ||
-            phone.isEmpty) {
-          _promptProfileCompletion();
-        }
-      }
-
-      if (currentRole == "Parent" ||
-          currentRole == "Instructor" ||
-          currentRole == "Admin") {
-        final lessonsResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/upcoming_lessons/'),
-          headers: headers,
-        );
-        final activePacksResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/active_packs/'),
-          headers: headers,
-        );
-        final lastPacksResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/last_packs/'),
-          headers: headers,
-        );
-
-        if (lessonsResponse.statusCode == 200) {
-          setState(() {
-            upcomingLessons =
-                json.decode(utf8.decode(lessonsResponse.bodyBytes));
-          });
-        }
-        if (activePacksResponse.statusCode == 200) {
-          setState(() {
-            activePacks =
-                json.decode(utf8.decode(activePacksResponse.bodyBytes));
-          });
-        }
-        if (lastPacksResponse.statusCode == 200) {
-          setState(() {
-            lastPacks = json.decode(utf8.decode(lastPacksResponse.bodyBytes));
-          });
-        }
-
-        final lastLessonsResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/last_lessons/'),
-          headers: headers,
-        );
-        if (lastLessonsResponse.statusCode == 200) {
-          setState(() {
-            lastLessons =
-                json.decode(utf8.decode(lastLessonsResponse.bodyBytes));
-          });
-        }
-      }
-
-      if (currentRole == "Instructor") {
-        final activeStudentsResponse = await http.get(
-          Uri.parse('$baseUrl/api/users/number_of_active_students/'),
-          headers: headers,
-        );
-        final balanceResponse = await http.get(
-          Uri.parse('$baseUrl/api/users/current_balance/'),
-          headers: headers,
-        );
-
-        if (activeStudentsResponse.statusCode == 200) {
-          setState(() {
-            numberOfActiveStudents = int.tryParse(json
-                    .decode(utf8.decode(activeStudentsResponse.bodyBytes))[
-                        'number_of_active_students']
-                    .toString()) ??
-                0;
-          });
-        }
-        if (balanceResponse.statusCode == 200) {
-          setState(() {
-            currentBalance = double.tryParse(json
-                    .decode(utf8.decode(balanceResponse.bodyBytes))[
-                        'current_balance']
-                    .toString()) ??
-                0.0;
-          });
-        }
-      }
-
-      if (currentRole == "Admin") {
-        await fetchAdminMetrics();
-      }
-    } catch (e) {
-      print("Error fetching data: $e");
-    }
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  Future<void> fetchAdminMetrics() async {
-    final headers = await getAuthHeaders();
-
-    final formattedStart = DateFormat('yyyy-MM-dd').format(startDate);
-    final formattedEnd = DateFormat('yyyy-MM-dd').format(endDate);
-
-    final bookingsResponse = await http.get(
-      Uri.parse(
-          '$baseUrl/api/schools/number_of_booked_lessons/$schoolId/$formattedStart/$formattedEnd/'),
-      headers: headers,
-    );
-    final studentsResponse = await http.get(
-      Uri.parse(
-          '$baseUrl/api/schools/number_of_students/$schoolId/$formattedStart/$formattedEnd/'),
-      headers: headers,
-    );
-    final instructorsResponse = await http.get(
-      Uri.parse(
-          '$baseUrl/api/schools/number_of_instructors/$schoolId/$formattedStart/$formattedEnd/'),
-      headers: headers,
-    );
-    final revenueResponse = await http.get(
-      Uri.parse(
-          '$baseUrl/api/schools/school-revenue/$schoolId/$formattedStart/$formattedEnd/'),
-      headers: headers,
-    );
-
-    setState(() {
-      numberOfBookings = bookingsResponse.statusCode == 200
-          ? int.tryParse(json
-                  .decode(utf8.decode(bookingsResponse.bodyBytes))[
-                      'number_of_lessons_booked']
-                  .toString()) ??
-              0
-          : 0;
-      numberOfStudents = studentsResponse.statusCode == 200
-          ? int.tryParse(json
-                  .decode(
-                      utf8.decode(studentsResponse.bodyBytes))['total_students']
-                  .toString()) ??
-              0
-          : 0;
-      numberOfInstructors = instructorsResponse.statusCode == 200
-          ? int.tryParse(json
-                  .decode(utf8.decode(instructorsResponse.bodyBytes))[
-                      'total_instructors']
-                  .toString()) ??
-              0
-          : 0;
-      totalRevenue = revenueResponse.statusCode == 200
-          ? double.tryParse(json
-                  .decode(
-                      utf8.decode(revenueResponse.bodyBytes))['total_revenue']
-                  .toString()) ??
-              0.0
-          : 0.0;
-    });
-  }
-
-  Future<List<String>> _fetchAvailableTimes(
-          int lessonId, DateTime date, int increment) =>
-      fetchAvailableTimes(lessonId, date, increment);
-
-  Future<String?> _schedulePrivateLesson(
-          int lessonId, DateTime newDate, String newTime) =>
-      schedulePrivateLesson(lessonId, newDate, newTime);
-
-  Future<void> _markNotificationsAsRead(List<int> notificationIds) =>
-      markNotificationsAsRead(notificationIds);
-
-  Future<void> _promptProfileCompletion() async {
-    final result = await Navigator.push<Map<String, String>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProfileCompletionPage(
-          initialFirstName: firstName,
-          initialLastName: lastName,
-          initialPhone: phone,
-          initialCountryCode: countryCode,
-        ),
-      ),
-    );
-
-    if (result != null) {
-      final payload = {
-        'first_name': result['firstName']!,
-        'last_name': result['lastName']!,
-        'country_code': result['id']!, // ISO country code
-        'phone': result['phone']!,
-      };
-
-      try {
-        final message = await ProfileService.updateProfileData(payload);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-        await fetchData();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error updating profile: $e")),
-        );
-      }
-    }
-  }
-
-  // ----------------- Modal Options for Cards -----------------
-
+  /// Modal methods (using provider values as needed).
   void showLessonCardOptions(dynamic lesson) {
     showModalBottomSheet(
       context: context,
@@ -448,7 +139,8 @@ class _HomePageState extends State<HomePage>
                       ),
                     );
                   } else {
-                    showScheduleLessonModal(lesson);
+                    Provider.of<LessonModalProvider>(context, listen: false)
+                        .showScheduleLessonModal(context, lesson);
                   }
                 },
               ),
@@ -457,7 +149,8 @@ class _HomePageState extends State<HomePage>
                 title: const Text("View Details"),
                 onTap: () {
                   Navigator.pop(context);
-                  showLessonDetailsModal(lesson);
+                  Provider.of<LessonModalProvider>(context, listen: false)
+                      .showLessonDetailsModal(context, lesson);
                 },
               ),
             ],
@@ -519,43 +212,11 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // ------------------- Existing Modal Methods -------------------
-
-  showLessonDetailsModal(lesson) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.9,
-        child: LessonDetailsModal(
-          lesson: lesson,
-          currentRole: currentRole,
-          fetchData: fetchData,
-        ),
-      ),
-    );
-  }
-
   void showPackDetailsModal(dynamic pack) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => ChangeNotifierProvider(
-        create: (_) {
-          final provider = PackDetailsProvider();
-          provider.initialize(
-            pack: pack,
-            currentRole: currentRole,
-            fetchData: fetchData,
-            unschedulableLessons: unschedulableLessons,
-          );
-          return provider;
-        },
-        child: const PackDetailsModal(),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PackDetailsPage(pack: pack),
       ),
     );
   }
@@ -569,49 +230,33 @@ class _HomePageState extends State<HomePage>
       isScrollControlled: true,
       builder: (BuildContext context) => ScheduleMultipleLessonsModal(
         lessons: lessons,
-        unschedulableLessons: unschedulableLessons,
+        unschedulableLessons:
+            Provider.of<HomePageProvider>(context, listen: false)
+                .unschedulableLessons,
         expirationDate: expirationDate,
-        currentRole: currentRole,
+        currentRole:
+            Provider.of<HomePageProvider>(context, listen: false).currentRole,
         schoolScheduleTimeLimit: schoolScheduleTimeLimit,
         onScheduleConfirmed: () {
-          fetchData();
+          Provider.of<HomePageProvider>(context, listen: false).fetchData();
         },
       ),
     );
   }
 
-  Future<void> showScheduleLessonModal(dynamic lesson) async {
-    final int lessonId = lesson['id'] ?? lesson['lesson_id'];
-    int schoolScheduleTimeLimit =
-        await fetchSchoolScheduleTimeLimit(lesson["school"]);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext modalContext) {
-        return ScheduleLessonModal(
-          lessonId: lessonId,
-          expirationDate: lesson['expiration_date'],
-          schoolScheduleTimeLimit: schoolScheduleTimeLimit,
-          currentRole: currentRole,
-          fetchAvailableTimes: _fetchAvailableTimes,
-          schedulePrivateLesson: _schedulePrivateLesson,
-          onScheduleConfirmed: () {
-            fetchData();
-          },
-        );
-      },
-    );
-  }
-
   Future<void> _showNotificationsModal() async {
-    // Mark notifications as read and collapse the header.
+    // Animate the notifications warning to hide.
     setState(() {
-      notificationsCount = 0;
-      // Collapse the header so that the tab bar moves up.
-      _headerHeight = 0;
+      _notificationHeight = 0;
     });
+    await Future.delayed(const Duration(milliseconds: 500));
 
+    // Then mark notifications as read.
+    final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
+    homeProvider.notificationsCount = 0;
+    homeProvider.notifyListeners();
+
+    // Now show the notifications modal as before.
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -680,6 +325,14 @@ class _HomePageState extends State<HomePage>
                             },
                           ),
                   ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Close",
+                          style: TextStyle(color: Colors.orange)),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -691,7 +344,6 @@ class _HomePageState extends State<HomePage>
 
   Future<List<dynamic>> _fetchNotifications() async {
     final headers = await getAuthHeaders();
-
     final response = await http.get(
       Uri.parse('$baseUrl/api/notifications/unread/'),
       headers: headers,
@@ -708,10 +360,11 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  // Shows a modal bottom sheet to filter lessons.
+  Future<void> _markNotificationsAsRead(List<int> notificationIds) =>
+      markNotificationsAsRead(notificationIds);
+
   void _showLessonFilterModal(bool isUpcoming, List<dynamic> lessons) {
     const options = ['Group', 'Private'];
-    // Use upcomingFilters or lastLessonsFilters based on isUpcoming.
     List<Map<String, String>> tempFilters =
         isUpcoming ? List.from(upcomingFilters) : List.from(lastLessonsFilters);
     showModalBottomSheet(
@@ -777,10 +430,8 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-// Shows a modal bottom sheet to filter packs.
   void _showPackFilterModal(bool isActive, List<dynamic> packs) {
     const options = ['Group', 'Private'];
-    // Use activePacksFilters or lastPacksFilters based on isActive.
     List<Map<String, String>> tempFilters =
         isActive ? List.from(activePacksFilters) : List.from(lastPacksFilters);
     showModalBottomSheet(
@@ -845,8 +496,6 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // ------------------- Filtering Methods -------------------
-
   List<dynamic> _filterLessons(
       List<dynamic> lessons, String query, List<Map<String, String>> filters) {
     return lessons.where((lesson) {
@@ -881,84 +530,78 @@ class _HomePageState extends State<HomePage>
     }).toList();
   }
 
-  // ------------------- NEW WIDGETS FOR ANIMATED HEADER & TOGGLE/SEARCH ROW -------------------
-
-  Widget _buildHeader() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-      height: _headerHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: _headerHeight > 0
-          ? Stack(
-              alignment: Alignment.center,
-              children: [
-                // Welcome text and first name slide up and fade out.
-                SlideTransition(
-                  position: _headerAnimationController.drive(
-                    Tween<Offset>(begin: Offset.zero, end: const Offset(0, -1))
-                        .chain(CurveTween(curve: const Interval(0.0, 0.5))),
+  Widget _buildHeader(HomePageProvider homeProvider) {
+    return Column(
+      children: [
+        // Welcome message area.
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+          height: _welcomeHeight, // This part animates from 80 to 0.
+          child: SlideTransition(
+            position: _headerAnimationController.drive(
+              Tween<Offset>(begin: Offset.zero, end: const Offset(0, -1))
+                  .chain(CurveTween(curve: const Interval(0.5, 1.0))),
+            ),
+            child: FadeTransition(
+              opacity: _headerAnimationController.drive(
+                Tween<double>(begin: 1.0, end: 0.0)
+                    .chain(CurveTween(curve: const Interval(0.0, 0.5))),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Welcome back,",
+                    style: GoogleFonts.lato(fontSize: 18, color: Colors.orange),
+                    textAlign: TextAlign.center,
                   ),
-                  child: FadeTransition(
-                    opacity: _headerAnimationController.drive(
-                      Tween<double>(begin: 1.0, end: 0.0)
-                          .chain(CurveTween(curve: const Interval(0.0, 0.5))),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Welcome back,",
-                          style: GoogleFonts.lato(
-                              fontSize: 18, color: Colors.orange),
-                          textAlign: TextAlign.center,
-                        ),
-                        Text(
-                          firstName,
-                          style: GoogleFonts.lato(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
+                  Text(
+                    homeProvider.firstName,
+                    style: GoogleFonts.lato(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange),
+                    textAlign: TextAlign.center,
                   ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Notifications warning area only shows if notifications exist.
+        if (homeProvider.notificationsCount > 0)
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+            // Use _notificationHeight to drive opacity. When the height is 0, opacity is 0.
+            opacity: _notificationHeight > 0 ? 1.0 : 0.0,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              height: _notificationHeight, // e.g., initial value 50.
+              child: GestureDetector(
+                onTap: _showNotificationsModal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.notifications_none,
+                      size: 28,
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "${homeProvider.notificationsCount} new notifications",
+                      style:
+                          GoogleFonts.lato(fontSize: 18, color: Colors.orange),
+                    ),
+                  ],
                 ),
-                // Notifications row (if any) appears in the second half of the animation.
-                if (notificationsCount > 0)
-                  SlideTransition(
-                    position: _headerAnimationController.drive(
-                      Tween<Offset>(
-                              begin: const Offset(0, -1), end: Offset.zero)
-                          .chain(CurveTween(curve: const Interval(0.5, 1.0))),
-                    ),
-                    child: FadeTransition(
-                      opacity: _headerAnimationController.drive(
-                        Tween<double>(begin: 0.0, end: 1.0)
-                            .chain(CurveTween(curve: const Interval(0.5, 1.0))),
-                      ),
-                      child: GestureDetector(
-                        onTap: _showNotificationsModal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.notifications_none,
-                                size: 28, color: Colors.orange),
-                            const SizedBox(width: 8),
-                            Text(
-                              "$notificationsCount new notifications",
-                              style: GoogleFonts.lato(
-                                  fontSize: 18, color: Colors.orange),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            )
-          : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -975,7 +618,7 @@ class _HomePageState extends State<HomePage>
               child: IconButton(
                 icon: const Icon(Icons.search, color: Colors.orange),
                 onPressed: () {
-                  // Implement your search functionality here.
+                  // Implement search functionality.
                   print("Search pressed in lessons tab");
                 },
               ),
@@ -1047,9 +690,15 @@ class _HomePageState extends State<HomePage>
                 icon: const Icon(Icons.filter_list, color: Colors.orange),
                 onPressed: () {
                   if (_lessonsActiveTabIndex == 0) {
-                    _showLessonFilterModal(true, upcomingLessons);
+                    _showLessonFilterModal(
+                        true,
+                        Provider.of<HomePageProvider>(context, listen: false)
+                            .upcomingLessons);
                   } else {
-                    _showLessonFilterModal(false, lastLessons);
+                    _showLessonFilterModal(
+                        false,
+                        Provider.of<HomePageProvider>(context, listen: false)
+                            .lastLessons);
                   }
                 },
               ),
@@ -1068,18 +717,15 @@ class _HomePageState extends State<HomePage>
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
         child: Stack(
           children: [
-            // Left: Search Icon
             Align(
               alignment: Alignment.centerLeft,
               child: IconButton(
                 icon: const Icon(Icons.search, color: Colors.orange),
                 onPressed: () {
-                  // Implement search functionality.
                   print("Search pressed in packs tab");
                 },
               ),
             ),
-            // Center: Toggle Buttons.
             Center(
               child: ToggleButtons(
                 borderRadius: BorderRadius.circular(16),
@@ -1139,16 +785,21 @@ class _HomePageState extends State<HomePage>
                 ],
               ),
             ),
-            // Right: Filter Icon
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
                 icon: const Icon(Icons.filter_list, color: Colors.orange),
                 onPressed: () {
                   if (_packsActiveTabIndex == 0) {
-                    _showPackFilterModal(true, activePacks);
+                    _showPackFilterModal(
+                        true,
+                        Provider.of<HomePageProvider>(context, listen: false)
+                            .activePacks);
                   } else {
-                    _showPackFilterModal(false, lastPacks);
+                    _showPackFilterModal(
+                        false,
+                        Provider.of<HomePageProvider>(context, listen: false)
+                            .lastPacks);
                   }
                 },
               ),
@@ -1192,115 +843,6 @@ class _HomePageState extends State<HomePage>
               ),
             )
           ],
-        ),
-      ),
-    );
-  }
-
-  // ------------------- Card Builders -------------------
-
-  Widget _buildLessonCard(dynamic lesson, {bool isLastLesson = false}) {
-    final isGroup = lesson['type']?.toString().toLowerCase() == 'group';
-    return InkWell(
-      onTap: () => showLessonCardOptions(lesson),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              InkWell(
-                onTap: () {
-                  if (isLastLesson) {
-                    handleLessonReport(context, lesson);
-                  } else if (unschedulableLessons
-                      .contains(lesson['lesson_id'].toString())) {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Reschedule Unavailable"),
-                        content:
-                            const Text("The reschedule period has passed!"),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text("OK"),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else if (lesson['type']?.toString().toLowerCase() ==
-                      'group') {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Scheduling Unavailable"),
-                        content: const Text(
-                            "To change the schedule of a group lesson, please contact the school."),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text("OK"),
-                          )
-                        ],
-                      ),
-                    );
-                  } else {
-                    showScheduleLessonModal(lesson);
-                  }
-                },
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: Icon(
-                    isLastLesson ? Icons.article : Icons.calendar_today,
-                    size: 28,
-                    color: Colors.orange,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      lesson['students_name'],
-                      style: GoogleFonts.lato(
-                          fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${lesson['date']} at ${lesson['start_time']}',
-                      style:
-                          GoogleFonts.lato(fontSize: 14, color: Colors.black54),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isGroup ? Icons.groups : Icons.person,
-                    size: 20,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () {
-                      showLessonDetailsModal(lesson);
-                    },
-                    child: const Icon(Icons.more_vert,
-                        size: 28, color: Colors.orange),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
         ),
       ),
     );
@@ -1394,17 +936,17 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // ------------------- Stats Builders -------------------
-
   Widget _buildStatsSkeleton() {
     return Column(
       children: List.generate(3, (index) => _buildLoadingCard()),
     );
   }
 
-  Widget _buildAdminStats() {
-    final formattedStart = DateFormat('MMM dd, yyyy').format(startDate);
-    final formattedEnd = DateFormat('MMM dd, yyyy').format(endDate);
+  Widget _buildAdminStats(HomePageProvider homeProvider) {
+    final formattedStart =
+        DateFormat('MMM dd, yyyy').format(homeProvider.startDate);
+    final formattedEnd =
+        DateFormat('MMM dd, yyyy').format(homeProvider.endDate);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(8.0),
       child: Column(
@@ -1438,16 +980,15 @@ class _HomePageState extends State<HomePage>
                             child: SfDateRangePicker(
                               view: DateRangePickerView.month,
                               selectionMode: DateRangePickerSelectionMode.range,
-                              initialSelectedRange:
-                                  PickerDateRange(startDate, endDate),
+                              initialSelectedRange: PickerDateRange(
+                                  homeProvider.startDate, homeProvider.endDate),
                               showActionButtons: true,
                               onSubmit: (Object? val) {
                                 if (val is PickerDateRange) {
-                                  setState(() {
-                                    startDate = val.startDate!;
-                                    endDate = val.endDate ?? val.startDate!;
-                                  });
-                                  fetchAdminMetrics();
+                                  homeProvider.startDate = val.startDate!;
+                                  homeProvider.endDate =
+                                      val.endDate ?? val.startDate!;
+                                  homeProvider.fetchAdminMetrics();
                                 }
                                 Navigator.pop(context);
                               },
@@ -1476,14 +1017,16 @@ class _HomePageState extends State<HomePage>
           Row(
             children: [
               Expanded(
-                child: _buildStatCard("Lessons", numberOfBookings.toString(),
+                child: _buildStatCard(
+                    "Lessons", homeProvider.numberOfBookings.toString(),
                     actionLabel: "View lessons",
                     icon: Icons.menu_book,
                     onAction: null),
               ),
               const SizedBox(width: 8.0),
               Expanded(
-                child: _buildStatCard("Students", numberOfStudents.toString(),
+                child: _buildStatCard(
+                    "Students", homeProvider.numberOfStudents.toString(),
                     actionLabel: "View students",
                     icon: Icons.people,
                     onAction: null),
@@ -1495,7 +1038,7 @@ class _HomePageState extends State<HomePage>
             children: [
               Expanded(
                 child: _buildStatCard(
-                    "Instructors", numberOfInstructors.toString(),
+                    "Instructors", homeProvider.numberOfInstructors.toString(),
                     actionLabel: "View instructors",
                     icon: Icons.person_outline,
                     onAction: null),
@@ -1503,7 +1046,7 @@ class _HomePageState extends State<HomePage>
               const SizedBox(width: 8.0),
               Expanded(
                 child: _buildStatCard(
-                    "Revenue", totalRevenue.toStringAsFixed(2),
+                    "Revenue", homeProvider.totalRevenue.toStringAsFixed(2),
                     actionLabel: "View payments",
                     icon: Icons.payments_outlined,
                     onAction: null),
@@ -1515,20 +1058,22 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildInstructorStats() {
+  Widget _buildInstructorStats(HomePageProvider homeProvider) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(8.0),
       child: Row(
         children: [
           Expanded(
-            child: _buildStatCard("Students", numberOfActiveStudents.toString(),
+            child: _buildStatCard(
+                "Students", homeProvider.numberOfActiveStudents.toString(),
                 actionLabel: "View students",
                 icon: Icons.people,
                 onAction: null),
           ),
           const SizedBox(width: 8.0),
           Expanded(
-            child: _buildStatCard("Balance", currentBalance.toStringAsFixed(2),
+            child: _buildStatCard(
+                "Balance", homeProvider.currentBalance.toStringAsFixed(2),
                 actionLabel: "View payments",
                 icon: Icons.payments_outlined,
                 onAction: null),
@@ -1595,44 +1140,65 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // ------------------- Build Method with Nested Tabs -------------------
+  Widget _buildNoStats() {
+    return const Center(child: Text("No stats available"));
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Build the Lessons tab.
-    Widget lessonsTab = Column(
-      children: [
-        // NEW: Use the new toggle row (with search and filter icons)
-        _buildToggleRowForLessons(),
-        Expanded(
-          child: _lessonsActiveTabIndex == 0
+    return ChangeNotifierProvider<HomePageProvider>(
+      create: (_) => HomePageProvider(),
+      child: Consumer<HomePageProvider>(
+        builder: (context, homeProvider, child) {
+          // Build Lessons Tab.
+          Widget lessonsTab = _lessonsActiveTabIndex == 0
               ? RefreshIndicator(
                   color: Colors.orange,
                   backgroundColor: Colors.white,
                   onRefresh: () async {
-                    await fetchData();
+                    await homeProvider.fetchData();
                   },
                   child: SingleChildScrollView(
                     controller: _lessonsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: _isLoading
-                          ? Column(
-                              children: List.generate(
-                                  3, (index) => _buildLoadingCard()),
-                            )
-                          : _filterLessons(upcomingLessons, upcomingSearchQuery,
-                                      upcomingFilters)
-                                  .isNotEmpty
+                    child: Column(
+                      children: [
+                        // Moved toggle row inside the scrollable content.
+                        _buildToggleRowForLessons(),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: homeProvider.isLoading
                               ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _filterLessons(upcomingLessons,
-                                          upcomingSearchQuery, upcomingFilters)
-                                      .map((lesson) => _buildLessonCard(lesson))
-                                      .toList(),
+                                  children: List.generate(
+                                      3, (index) => _buildLoadingCard()),
                                 )
-                              : const Center(child: Text("No active lessons")),
+                              : _filterLessons(homeProvider.upcomingLessons,
+                                          upcomingSearchQuery, upcomingFilters)
+                                      .isNotEmpty
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: _filterLessons(
+                                              homeProvider.upcomingLessons,
+                                              upcomingSearchQuery,
+                                              upcomingFilters)
+                                          .map((lesson) {
+                                        return Provider.of<LessonModalProvider>(
+                                                context,
+                                                listen: false)
+                                            .buildLessonCard(
+                                                context,
+                                                lesson,
+                                                Provider.of<PackDetailsProvider>(
+                                                        context)
+                                                    .unschedulableLessons,
+                                                isLastLesson: false);
+                                      }).toList(),
+                                    )
+                                  : const Center(
+                                      child: Text("No active lessons")),
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -1640,75 +1206,96 @@ class _HomePageState extends State<HomePage>
                   color: Colors.orange,
                   backgroundColor: Colors.white,
                   onRefresh: () async {
-                    await fetchData();
+                    await homeProvider.fetchData();
                   },
                   child: SingleChildScrollView(
                     controller: _lessonsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: _isLoading
-                          ? Column(
-                              children: List.generate(
-                                  3, (index) => _buildLoadingCard()),
-                            )
-                          : _filterLessons(lastLessons, lastLessonsSearchQuery,
-                                      lastLessonsFilters)
-                                  .isNotEmpty
+                    child: Column(
+                      children: [
+                        // Moved toggle row inside the scrollable content.
+                        _buildToggleRowForLessons(),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: homeProvider.isLoading
                               ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _filterLessons(
-                                          lastLessons,
+                                  children: List.generate(
+                                      3, (index) => _buildLoadingCard()),
+                                )
+                              : _filterLessons(
+                                          homeProvider.lastLessons,
                                           lastLessonsSearchQuery,
                                           lastLessonsFilters)
-                                      .map((lesson) => _buildLessonCard(lesson,
-                                          isLastLesson: true))
-                                      .toList(),
-                                )
-                              : const Center(
-                                  child: Text("No historical lessons")),
+                                      .isNotEmpty
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: _filterLessons(
+                                              homeProvider.lastLessons,
+                                              lastLessonsSearchQuery,
+                                              lastLessonsFilters)
+                                          .map((lesson) => Provider.of<
+                                                      LessonModalProvider>(
+                                                  context,
+                                                  listen: false)
+                                              .buildLessonCard(
+                                                  context,
+                                                  lesson,
+                                                  Provider.of<PackDetailsProvider>(
+                                                          context)
+                                                      .unschedulableLessons,
+                                                  isLastLesson: true))
+                                          .toList(),
+                                    )
+                                  : const Center(
+                                      child: Text("No historical lessons")),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-        ),
-      ],
-    );
+                );
 
-    // Build the Packs tab.
-    Widget packsTab = Column(
-      children: [
-        _buildToggleRowForPacks(),
-        Expanded(
-          child: _packsActiveTabIndex == 0
+          // Build Packs Tab.
+          Widget packsTab = _packsActiveTabIndex == 0
               ? RefreshIndicator(
                   color: Colors.orange,
                   backgroundColor: Colors.white,
                   onRefresh: () async {
-                    await fetchData();
+                    await homeProvider.fetchData();
                   },
                   child: SingleChildScrollView(
                     controller: _packsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: _isLoading
-                          ? Column(
-                              children: List.generate(
-                                  3, (index) => _buildLoadingCard()),
-                            )
-                          : _filterPacks(activePacks, activePacksSearchQuery,
-                                      activePacksFilters)
-                                  .isNotEmpty
+                    child: Column(
+                      children: [
+                        // Moved toggle row inside the scrollable content.
+                        _buildToggleRowForPacks(),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: homeProvider.isLoading
                               ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _filterPacks(
-                                          activePacks,
+                                  children: List.generate(
+                                      3, (index) => _buildLoadingCard()),
+                                )
+                              : _filterPacks(
+                                          homeProvider.activePacks,
                                           activePacksSearchQuery,
                                           activePacksFilters)
-                                      .map((pack) => _buildPackCard(pack))
-                                      .toList(),
-                                )
-                              : const Center(child: Text("No active packs")),
+                                      .isNotEmpty
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: _filterPacks(
+                                              homeProvider.activePacks,
+                                              activePacksSearchQuery,
+                                              activePacksFilters)
+                                          .map((pack) => _buildPackCard(pack))
+                                          .toList(),
+                                    )
+                                  : const Center(
+                                      child: Text("No active packs")),
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -1716,93 +1303,98 @@ class _HomePageState extends State<HomePage>
                   color: Colors.orange,
                   backgroundColor: Colors.white,
                   onRefresh: () async {
-                    await fetchData();
+                    await homeProvider.fetchData();
                   },
                   child: SingleChildScrollView(
                     controller: _packsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: _isLoading
-                          ? Column(
-                              children: List.generate(
-                                  3, (index) => _buildLoadingCard()),
-                            )
-                          : _filterPacks(lastPacks, lastPacksSearchQuery,
-                                      lastPacksFilters)
-                                  .isNotEmpty
+                    child: Column(
+                      children: [
+                        // Moved toggle row inside the scrollable content.
+                        _buildToggleRowForPacks(),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: homeProvider.isLoading
                               ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _filterPacks(
-                                          lastPacks,
+                                  children: List.generate(
+                                      3, (index) => _buildLoadingCard()),
+                                )
+                              : _filterPacks(
+                                          homeProvider.lastPacks,
                                           lastPacksSearchQuery,
                                           lastPacksFilters)
-                                      .map((pack) => _buildPackCard(pack))
-                                      .toList(),
-                                )
-                              : const Center(
-                                  child: Text("No historical packs")),
+                                      .isNotEmpty
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: _filterPacks(
+                                              homeProvider.lastPacks,
+                                              lastPacksSearchQuery,
+                                              lastPacksFilters)
+                                          .map((pack) => _buildPackCard(pack))
+                                          .toList(),
+                                    )
+                                  : const Center(
+                                      child: Text("No historical packs")),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-        ),
-      ],
-    );
+                );
 
-    // Stats tab remains unchanged.
-    Widget statsTab = (currentRole == "Admin" || currentRole == "Instructor")
-        ? _isLoading
-            ? _buildStatsSkeleton()
-            : (currentRole == "Admin"
-                ? _buildAdminStats()
-                : _buildInstructorStats())
-        : _buildNoStats();
+          // Build Stats Tab.
+          Widget statsTab = (homeProvider.currentRole == "Admin" ||
+                  homeProvider.currentRole == "Instructor")
+              ? homeProvider.isLoading
+                  ? _buildStatsSkeleton()
+                  : (homeProvider.currentRole == "Admin"
+                      ? _buildAdminStats(homeProvider)
+                      : _buildInstructorStats(homeProvider))
+              : _buildNoStats();
 
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Column(
-            children: [
-              // NEW: Use the animated header
-              _buildHeader(),
-              Expanded(
-                child: DefaultTabController(
-                  length: 3,
-                  child: Column(
-                    children: [
-                      TabBar(
-                        labelColor: Colors.orange,
-                        unselectedLabelColor: Colors.grey,
-                        tabs: const [
-                          Tab(text: "Lessons"),
-                          Tab(text: "Packs"),
-                          Tab(text: "Stats"),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: TabBarView(
+          return Scaffold(
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 12.0),
+                child: Column(
+                  children: [
+                    _buildHeader(homeProvider),
+                    Expanded(
+                      child: DefaultTabController(
+                        length: 3,
+                        child: Column(
                           children: [
-                            lessonsTab,
-                            packsTab,
-                            statsTab,
+                            TabBar(
+                              labelColor: Colors.orange,
+                              unselectedLabelColor: Colors.grey,
+                              tabs: const [
+                                Tab(text: "Lessons"),
+                                Tab(text: "Packs"),
+                                Tab(text: "Stats"),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: TabBarView(
+                                children: [
+                                  lessonsTab,
+                                  packsTab,
+                                  statsTab,
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
-  }
-
-  // Simple message for roles with no stats.
-  Widget _buildNoStats() {
-    return const Center(child: Text("No stats available"));
   }
 }

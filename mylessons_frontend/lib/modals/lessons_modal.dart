@@ -9,15 +9,11 @@ import '../widgets/handle_lesson_report.dart';
 
 class LessonsModal extends StatefulWidget {
   final List<dynamic> lessons;
-  final String currentRole;
   final dynamic unschedulableLessons;
-  final Future<void> Function() fetchData; // Callback to refresh data
 
   const LessonsModal({
     Key? key,
     required this.lessons,
-    required this.currentRole,
-    required this.fetchData,
     this.unschedulableLessons,
   }) : super(key: key);
 
@@ -46,8 +42,6 @@ class _LessonsModalState extends State<LessonsModal> {
             .showLessonCardOptions(
               context,
               lesson,
-              widget.currentRole,
-              widget.fetchData,
             );
       },
       child: Card(
@@ -103,8 +97,6 @@ class _LessonsModalState extends State<LessonsModal> {
                         .showScheduleLessonModal(
                           context,
                           lesson,
-                          widget.currentRole,
-                          widget.fetchData,
                         );
                   }
                 },
@@ -153,8 +145,6 @@ class _LessonsModalState extends State<LessonsModal> {
                           .showLessonDetailsModal(
                             context,
                             lesson,
-                            widget.currentRole,
-                            widget.fetchData,
                           );
                     },
                     child: const Icon(Icons.more_vert,

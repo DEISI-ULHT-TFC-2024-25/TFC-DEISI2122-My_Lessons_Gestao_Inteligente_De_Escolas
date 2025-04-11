@@ -4,7 +4,7 @@ from locations.models import Location
 from sports.models import Sport
 from payments.models import Payment
 from users.models import Instructor, Monitor, UserAccount
-from .models import School
+from .models import Review, School
 from datetime import datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework.decorators import api_view, permission_classes
@@ -134,6 +134,7 @@ def all_schools(request):
             'isFavorite': True if request.user.schools.exists() and school in request.user.schools.all() else False,
             'services': school.services,
             'currency': school.currency if school.currency else "EUR",
+            'contacts': school.contacts,
             'subjects': [{
                 'id': subject.id,
                 'name': subject.name,
@@ -1056,3 +1057,42 @@ def create_subject(request):
     status_msg = "Subject set"
     
     return Response({"status": status_msg}, status=status.HTTP_200_OK)
+
+
+@csrf_exempt  # Consider using proper CSRF handling or a DRF-based view if needed.
+def create_review(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {'error': 'Invalid JSON.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        rating = data.get('rating')
+        description = data.get('description', '')
+        if rating is None:
+            return JsonResponse(
+                {'error': 'Rating is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            rating = float(rating)
+        except (ValueError, TypeError):
+            return JsonResponse(
+                {'error': 'Invalid rating provided.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create the review using the authenticated user.
+        review = Review.objects.create(
+            user=request.user,
+            rating=rating,
+            description=description
+        )
+        return JsonResponse(
+            {'message': 'Review created successfully', 'review_id': review.id},
+            status=status.HTTP_201_CREATED
+        )
+    return JsonResponse({'error': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
