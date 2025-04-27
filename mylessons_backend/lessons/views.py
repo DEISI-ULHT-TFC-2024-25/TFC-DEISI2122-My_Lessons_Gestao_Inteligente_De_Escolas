@@ -18,8 +18,7 @@ from django.shortcuts import get_object_or_404
 # on instructor or admin schedule private lesson if the time is unavailable because of his unavailability or pecause its in the past there should be an alert message and an option to override
 
 
-
-def get_lessons_data(user, date_lookup, is_done_flag):
+def get_lessons_data(user, is_done_flag):
     """
     Helper function to get lessons data.
     
@@ -32,49 +31,34 @@ def get_lessons_data(user, date_lookup, is_done_flag):
     """
     today = now().date()
     
-    # For each user role, conditionally add the date filters only if lessons are not done.
     if user.current_role == "Parent":
         student_ids = user.students.values_list('id', flat=True)
-        if is_done_flag:
-            lessons = Lesson.objects.filter(
-                students__id__in=student_ids,
-                is_done=is_done_flag,
-            ).order_by('date', 'start_time').distinct()
-        else:
-            lessons = Lesson.objects.filter(
-                students__id__in=student_ids,
-                is_done=is_done_flag,
-                **date_lookup  # Applies date filtering when lessons are upcoming
-            ).order_by('date', 'start_time').distinct()
-    
+        lessons = Lesson.objects.filter(
+            students__id__in=student_ids,
+            is_done=is_done_flag,
+            date__isnull=False,
+            start_time__isnull=False,
+        ).order_by('date', 'start_time').distinct()
+
     elif user.current_role == "Instructor":
-        if is_done_flag:
-            lessons = Lesson.objects.filter(
-                instructors__id__in=[user.instructor_profile.id],
-                is_done=is_done_flag,
-            ).order_by('date', 'start_time').distinct()
-        else:
-            lessons = Lesson.objects.filter(
-                instructors__id__in=[user.instructor_profile.id],
-                is_done=is_done_flag,
-                **date_lookup
-            ).order_by('date', 'start_time').distinct()
-    
+        lessons = Lesson.objects.filter(
+            instructors__id__in=[user.instructor_profile.id],
+            is_done=is_done_flag,
+            date__isnull=False,
+            start_time__isnull=False,
+        ).order_by('date', 'start_time').distinct()
+
     elif user.current_role == "Admin":
         if not user.current_school_id:
             lessons = []
         else:
-            if is_done_flag:
-                lessons = Lesson.objects.filter(
-                    school_id=user.current_school_id,
-                    is_done=is_done_flag,
-                ).order_by('date', 'start_time').distinct()
-            else:
-                lessons = Lesson.objects.filter(
-                    school_id=user.current_school_id,
-                    is_done=is_done_flag,
-                    **date_lookup
-                ).order_by('date', 'start_time').distinct()
+            lessons = Lesson.objects.filter(
+                school_id=user.current_school_id,
+                is_done=is_done_flag,
+                date__isnull=False,
+                start_time__isnull=False,
+            ).order_by('date', 'start_time').distinct()
+
 
     # Process lessons data.
     lessons_data = [
@@ -90,11 +74,18 @@ def get_lessons_data(user, date_lookup, is_done_flag):
             "expiration_date": lesson.packs.all()[0].expiration_date if lesson.packs.exists() and lesson.packs.all()[0].expiration_date else "None",
             "school": str(lesson.school) if lesson.school else "",
             "subject_id": lesson.sport.id if lesson.sport else "Unknown",
+            "subject_name": lesson.sport.name if lesson.sport else "",
             "is_done": lesson.is_done,
+            # Added status flag: "Today", "Upcoming", or "Need Reschedule" based on lesson.date.
+            "status": (
+                "Today" if lesson.date == today else 
+                ("Upcoming" if lesson.date > today else "Need Reschedule")
+            ) if lesson.date else "Unknown",
         }
         for lesson in lessons
     ]
     return lessons_data
+
 
 def get_packs_data(user, is_done_flag):
     """
@@ -166,7 +157,6 @@ def upcoming_lessons(request):
     # For upcoming lessons, filter for date >= today and is_done False.
     lessons_data = get_lessons_data(
         user=request.user,
-        date_lookup={'date__gte': now().date()},
         is_done_flag=False
     )
     return Response(lessons_data)
@@ -180,7 +170,6 @@ def last_lessons(request):
     # For past lessons, filter for date <= today and is_done True.
     lessons_data = get_lessons_data(
         user=request.user,
-        date_lookup={'date__lte': now().date()},
         is_done_flag=True
     )
     return Response(lessons_data)

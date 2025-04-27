@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db import models
 from events.models import Activity
 from notifications.models import Notification
-from users.models import Discount, Unavailability, UserAccount, Student, Instructor
+from users.models import Discount, Monitor, Unavailability, UserAccount, Student, Instructor
 from users.utils import get_users_name, get_students_ids, get_instructors_name, get_instructors_ids
 from django.db.models import Q
 from django.utils.timezone import now, make_aware
@@ -279,6 +279,7 @@ class Lesson(models.Model):
     maximum_number_of_students = models.PositiveIntegerField(blank=True, null=True)
     students = models.ManyToManyField('users.Student', related_name="lessons")
     instructors = models.ManyToManyField(Instructor, related_name="lessons", blank=True)
+    monitors = models.ManyToManyField(Monitor, related_name="lessons", blank=True)
     location = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name="lessons")
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='lessons', blank=True, null=True)
     pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name='lessons', blank=True, null=True)

@@ -39,8 +39,4 @@ class CampAdmin(admin.ModelAdmin):
 
 @admin.register(BirthdayParty)
 class BirthdayPartyAdmin(admin.ModelAdmin):
-    list_display = ('student', 'date', 'start_time', 'end_time',  'number_of_guests', 'price')
-    list_filter = ('date', 'student', 'number_of_guests')
-    search_fields = ('student__user__first_name', 'student__user__last_name')
-    ordering = ('date', 'start_time')
-    filter_horizontal = ('activities', 'equipment')
+    pass

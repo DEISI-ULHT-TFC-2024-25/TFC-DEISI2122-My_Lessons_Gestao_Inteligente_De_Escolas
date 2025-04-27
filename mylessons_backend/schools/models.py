@@ -268,7 +268,7 @@ class Review(models.Model):
         on_delete=models.CASCADE,
         related_name="reviews"
     )
-    date = models.DateField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     rating = models.PositiveSmallIntegerField()  # 1-5 scale
     description = models.TextField(blank=True, null=True)
     is_verified = models.BooleanField(default=False)  # Verified indicates if it's an authenticated review.
@@ -279,7 +279,7 @@ class Review(models.Model):
         return f"Review by {self.user} - {self.rating} stars"
 
     class Meta:
-        ordering = ['-date']  # Newest reviews appear first
+        ordering = ['-created_at']  # Newest reviews appear first
 
 class School(models.Model):
     pack_prices = models.JSONField(default=dict, blank=True)

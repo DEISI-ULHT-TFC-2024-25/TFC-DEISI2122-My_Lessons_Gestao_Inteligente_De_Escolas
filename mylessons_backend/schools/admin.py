@@ -4,10 +4,9 @@ from .models import Review, School
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = ('user', 'date', 'rating', 'is_verified', 'description')  # Show important fields
+    list_display = ('user', 'rating', 'is_verified', 'description')  # Show important fields
     search_fields = ('user__username', 'description')  # Enable search by user or description
-    list_filter = ('is_verified', 'rating', 'date')  # Filter by verification status, rating, and date
-    ordering = ('-date',)  # Order reviews by most recent
+    list_filter = ('is_verified', 'rating')  # Filter by verification status, rating, and date
 
 
 @admin.register(School)
