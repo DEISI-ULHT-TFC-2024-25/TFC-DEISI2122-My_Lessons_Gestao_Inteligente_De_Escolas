@@ -17,6 +17,7 @@ import '../modals/profile_completion_modal.dart';
 import '../providers/lessons_modal_provider.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
+import '../widgets/lesson_grouping_widget.dart';
 import 'profile_page.dart';
 import 'package:mylessons_frontend/modals/schedule_lesson_modal.dart';
 import '../providers/home_page_provider.dart';
@@ -1168,35 +1169,67 @@ class _HomePageState extends State<HomePage>
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: homeProvider.isLoading
-                              ? Column(
-                                  children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
-                                )
-                              : _filterLessons(homeProvider.upcomingLessons,
-                                          upcomingSearchQuery, upcomingFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterLessons(
-                                              homeProvider.upcomingLessons,
-                                              upcomingSearchQuery,
-                                              upcomingFilters)
-                                          .map((lesson) {
-                                        return Provider.of<LessonModalProvider>(
-                                                context,
-                                                listen: false)
-                                            .buildLessonCard(
-                                                context,
-                                                lesson,
-                                                Provider.of<PackDetailsProvider>(
-                                                        context)
-                                                    .unschedulableLessons,
-                                                isLastLesson: false);
-                                      }).toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No active lessons")),
+    ? Column(
+        children: List.generate(3, (index) => _buildLoadingCard()),
+      )
+    : Builder(builder: (context) {
+        // Retrieve the filtered active lessons list.
+        final activeLessons = _filterLessons(
+          homeProvider.upcomingLessons,
+          upcomingSearchQuery,
+          upcomingFilters,
+        );
+
+        // Map group titles to their background colors.
+        final Map<String, Color> groupColors = {
+          'Need Reschedule': Colors.red,
+          'Today': Colors.orange,
+          'Upcoming': Colors.grey,
+        };
+
+        // Create groups (assumes each lesson has a "status" field).
+        final Map<String, List<dynamic>> groupedLessons = {
+          'Today': [],
+          'Need Reschedule': [],
+          'Upcoming': [],
+        };
+
+        // Group the lessons based on the 'status' field.
+        for (var lesson in activeLessons) {
+          String status = lesson['status'] ?? 'Upcoming';
+          if (!groupedLessons.containsKey(status)) {
+            status = 'Upcoming';
+          }
+          groupedLessons[status]!.add(lesson);
+        }
+
+        // Build a list of grouped cards.
+        List<Widget> groupedCards = [];
+        groupedLessons.forEach((group, lessons) {
+          if (lessons.isNotEmpty) {
+            // Build individual lesson card widgets using your existing method.
+            final lessonWidgets = lessons.map((lesson) {
+              return Provider.of<LessonModalProvider>(context, listen: false)
+                  .buildLessonCard(
+                    context,
+                    lesson,
+                    Provider.of<PackDetailsProvider>(context).unschedulableLessons,
+                    isLastLesson: false,
+                  );
+            }).toList();
+
+            groupedCards.add(
+              buildGroupedLessonCard(group, groupColors[group]!, lessonWidgets),
+            );
+          }
+        });
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: groupedCards,
+        );
+      }),
+
                         ),
                       ],
                     ),

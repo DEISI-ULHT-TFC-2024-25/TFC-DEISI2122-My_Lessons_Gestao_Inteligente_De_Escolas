@@ -98,9 +98,9 @@ class BirthdayParty(models.Model):
     end_time = models.TimeField(null=True, blank=True)
     duration_in_minutes = models.PositiveIntegerField()
     activities = models.ManyToManyField(Activity, related_name='birthday_parties')
-    student = models.ForeignKey('users.Student', on_delete=models.CASCADE, related_name='birthday_parties')
+    students = models.ManyToManyField('users.Student', related_name='birthday_parties', blank=True)
     number_of_guests = models.PositiveIntegerField()
-    equipment = models.ManyToManyField('equipment.Equipment', related_name='birthday_parties')
+    equipment = models.JSONField(default=dict, blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):

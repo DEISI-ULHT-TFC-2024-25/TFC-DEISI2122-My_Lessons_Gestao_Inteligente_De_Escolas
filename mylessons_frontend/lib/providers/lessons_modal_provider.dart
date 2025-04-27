@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:mylessons_frontend/modals/lesson_details_modal.dart';
 import 'package:mylessons_frontend/modals/schedule_lesson_modal.dart';
 import 'package:mylessons_frontend/providers/home_page_provider.dart';
@@ -16,10 +17,10 @@ class LessonModalProvider with ChangeNotifier {
   /// Opens the lesson details modal using the provided BuildContext.
   void showLessonDetailsModal(BuildContext context, dynamic lesson) {
     Navigator.push(
-  context,
-  MaterialPageRoute(builder: (context) => LessonDetailsPage(lesson: lesson)),
-);
-
+      context,
+      MaterialPageRoute(
+          builder: (context) => LessonDetailsPage(lesson: lesson)),
+    );
   }
 
   Future<Map<String, dynamic>?> toggleLessonCompletion(int lessonId) async {
@@ -49,7 +50,8 @@ class LessonModalProvider with ChangeNotifier {
       schedulePrivateLesson(lessonId, newDate, newTime);
 
   /// Opens the schedule lesson modal.
-  Future<void> showScheduleLessonModal(BuildContext context, dynamic lesson) async {
+  Future<void> showScheduleLessonModal(
+      BuildContext context, dynamic lesson) async {
     final int lessonId = lesson['id'] ?? lesson['lesson_id'];
     final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
     final currentRole = homeProvider.currentRole;
@@ -130,8 +132,52 @@ class LessonModalProvider with ChangeNotifier {
   }
 
   /// Builds and returns a card widget representing a lesson.
-  Widget buildLessonCard(BuildContext context, dynamic lesson, dynamic unschedulableLessons, {bool isLastLesson = false}) {
+  Widget buildLessonCard(
+      BuildContext context, dynamic lesson, dynamic unschedulableLessons,
+      {bool isLastLesson = false}) {
     final bool isGroup = lesson['type']?.toString().toLowerCase() == 'group';
+
+    // Parse the lesson date string. Make sure the format ("dd MMM yyyy") matches your data.
+    DateTime? lessonDate;
+    try {
+      if (lesson['date'] != null) {
+        lessonDate = DateFormat("dd MMM yyyy").parse(lesson['date']);
+      }
+    } catch (e) {
+      lessonDate = null;
+    }
+
+    // Get today's date (only year, month, day for comparison).
+    final now = DateTime.now();
+    final todayOnly = DateTime(now.year, now.month, now.day);
+
+    // Determine if the lesson is today, past, or upcoming.
+    bool isToday = false;
+    bool isPast = false;
+    if (lessonDate != null) {
+      final lessonOnly =
+          DateTime(lessonDate.year, lessonDate.month, lessonDate.day);
+      isToday = lessonOnly == todayOnly;
+      isPast = lessonOnly.isBefore(todayOnly) && lesson["is_done"] == false;
+    }
+
+    // Determine display string and its text color.
+    String dateTimeStr = '';
+    Color dateTextColor = Colors.black54;
+    if (lessonDate != null) {
+      if (isPast) {
+        dateTimeStr = '${lesson['date']} at ${lesson['start_time']}';
+        dateTextColor = Colors.red;
+      } else if (isToday) {
+        dateTimeStr = 'Today at ${lesson['start_time']}';
+        dateTextColor = Colors.orange;
+      } else {
+        dateTimeStr = '${lesson['date']} at ${lesson['start_time']}';
+        dateTextColor = Colors.black54;
+      }
+    } else {
+      dateTimeStr = 'Unknown';
+    }
 
     return InkWell(
       onTap: () => showLessonCardOptions(context, lesson),
@@ -149,12 +195,14 @@ class LessonModalProvider with ChangeNotifier {
                   if (isLastLesson) {
                     // Call your lesson report handler.
                     handleLessonReport(context, lesson);
-                  } else if ((unschedulableLessons ?? []).contains(lesson['lesson_id']?.toString() ?? '')) {
+                  } else if ((unschedulableLessons ?? [])
+                      .contains(lesson['lesson_id']?.toString() ?? '')) {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text("Reschedule Unavailable"),
-                        content: const Text("The reschedule period has passed!"),
+                        content:
+                            const Text("The reschedule period has passed!"),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
@@ -163,7 +211,8 @@ class LessonModalProvider with ChangeNotifier {
                         ],
                       ),
                     );
-                  } else if (lesson['type']?.toString().toLowerCase() == 'group') {
+                  } else if (lesson['type']?.toString().toLowerCase() ==
+                      'group') {
                     // For group lessons, scheduling might be unavailable.
                     showDialog(
                       context: context,
@@ -201,16 +250,28 @@ class LessonModalProvider with ChangeNotifier {
                     Text(
                       lesson['students_name'],
                       style: GoogleFonts.lato(
-                        fontWeight: FontWeight.bold, 
+                        fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
+                    if (lesson["subject_name"] != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        lesson["subject_name"],
+                        style: GoogleFonts.lato(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
-                      '${lesson['date']} at ${lesson['start_time']}',
+                      dateTimeStr,
                       style: GoogleFonts.lato(
-                        fontSize: 14, 
-                        color: Colors.black54,
+                        fontSize: 14,
+                        color: dateTextColor,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
