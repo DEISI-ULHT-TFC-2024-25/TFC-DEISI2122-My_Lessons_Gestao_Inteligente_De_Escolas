@@ -7,8 +7,25 @@ class LocationModal extends StatefulWidget {
   final int? lessonId;
   final int? packId;
   final int? schoolId;
-  const LocationModal({Key? key, this.lessonId, this.packId, this.schoolId})
-      : super(key: key);
+
+  /// if true, operate purely locally: no HTTP POST for update/create
+  final bool localOnly;
+
+  /// initial selection for the picker (IDs)
+  final List<int>? initialSelectedIds;
+
+  /// supply list of available items in local mode
+  final List<Map<String, dynamic>>? items;
+
+  const LocationModal({
+    Key? key,
+    this.lessonId,
+    this.packId,
+    this.schoolId,
+    this.localOnly = false,
+    this.initialSelectedIds,
+    this.items,
+  }) : super(key: key);
 
   @override
   _LocationModalState createState() => _LocationModalState();
@@ -20,7 +37,7 @@ class _LocationModalState extends State<LocationModal>
   List<dynamic> locations = [];
   bool isLoading = false;
   String searchQuery = "";
-  dynamic selectedLocation; // singular selected location from lesson/pack
+  dynamic selectedLocation; // singular selected location
   List<int> _selectedIds = []; // for multi-select mode
 
   final TextEditingController _newLocationNameController =
@@ -35,7 +52,13 @@ class _LocationModalState extends State<LocationModal>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    fetchLocations();
+    if (widget.localOnly) {
+      locations = widget.items ?? [];
+      _selectedIds = List<int>.from(widget.initialSelectedIds ?? []);
+      isLoading = false;
+    } else {
+      fetchLocations();
+    }
   }
 
   Future<void> fetchLocations() async {
@@ -43,7 +66,6 @@ class _LocationModalState extends State<LocationModal>
       isLoading = true;
     });
     try {
-      // Build query parameters.
       Map<String, String> queryParams = {};
       if (widget.lessonId != null) {
         queryParams['lesson_id'] = widget.lessonId.toString();
@@ -54,10 +76,9 @@ class _LocationModalState extends State<LocationModal>
       if (widget.schoolId != null) {
         queryParams['school_id'] = widget.schoolId.toString();
       }
-      Uri uri = Uri.parse("$baseUrl/api/schools/locations/")
+      Uri uri = Uri.parse("\$baseUrl/api/schools/locations/")
           .replace(queryParameters: queryParams);
 
-      // Decode the response as UTF8.
       final response = await http.get(uri, headers: await getAuthHeaders());
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -66,24 +87,25 @@ class _LocationModalState extends State<LocationModal>
           if (isMultiSelect) {
             _selectedIds = (data["selected_locations"] as List?)
                     ?.map((l) => l["id"] as int)
-                    .toList() ??
-                [];
+                    .toList() ?? [];
           } else {
             selectedLocation = data["selected_location"];
           }
-          // Sort locations so that selected ones come first.
+          // Sort so selected come first, then alphabetically
           locations.sort((a, b) {
-            bool aSelected;
-            bool bSelected;
+            bool aSel;
+            bool bSel;
             if (isMultiSelect) {
-              aSelected = _selectedIds.contains(a["id"]);
-              bSelected = _selectedIds.contains(b["id"]);
+              aSel = _selectedIds.contains(a["id"]);
+              bSel = _selectedIds.contains(b["id"]);
             } else {
-              aSelected = selectedLocation != null && a["id"] == selectedLocation["id"];
-              bSelected = selectedLocation != null && b["id"] == selectedLocation["id"];
+              aSel = selectedLocation != null &&
+                  a["id"] == selectedLocation["id"];
+              bSel = selectedLocation != null &&
+                  b["id"] == selectedLocation["id"];
             }
-            if (aSelected && !bSelected) return -1;
-            if (bSelected && !aSelected) return 1;
+            if (aSel && !bSel) return -1;
+            if (bSel && !aSel) return 1;
             return a["name"]
                 .toString()
                 .toLowerCase()
@@ -92,14 +114,13 @@ class _LocationModalState extends State<LocationModal>
         });
       }
     } catch (e) {
-      print("Error fetching locations: $e");
+      print("Error fetching locations: \$e");
     }
     setState(() {
       isLoading = false;
     });
   }
 
-  // Toggle selection for multi-select mode.
   void _toggleSelection(int locationId) {
     setState(() {
       if (_selectedIds.contains(locationId)) {
@@ -110,26 +131,26 @@ class _LocationModalState extends State<LocationModal>
     });
   }
 
-  // For single-select mode: handle selection immediately.
   void _selectLocation(dynamic location) async {
+    if (widget.localOnly) {
+      Navigator.pop(context, location);
+      return;
+    }
     bool? confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (c) => AlertDialog(
         title: const Text("Confirm Selection"),
-        content: Text("Do you want to select location: ${location["name"]}?"),
+        content: Text(
+          'Do you want to select location: ${location["name"]}?'
+        ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Confirm")),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text("Confirm")),
         ],
       ),
     );
     if (confirmed == true) {
-      final url = "$baseUrl/api/lessons/edit_location/";
-      // Build payload including all available IDs.
+      final url = "\$baseUrl/api/lessons/edit_location/";
       Map<String, dynamic> payload = {
         "location_id": location["id"],
         "action": "change",
@@ -139,156 +160,141 @@ class _LocationModalState extends State<LocationModal>
       if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
 
       try {
-        final response = await http.post(
-          Uri.parse(url),
-          headers: await getAuthHeaders(),
-          body: jsonEncode(payload),
-        );
-        if (response.statusCode == 200) {
+        final resp = await http.post(Uri.parse(url),
+            headers: await getAuthHeaders(), body: jsonEncode(payload));
+        if (resp.statusCode == 200) {
           Navigator.pop(context, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text("Error updating location: ${utf8.decode(response.bodyBytes)}")),
+            SnackBar(content: Text("Error updating location: \${utf8.decode(resp.bodyBytes)}")),
           );
         }
       } catch (e) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: \$e")),
+        );
       }
     }
   }
 
-  // Update locations for multi-select mode.
   Future<void> _updateLocations() async {
-    final url = "$baseUrl/api/schools/update_locations/";
-    // Build payload including all available IDs.
-    Map<String, dynamic> payload = {
-      "location_ids": _selectedIds,
-    };
-    if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
-    if (widget.packId != null) payload["pack_id"] = widget.packId;
-    if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+    if (widget.localOnly) {
+      final picked = locations.where((l) => _selectedIds.contains(l['id'] as int)).toList();
+      Navigator.pop(context, picked);
+      return;
+    }
+    final url = "\$baseUrl/api/schools/update_locations/";
+    Map<String, dynamic> payload = {"location_ids": _selectedIds};
+    if (widget.lessonId != null) payload['lesson_id'] = widget.lessonId;
+    if (widget.packId != null) payload['pack_id'] = widget.packId;
+    if (widget.schoolId != null) payload['school_id'] = widget.schoolId;
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: await getAuthHeaders(),
-        body: jsonEncode(payload),
-      );
-      if (response.statusCode == 200) {
+      final resp = await http.post(Uri.parse(url),
+          headers: await getAuthHeaders(), body: jsonEncode(payload));
+      if (resp.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("Error updating locations: ${utf8.decode(response.bodyBytes)}")),
+          SnackBar(content: Text("Error updating locations: \${utf8.decode(resp.bodyBytes)}")),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: \$e")),
+      );
     }
   }
 
   void _createLocation() async {
-    if (_newLocationNameController.text.trim().isEmpty ||
-        _newLocationAddressController.text.trim().isEmpty) {
+    final name = _newLocationNameController.text.trim();
+    final address = _newLocationAddressController.text.trim();
+    if (name.isEmpty || address.isEmpty) return;
+
+    if (widget.localOnly) {
+      final newItem = {'id': -1, 'name': name, 'address': address};
+      Navigator.pop(context, [newItem]);
       return;
     }
+
     bool? confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (c) => AlertDialog(
         title: const Text("Confirm Creation"),
-        content: Text(
-            "Do you want to create location: ${_newLocationNameController.text.trim()}?"),
+        content: Text("Create location: \$name?"),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Confirm")),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text("Confirm")),
         ],
       ),
     );
     if (confirmed != true) return;
-    final url = "$baseUrl/api/schools/create_location/";
-    // Build the payload based on which IDs are available.
+
+    final url = "\$baseUrl/api/schools/create_location/";
     Map<String, dynamic> payload = {
-      "location_name": _newLocationNameController.text.trim(),
-      "location_address": _newLocationAddressController.text.trim(),
+      "location_name": name,
+      "location_address": address,
     };
-    if (widget.lessonId != null) payload["lesson_id"] = widget.lessonId;
-    else if (widget.packId != null) payload["pack_id"] = widget.packId;
-    else if (widget.schoolId != null) payload["school_id"] = widget.schoolId;
+    if (widget.lessonId != null) payload['lesson_id'] = widget.lessonId;
+    if (widget.packId != null) payload['pack_id'] = widget.packId;
+    if (widget.schoolId != null) payload['school_id'] = widget.schoolId;
+
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: await getAuthHeaders(),
-        body: jsonEncode(payload),
-      );
-      if (response.statusCode == 200) {
+      final resp = await http.post(Uri.parse(url),
+          headers: await getAuthHeaders(), body: jsonEncode(payload));
+      if (resp.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error creating location: ${utf8.decode(response.bodyBytes)}")),
+          SnackBar(content: Text("Error creating location: \${utf8.decode(resp.bodyBytes)}")),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: \$e")),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Filter locations based on the search query.
-    List<dynamic> filteredLocations = locations
-        .where((loc) =>
-            loc["name"].toString().toLowerCase().contains(searchQuery))
-        .toList();
+    final filtered = locations.where((loc) =>
+        loc['name'].toString().toLowerCase().contains(searchQuery)).toList();
 
     return Padding(
       padding: EdgeInsets.only(
-          left: 16.0,
-          right: 16.0,
-          top: 16.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16.0),
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Modal Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Select or Create Location",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+              const Text(
+                'Select or Create Location',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context)),
             ],
           ),
           const SizedBox(height: 8),
-          // TabBar
           TabBar(
             controller: _tabController,
             labelColor: Colors.black,
             indicatorColor: Colors.orange,
-            tabs: const [
-              Tab(text: "Select Existing"),
-              Tab(text: "Create New"),
-            ],
+            tabs: const [Tab(text: 'Select Existing'), Tab(text: 'Create New')],
           ),
           const SizedBox(height: 8),
-          // Tab Content
-          SizedBox(
-            height: 300,
+          Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Tab 1: Select Existing with Search Input
                 isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : Padding(
@@ -300,14 +306,10 @@ class _LocationModalState extends State<LocationModal>
                                 Expanded(
                                   child: TextField(
                                     decoration: const InputDecoration(
-                                      labelText: "Search Location",
+                                      labelText: 'Search Location',
                                       border: OutlineInputBorder(),
                                     ),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        searchQuery = value.toLowerCase();
-                                      });
-                                    },
+                                    onChanged: (v) => setState(() => searchQuery = v.toLowerCase()),
                                   ),
                                 ),
                                 if (isMultiSelect) ...[
@@ -316,7 +318,7 @@ class _LocationModalState extends State<LocationModal>
                                     onPressed: _updateLocations,
                                     style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.orange),
-                                    child: const Text("Save"),
+                                    child: const Text('Save'),
                                   ),
                                 ],
                               ],
@@ -325,29 +327,25 @@ class _LocationModalState extends State<LocationModal>
                             Expanded(
                               child: isMultiSelect
                                   ? ListView(
-                                      children: filteredLocations.map((loc) {
+                                      children: filtered.map((loc) {
                                         return CheckboxListTile(
-                                          title: Text(loc["name"]),
-                                          subtitle: Text(loc["address"] ?? ""),
-                                          value: _selectedIds.contains(loc["id"]),
+                                          title: Text(loc['name']),
+                                          subtitle: Text(loc['address'] ?? ''),
+                                          value: _selectedIds.contains(loc['id']),
                                           activeColor: Colors.orange,
-                                          onChanged: (val) =>
-                                              _toggleSelection(loc["id"] as int),
+                                          onChanged: (_) => _toggleSelection(loc['id'] as int),
                                         );
                                       }).toList(),
                                     )
                                   : ListView(
-                                      children: filteredLocations.map((loc) {
-                                        bool isSelected = selectedLocation != null &&
-                                            loc["id"] == selectedLocation["id"];
+                                      children: filtered.map((loc) {
+                                        final sel = selectedLocation != null && loc['id'] == selectedLocation['id'];
                                         return ListTile(
-                                          title: Text(loc["name"]),
-                                          subtitle: Text(loc["address"] ?? ""),
-                                          trailing: isSelected
-                                              ? const Icon(Icons.check_circle,
-                                                  color: Colors.orange)
-                                              : const Icon(Icons.arrow_forward,
-                                                  color: Colors.orange),
+                                          title: Text(loc['name']),
+                                          subtitle: Text(loc['address'] ?? ''),
+                                          trailing: sel
+                                              ? const Icon(Icons.check_circle, color: Colors.orange)
+                                              : const Icon(Icons.arrow_forward, color: Colors.orange),
                                           onTap: () => _selectLocation(loc),
                                         );
                                       }).toList(),
@@ -356,7 +354,6 @@ class _LocationModalState extends State<LocationModal>
                           ],
                         ),
                       ),
-                // Tab 2: Create New
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -364,7 +361,7 @@ class _LocationModalState extends State<LocationModal>
                       TextField(
                         controller: _newLocationNameController,
                         decoration: const InputDecoration(
-                          labelText: "New Location Name",
+                          labelText: 'New Location Name',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -372,7 +369,7 @@ class _LocationModalState extends State<LocationModal>
                       TextField(
                         controller: _newLocationAddressController,
                         decoration: const InputDecoration(
-                          labelText: "New Location Address",
+                          labelText: 'New Location Address',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -383,7 +380,7 @@ class _LocationModalState extends State<LocationModal>
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text("Create Location"),
+                        child: const Text('Create Location'),
                       ),
                     ],
                   ),

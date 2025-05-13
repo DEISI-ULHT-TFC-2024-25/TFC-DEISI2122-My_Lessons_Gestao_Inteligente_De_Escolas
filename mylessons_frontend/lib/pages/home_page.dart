@@ -18,6 +18,7 @@ import '../providers/lessons_modal_provider.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
 import '../widgets/lesson_grouping_widget.dart';
+import '../widgets/notification_card_widget.dart';
 import 'profile_page.dart';
 import 'package:mylessons_frontend/modals/schedule_lesson_modal.dart';
 import '../providers/home_page_provider.dart';
@@ -223,13 +224,17 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _showScheduleMultipleLessonsModal(
-      List<dynamic> lessons, String expirationDate) async {
-    int schoolScheduleTimeLimit =
+    List<dynamic> lessons,
+    String expirationDate,
+  ) async {
+    final timeLimit =
         await fetchSchoolScheduleTimeLimit(lessons.first["school"]);
-    showModalBottomSheet(
+
+    // Await the sheet, declaring it returns a bool
+    final didSchedule = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (BuildContext context) => ScheduleMultipleLessonsModal(
+      builder: (_) => ScheduleMultipleLessonsModal(
         lessons: lessons,
         unschedulableLessons:
             Provider.of<HomePageProvider>(context, listen: false)
@@ -237,104 +242,88 @@ class _HomePageState extends State<HomePage>
         expirationDate: expirationDate,
         currentRole:
             Provider.of<HomePageProvider>(context, listen: false).currentRole,
-        schoolScheduleTimeLimit: schoolScheduleTimeLimit,
-        onScheduleConfirmed: () {
-          Provider.of<HomePageProvider>(context, listen: false).fetchData();
+        schoolScheduleTimeLimit: timeLimit,
+        onScheduleConfirmed: () async {
+          // you can still refresh here if you like
+          await Provider.of<HomePageProvider>(context, listen: false)
+              .fetchData();
         },
       ),
     );
   }
 
   Future<void> _showNotificationsModal() async {
-    // Animate the notifications warning to hide.
-    setState(() {
-      _notificationHeight = 0;
-    });
+    // Hide warning bar…
+    setState(() => _notificationHeight = 0);
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Then mark notifications as read.
+    // Mark as read…
     final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
     homeProvider.notificationsCount = 0;
     homeProvider.notifyListeners();
 
-    // Now show the notifications modal as before.
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return FutureBuilder<List<dynamic>>(
-          future: _fetchNotifications(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Container(
-                height: MediaQuery.of(context).size.height * 0.6,
-                padding: const EdgeInsets.all(16),
-                child: const Center(child: CircularProgressIndicator()),
-              );
-            }
-            final notifications = snapshot.data!;
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6, // when opened
+          minChildSize: 0.3, // how far down it can collapse
+          maxChildSize: 0.9, // up to 90% height
+          expand: false,
+          builder: (context, scrollCtrl) {
             return Container(
-              height: MediaQuery.of(context).size.height * 0.6,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Notificações",
-                    style: GoogleFonts.lato(
-                        fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: notifications.isEmpty
-                        ? Center(
-                            child: Text(
-                              "Sem notificações novas.",
-                              style: GoogleFonts.lato(
-                                  fontSize: 16, color: Colors.black54),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: notifications.length,
-                            itemBuilder: (context, index) {
-                              final notification = notifications[index];
-                              final formattedDate =
-                                  DateFormat("dd MMM yyyy, HH:mm").format(
-                                      DateTime.parse(
-                                          notification['created_at']));
-                              return Card(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+              child: FutureBuilder<List<dynamic>>(
+                future: _fetchNotifications(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final notifications = snapshot.data!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Notificações",
+                        style: GoogleFonts.lato(
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: notifications.isEmpty
+                            ? Center(
+                                child: Text(
+                                  "Sem notificações novas.",
+                                  style: GoogleFonts.lato(
+                                      fontSize: 16, color: Colors.black54),
                                 ),
-                                child: ListTile(
-                                  leading: const Icon(Icons.notifications,
-                                      color: Colors.orange),
-                                  title: Text(
-                                    notification['subject'],
-                                    style: GoogleFonts.lato(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Text(
-                                    formattedDate,
-                                    style: GoogleFonts.lato(
-                                        fontSize: 14, color: Colors.black54),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Close",
-                          style: TextStyle(color: Colors.orange)),
-                    ),
-                  ),
-                ],
+                              )
+                            : ListView.builder(
+                                controller: scrollCtrl,
+                                itemCount: notifications.length,
+                                itemBuilder: (context, index) {
+                                  return NotificationCard(
+                                      notification: notifications[index]);
+                                },
+                              ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("Close",
+                              style: TextStyle(color: Colors.orange)),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             );
           },
@@ -1169,67 +1158,76 @@ class _HomePageState extends State<HomePage>
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: homeProvider.isLoading
-    ? Column(
-        children: List.generate(3, (index) => _buildLoadingCard()),
-      )
-    : Builder(builder: (context) {
-        // Retrieve the filtered active lessons list.
-        final activeLessons = _filterLessons(
-          homeProvider.upcomingLessons,
-          upcomingSearchQuery,
-          upcomingFilters,
-        );
+                              ? Column(
+                                  children: List.generate(
+                                      3, (index) => _buildLoadingCard()),
+                                )
+                              : Builder(builder: (context) {
+                                  // Retrieve the filtered active lessons list.
+                                  final activeLessons = _filterLessons(
+                                    homeProvider.upcomingLessons,
+                                    upcomingSearchQuery,
+                                    upcomingFilters,
+                                  );
 
-        // Map group titles to their background colors.
-        final Map<String, Color> groupColors = {
-          'Need Reschedule': Colors.red,
-          'Today': Colors.orange,
-          'Upcoming': Colors.grey,
-        };
+                                  // Map group titles to their background colors.
+                                  final Map<String, Color> groupColors = {
+                                    'Need Reschedule': Colors.red,
+                                    'Today': Colors.orange,
+                                    'Upcoming': Colors.grey,
+                                  };
 
-        // Create groups (assumes each lesson has a "status" field).
-        final Map<String, List<dynamic>> groupedLessons = {
-          'Today': [],
-          'Need Reschedule': [],
-          'Upcoming': [],
-        };
+                                  // Create groups (assumes each lesson has a "status" field).
+                                  final Map<String, List<dynamic>>
+                                      groupedLessons = {
+                                    'Today': [],
+                                    'Need Reschedule': [],
+                                    'Upcoming': [],
+                                  };
 
-        // Group the lessons based on the 'status' field.
-        for (var lesson in activeLessons) {
-          String status = lesson['status'] ?? 'Upcoming';
-          if (!groupedLessons.containsKey(status)) {
-            status = 'Upcoming';
-          }
-          groupedLessons[status]!.add(lesson);
-        }
+                                  // Group the lessons based on the 'status' field.
+                                  for (var lesson in activeLessons) {
+                                    String status =
+                                        lesson['status'] ?? 'Upcoming';
+                                    if (!groupedLessons.containsKey(status)) {
+                                      status = 'Upcoming';
+                                    }
+                                    groupedLessons[status]!.add(lesson);
+                                  }
 
-        // Build a list of grouped cards.
-        List<Widget> groupedCards = [];
-        groupedLessons.forEach((group, lessons) {
-          if (lessons.isNotEmpty) {
-            // Build individual lesson card widgets using your existing method.
-            final lessonWidgets = lessons.map((lesson) {
-              return Provider.of<LessonModalProvider>(context, listen: false)
-                  .buildLessonCard(
-                    context,
-                    lesson,
-                    Provider.of<PackDetailsProvider>(context).unschedulableLessons,
-                    isLastLesson: false,
-                  );
-            }).toList();
+                                  // Build a list of grouped cards.
+                                  List<Widget> groupedCards = [];
+                                  groupedLessons.forEach((group, lessons) {
+                                    if (lessons.isNotEmpty) {
+                                      // Build individual lesson card widgets using your existing method.
+                                      final lessonWidgets =
+                                          lessons.map((lesson) {
+                                        return Provider.of<LessonModalProvider>(
+                                                context,
+                                                listen: false)
+                                            .buildLessonCard(
+                                          context,
+                                          lesson,
+                                          Provider.of<PackDetailsProvider>(
+                                                  context)
+                                              .unschedulableLessons,
+                                          isLastLesson: false,
+                                        );
+                                      }).toList();
 
-            groupedCards.add(
-              buildGroupedLessonCard(group, groupColors[group]!, lessonWidgets),
-            );
-          }
-        });
+                                      groupedCards.add(
+                                        buildGroupedLessonCard(group,
+                                            groupColors[group]!, lessonWidgets),
+                                      );
+                                    }
+                                  });
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: groupedCards,
-        );
-      }),
-
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: groupedCards,
+                                  );
+                                }),
                         ),
                       ],
                     ),

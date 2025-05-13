@@ -1,6 +1,8 @@
+from collections import defaultdict
 from datetime import datetime, timedelta
 import json
 from locations.models import Location
+from notifications.models import Notification
 from payments.models import Payment
 from sports.models import Sport
 from users.models import Instructor, Student, UserAccount
@@ -17,6 +19,18 @@ from django.shortcuts import get_object_or_404
 # TODO refactor packs data
 # on instructor or admin schedule private lesson if the time is unavailable because of his unavailability or pecause its in the past there should be an alert message and an option to override
 
+def build_lessons_details(rows):
+    total = len(rows)
+    lines = []
+    for idx, r in enumerate(rows, start=1):
+        lines.append(
+            f"Class {idx}/{total} ({r['lesson_str']}):\n"
+            f"  - Date: {r['new_date']}\n"
+            f"  - Time: {r['new_time']}\n"
+            f"  - Duration: {r['duration_in_minutes']} minutes\n"
+            f"  - Instructors: {r['instructors_str']}"
+        )
+    return "\n\n".join(lines)
 
 def get_lessons_data(user, is_done_flag):
     """
@@ -583,6 +597,72 @@ def schedule_private_lesson(request):
     reschedule_success = lesson.schedule_lesson(new_date_obj, new_time_obj)
 
     if reschedule_success:
+        if lesson.school:
+                # Notify parents
+                for parent in lesson.packs.all()[0].parents.all():
+                    Notification.create_notification(
+                        user=parent,
+                        subject=lesson.school.get_notification_template(f"{lesson.type}_class_scheduled_subject_parent").format(
+                            students=lesson.get_students_name()
+                        ),
+                        message=lesson.school.get_notification_template(f"{lesson.type}_class_scheduled_message_parent").format(
+                            parent_name=parent.first_name,
+                            students=lesson.get_students_name(),
+                            class_number=lesson.class_number,
+                            number_of_classes=lesson.packs.all()[0].number_of_classes,
+                            date=new_date_obj,
+                            start_time=lesson.start_time,
+                            duration_in_minutes=lesson.duration_in_minutes,
+                            instructor_name=f"{lesson.get_instructors_name()}" if len(lesson.instructors.all()) > 0 else "Not Assigned yet"
+                        ),
+                        lessons=[lesson],
+                        school=lesson.school,
+                        type="Parent",
+                    )
+
+                # Notify instructor
+                for instructor in lesson.instructors.all():
+                    Notification.create_notification(
+                        user=instructor.user,
+                        subject=lesson.school.get_notification_template(f"{lesson.type}_class_scheduled_subject_instructor").format(
+                            students=lesson.get_students_name()
+                        ),
+                        message=lesson.school.get_notification_template(f"{lesson.type}_class_scheduled_message_instructor").format(
+                            instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}",
+                            students=lesson.get_students_name(),
+                            class_number=lesson.class_number,
+                            number_of_classes=lesson.packs.all()[0].number_of_classes,
+                            date=new_date_obj,
+                            start_time=lesson.start_time,
+                            duration_in_minutes=lesson.duration_in_minutes
+                        ),
+                        lessons=[lesson],
+                        school=lesson.school,
+                        type="Instructor",
+                    )
+
+                # Notify school admin
+                for admin in lesson.school.admins.all():
+                    Notification.create_notification(
+                        user=admin,
+                        subject=lesson.school.get_notification_template(f"{lesson.type}_class_scheduled_subject_admin").format(
+                            students=lesson.get_students_name()
+                        ),
+                        message=lesson.school.get_notification_template(f"{lesson.type}_class_scheduled_message_admin").format(
+                            students=lesson.get_students_name(),
+                            class_number=lesson.class_number,
+                            number_of_classes=lesson.packs.all()[0].number_of_classes,
+                            date=new_date_obj,
+                            start_time=lesson.start_time,
+                            duration_in_minutes=lesson.duration_in_minutes,
+                            instructor_name=f"{lesson.get_instructors_name()}" if len(lesson.instructors.all()) > 0 else "Not Assigned yet",
+                            price=lesson.price,
+                            currency=lesson.school.currency if lesson.price else ""
+                        ),
+                        lessons=[lesson],
+                        school=lesson.school,
+                        type="Admin",
+                    )
         return Response({"message": "Aula agendada com sucesso!"}, status=status.HTTP_200_OK)
     else:
         return Response({"error": "Não foi possível agendar. Data e horário não disponíveis."},
@@ -754,7 +834,8 @@ def schedule_multiple_lessons(request):
                 "old_time": old_time_str,
                 "weekday": weekday_out,
                 "instructor_ids": [str(instr.id) for instr in available_instructors],
-                "instructors_str": [str(instr) for instr in available_instructors]
+                "instructors_str": [str(instr) for instr in available_instructors],
+                "duration_in_minutes": lesson.duration_in_minutes,
             }
             scheduled_this_block.append(lesson)
         
@@ -773,14 +854,129 @@ def schedule_multiple_lessons(request):
             "old_time": old_time_str,
             "weekday": "",
             "instructor_ids": [],
-            "instructors_str": []
+            "instructors_str": [],
+            "duration_in_minutes": lesson.duration_in_minutes,
         }
     
     final_results = []
     for lesson in lessons:
         final_results.append(scheduled_results.get(lesson.id))
     
+    final_results = [ scheduled_results[l.id] for l in lessons ]
+
+    # ── Prepare notification data ──
+    pack           = lessons[0].packs.first()
+    students_str   = pack.get_students_name()
+    num_classes    = len(lessons)
+    school         = pack.school
+
+    # Build the full details once
+    lessons_details_all = build_lessons_details(final_results)
+
+    # ——— Parent notifications ———
+    subj_tpl = school.get_notification_template(
+        f"{lesson.type}_class_multiple_scheduled_subject_parent"
+    )
+    msg_tpl  = school.get_notification_template(
+        f"{lesson.type}_class_multiple_scheduled_message_parent"
+    )
+
+    for parent in pack.parents.all():
+        subject = subj_tpl.format(
+            number_of_classes=num_classes,
+            students=students_str
+        )
+        message = msg_tpl.format(
+            parent_name=parent.first_name,
+            number_of_classes=num_classes,
+            students=students_str,
+            lessons_details=lessons_details_all
+        )
+        Notification.create_notification(
+            user=parent,
+            subject=subject,
+            message=message,
+            lessons=lessons,
+            school=school,
+            type="Parent",
+        )
+
+    # ——— Admin notifications ———
+    subj_tpl = school.get_notification_template(
+        f"{lesson.type}_class_multiple_scheduled_subject_admin"
+    )
+    msg_tpl  = school.get_notification_template(
+        f"{lesson.type}_class_multiple_scheduled_message_admin"
+    )
+
+    for admin in school.admins.all():
+        subject = subj_tpl.format(
+            number_of_classes=num_classes,
+            students=students_str
+        )
+        message = msg_tpl.format(
+            number_of_classes=num_classes,
+            students=students_str,
+            lessons_details=lessons_details_all
+        )
+        Notification.create_notification(
+            user=admin,
+            subject=subject,
+            message=message,
+            lessons=lessons,
+            school=school,
+            type="Admin",
+        )
+
+    # ——— Instructor notifications ———
+    from collections import defaultdict
+    by_instr = defaultdict(list)
+    for entry in final_results:
+        for instr_id in entry["instructor_ids"]:
+            by_instr[instr_id].append(entry)
+
+    subj_tpl = school.get_notification_template(
+        f"{lesson.type}_class_multiple_scheduled_subject_instructor"
+    )
+    msg_tpl  = school.get_notification_template(
+        f"{lesson.type}_class_multiple_scheduled_message_instructor"
+    )
+
+    for instr_id, entries in by_instr.items():
+        instr = Instructor.objects.get(id=instr_id)
+        # build only this instructor’s lessons
+        mini_rows = []
+        for e in entries:
+            mini_rows.append({
+                "lesson_str": e["lesson_str"],
+                "new_date":   e["new_date"],
+                "new_time":   e["new_time"],
+                "duration_in_minutes": e["duration_in_minutes"],
+                "instructors_str":      e["instructors_str"][0],
+            })
+        details_i = build_lessons_details(mini_rows)
+
+        subject = subj_tpl.format(
+            lesson_count=len(entries),
+            students=students_str
+        )
+        message = msg_tpl.format(
+            instructor_name=instr.user.first_name,
+            lesson_count=len(entries),
+            students=students_str,
+            lessons_details=details_i
+        )
+        Notification.create_notification(
+            user=instr.user,
+            subject=subject,
+            message=message,
+            lessons=[Lesson.objects.get(id=int(e["lesson_id"])) for e in entries],
+            school=school,
+            type="Instructor",
+        )
+
     return Response(final_results, status=200)
+
 
 # (lessons)
 # update extras - the user is able to book equipment or extra students for that specific lesson

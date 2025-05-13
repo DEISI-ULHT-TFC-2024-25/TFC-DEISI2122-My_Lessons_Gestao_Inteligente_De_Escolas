@@ -35,7 +35,6 @@ Widget buildPaymentTypesWidget(
   BuildContext? context,
   Map<String, dynamic>? schoolDetails,
   TextEditingController? schoolNameController,
-  Future<void> Function()? refreshSchoolDetails,
   String? userId,
 }) {
   return Column(
@@ -88,8 +87,7 @@ Widget buildPaymentTypesWidget(
             // Only display the edit icon if all optional parameters are provided.
             if (context != null &&
                 schoolDetails != null &&
-                schoolNameController != null &&
-                refreshSchoolDetails != null)
+                schoolNameController != null )
               Positioned(
                 top: 10,
                 right: 10,
@@ -100,7 +98,6 @@ Widget buildPaymentTypesWidget(
                       context,
                       schoolDetails,
                       schoolNameController,
-                      refreshSchoolDetails,
                       userId: userId,
                       preselectedOptions: preselectedOptions,
                     );

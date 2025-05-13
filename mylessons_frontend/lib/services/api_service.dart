@@ -4,11 +4,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-const String baseUrl = 'https://mylessons.pythonanywhere.com'; // hosting
+//const String baseUrl = 'https://mylessons.pythonanywhere.com'; // hosting
 //const String baseUrl = 'http://127.0.0.1:8000'; // localhost
 //const String baseUrl = 'http://192.168.1.66:8000'; // net da sala
 //const String baseUrl = 'http://172.19.72.130:8000'; // freeulusofona
-//const String baseUrl = 'http://172.20.10.9:8000'; // hotspot
+const String baseUrl = 'http://172.20.10.9:8000'; // hotspot
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 

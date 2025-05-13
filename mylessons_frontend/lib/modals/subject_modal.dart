@@ -7,8 +7,25 @@ class SubjectModal extends StatefulWidget {
   final int? lessonId;
   final int? packId;
   final int? schoolId;
-  const SubjectModal({Key? key, this.lessonId, this.packId, this.schoolId})
-      : super(key: key);
+
+  /// if true, operate purely locally: no HTTP POST for update/create
+  final bool? localOnly;
+
+  /// initial selection for the picker (IDs)
+  final List<int>? initialSelectedIds;
+
+  /// supply list of available items in local mode
+  final List<Map<String, dynamic>>? items;
+
+  const SubjectModal({
+    Key? key,
+    this.lessonId,
+    this.packId,
+    this.schoolId,
+    this.localOnly = false,
+    this.initialSelectedIds,
+    this.items,
+  }) : super(key: key);
 
   @override
   _SubjectModalState createState() => _SubjectModalState();
@@ -32,7 +49,13 @@ class _SubjectModalState extends State<SubjectModal>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    fetchSubjects();
+    if (widget.localOnly == true) {
+      subjects = widget.items ?? [];
+      _selectedIds = List<int>.from(widget.initialSelectedIds ?? []);
+      isLoading = false;
+    } else {
+      fetchSubjects();
+    }
   }
 
   Future<void> fetchSubjects() async {
@@ -112,6 +135,10 @@ class _SubjectModalState extends State<SubjectModal>
 
   // For single-select mode: handle selection immediately.
   void _selectSubject(dynamic subject) async {
+    if (widget.localOnly == true) {
+      Navigator.pop(context, subject);
+      return;
+    }
     bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -162,6 +189,14 @@ class _SubjectModalState extends State<SubjectModal>
 
   // Update subjects for multi-select mode.
   Future<void> _updateSubjects() async {
+    if (widget.localOnly == true) {
+      // return list of selected objects
+      final picked = subjects
+          .where((s) => _selectedIds.contains(s['id'] as int))
+          .toList();
+      Navigator.pop(context, picked);
+      return;
+    }
     final url = "$baseUrl/api/schools/update_subjects/";
     try {
       final response = await http.post(Uri.parse(url),
@@ -187,6 +222,13 @@ class _SubjectModalState extends State<SubjectModal>
 
   // Updated subject creation: include all provided IDs.
   void _createSubject() async {
+    if (widget.localOnly == true) {
+      final name = _newSubjectController.text.trim();
+      if (name.isEmpty) return;
+      final newItem = {'id': -1, 'name': name};
+      Navigator.pop(context, [newItem]);
+      return;
+    }
     if (_newSubjectController.text.trim().isEmpty) return;
     bool? confirmed = await showDialog<bool>(
       context: context,
@@ -236,6 +278,7 @@ class _SubjectModalState extends State<SubjectModal>
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     // Filter subjects based on the search query.
@@ -252,7 +295,7 @@ class _SubjectModalState extends State<SubjectModal>
         bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Modal Header
@@ -281,9 +324,8 @@ class _SubjectModalState extends State<SubjectModal>
           ),
           const SizedBox(height: 8),
           // Tab Content
-          SizedBox(
-            height: 300,
-            child: TabBarView(
+          Expanded(          // now takes all remaining height, letting ListView inside scroll
+          child: TabBarView(
               controller: _tabController,
               children: [
                 // Tab 1: Select Existing with Search Input

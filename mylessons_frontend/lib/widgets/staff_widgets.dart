@@ -8,7 +8,6 @@ Widget buildStaffSection(
   required BuildContext context,
   required Map<String, dynamic> schoolDetails,
   required TextEditingController schoolNameController,
-  required Future<void> Function() refreshSchoolDetails,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +66,6 @@ Widget buildStaffSection(
                 context: context,
                 schoolDetails: schoolDetails,
                 schoolNameController: schoolNameController,
-                refreshSchoolDetails: refreshSchoolDetails,
                 userId: userId, // The key piece for user-specific edits.
               ),
             ],

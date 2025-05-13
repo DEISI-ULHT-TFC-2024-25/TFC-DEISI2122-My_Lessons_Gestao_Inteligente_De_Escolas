@@ -29,7 +29,8 @@ dependencies:
   url_launcher: ^6.3.1
   app_links: ^6.4.0
   flutter_stripe: ^11.4.0
-  connectivity_plus: ^3.0.2
+  flutter_stripe_web: ^6.5.0
+  connectivity_plus: 5.0.2
   intl_phone_field: ^3.2.0
   image_picker: ^1.1.2
 

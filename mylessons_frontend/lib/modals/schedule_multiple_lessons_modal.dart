@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/services/api_service.dart';
+import 'package:provider/provider.dart';
+import 'package:mylessons_frontend/providers/home_page_provider.dart';
 
 class ScheduleMultipleLessonsModal extends StatefulWidget {
   final List<dynamic> lessons;

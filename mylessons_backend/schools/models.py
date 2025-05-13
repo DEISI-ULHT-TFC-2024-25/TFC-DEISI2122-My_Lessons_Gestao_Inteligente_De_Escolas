@@ -807,6 +807,35 @@ class School(models.Model):
                 "- Start Time: {start_time}\n"
                 "- Duration: {duration_in_minutes} minutes"
             ),
+            
+            # TODO add multiple classes logic on schedule multiple lessons
+            
+            "private_class_multiple_scheduled_subject_parent":
+            "Your {number_of_classes} Private Classes Scheduled for {students}",
+
+            "private_class_multiple_scheduled_subject_instructor":
+            "Your {lesson_count} Private Classes Scheduled for {students}",
+
+            "private_class_multiple_scheduled_subject_admin":
+            "{number_of_classes} Private Classes Scheduled for {students}",
+
+            "private_class_multiple_scheduled_message_parent": (
+            "Dear {parent_name},\n\n"
+            "Your {number_of_classes} private classes for {students} have been scheduled:\n\n"
+            "{lessons_details}"
+            ),
+
+            "private_class_multiple_scheduled_message_instructor": (
+            "Dear {instructor_name},\n\n"
+            "You’ve been booked for {lesson_count} private classes with {students}:\n\n"
+            "{lessons_details}"
+            ),
+
+            "private_class_multiple_scheduled_message_admin": (
+            "Dear Admin,\n\n"
+            "{number_of_classes} private classes have been scheduled for {students}:\n\n"
+            "{lessons_details}"
+            ),
             "conflict_notification_subject": "Scheduling Conflict Detected: {conflict_type}",
             "conflict_notification_message_instructor": (
                 "Dear {instructor_name},\n\n"

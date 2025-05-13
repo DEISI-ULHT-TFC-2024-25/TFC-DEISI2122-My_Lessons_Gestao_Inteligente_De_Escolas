@@ -720,72 +720,7 @@ class Lesson(models.Model):
             self.start_time = time
             self.end_time = (datetime.combine(self.date, time) + timedelta(minutes=self.duration_in_minutes)).time()
             self.save()
-            if self.school:
-                # Notify parents
-                for parent in self.packs.all()[0].parents.all():
-                    Notification.create_notification(
-                        user=parent,
-                        subject=self.school.get_notification_template(f"{self.type}_class_scheduled_subject_parent").format(
-                            students=self.get_students_name()
-                        ),
-                        message=self.school.get_notification_template(f"{self.type}_class_scheduled_message_parent").format(
-                            parent_name=parent.first_name,
-                            students=self.get_students_name(),
-                            class_number=self.class_number,
-                            number_of_classes=self.packs.all()[0].number_of_classes,
-                            date=date,
-                            start_time=self.start_time,
-                            duration_in_minutes=self.duration_in_minutes,
-                            instructor_name=f"{get_instructors_name(available_instructors)}" if len(available_instructors) > 0 else "Not Assigned yet"
-                        ),
-                        lessons=[self],
-                        school=self.school,
-                        type="Parent",
-                    )
-
-                # Notify instructor
-                for instructor in available_instructors:
-                    Notification.create_notification(
-                        user=instructor.user,
-                        subject=self.school.get_notification_template(f"{self.type}_class_scheduled_subject_instructor").format(
-                            students=self.get_students_name()
-                        ),
-                        message=self.school.get_notification_template(f"{self.type}_class_scheduled_message_instructor").format(
-                            instructor_name=f"{instructor.user.first_name} {instructor.user.last_name}",
-                            students=self.get_students_name(),
-                            class_number=self.class_number,
-                            number_of_classes=self.packs.all()[0].number_of_classes,
-                            date=date,
-                            start_time=self.start_time,
-                            duration_in_minutes=self.duration_in_minutes
-                        ),
-                        lessons=[self],
-                        school=self.school,
-                        type="Instructor",
-                    )
-
-                # Notify school admin
-                for admin in self.school.admins.all():
-                    Notification.create_notification(
-                        user=admin,
-                        subject=self.school.get_notification_template(f"{self.type}_class_scheduled_subject_admin").format(
-                            students=self.get_students_name()
-                        ),
-                        message=self.school.get_notification_template(f"{self.type}_class_scheduled_message_admin").format(
-                            students=self.get_students_name(),
-                            class_number=self.class_number,
-                            number_of_classes=self.packs.all()[0].number_of_classes,
-                            date=date,
-                            start_time=self.start_time,
-                            duration_in_minutes=self.duration_in_minutes,
-                            instructor_name=f"{get_instructors_name(available_instructors)}" if len(available_instructors) > 0 else "Not Assigned yet",
-                            price=self.price,
-                            currency=self.school.currency if self.price else ""
-                        ),
-                        lessons=[self],
-                        school=self.school,
-                        type="Admin",
-                    )
+            
             return True
         return False
     

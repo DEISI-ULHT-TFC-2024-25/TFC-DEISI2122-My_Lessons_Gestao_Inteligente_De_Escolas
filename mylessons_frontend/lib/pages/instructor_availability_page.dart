@@ -112,7 +112,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
   }
 
   // --------------------- CUSTOM CUPERTINO TIME PICKER ---------------------
-  Future<void> _showCupertinoTimePickerForRange(
+  Future<void> showCupertinoTimePickerForRange(
       BuildContext context, bool isStart, TimeRangeInterface range,
       {TimeOfDay? minTime}) async {
     final hours =
@@ -567,9 +567,9 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                     return _TimeRangeRow(
                       range: range,
                       onRemove: () => _removeTimeRangeSingleDay(item, rIndex),
-                      onPickStart: () => _showCupertinoTimePickerForRange(
+                      onPickStart: () => showCupertinoTimePickerForRange(
                           context, true, range),
-                      onPickEnd: () => _showCupertinoTimePickerForRange(
+                      onPickEnd: () => showCupertinoTimePickerForRange(
                           context, false, range,
                           minTime: range.start),
                     );
@@ -799,8 +799,8 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                         onRemove: () =>
                             _removeTimeRangeFromDay(dayItem, rIndex),
                         onPickStart: () =>
-                            _showCupertinoTimePickerForRange(context, true, r),
-                        onPickEnd: () => _showCupertinoTimePickerForRange(
+                            showCupertinoTimePickerForRange(context, true, r),
+                        onPickEnd: () => showCupertinoTimePickerForRange(
                             context, false, r,
                             minTime: r.start),
                       );
@@ -849,7 +849,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () => _showCupertinoTimePickerForRange(
+                          onTap: () => showCupertinoTimePickerForRange(
                               context, true, item),
                           child: Row(
                             children: [
@@ -868,7 +868,7 @@ class _AvailabilityPageState extends State<AvailabilityPage>
                         ),
                         const SizedBox(width: 12),
                         GestureDetector(
-                          onTap: () => _showCupertinoTimePickerForRange(
+                          onTap: () => showCupertinoTimePickerForRange(
                               context, false, item,
                               minTime: item.start),
                           child: Row(

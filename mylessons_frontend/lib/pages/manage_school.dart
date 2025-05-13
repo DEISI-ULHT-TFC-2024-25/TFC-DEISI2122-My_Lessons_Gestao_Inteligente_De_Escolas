@@ -12,6 +12,9 @@ import '../modals/service_modal.dart';
 import '../modals/subject_modal.dart';
 import '../modals/location_modal.dart';
 import '../providers/school_data_provider.dart';
+import '../services/school_service.dart';
+import '../widgets/payment_widgets.dart';
+import '../widgets/staff_widgets.dart';
 
 class SchoolSetupPage extends StatefulWidget {
   final bool isCreatingSchool;
@@ -99,7 +102,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
           context,
           details,
           _schoolNameController,
-          () async {},
         );
         break;
       case 3:
@@ -239,7 +241,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                         children: [
                           _buildServicesTab(details),
                           _buildStaffTab(details),
-                          _buildStaffPaymentsTab(details),
+                          buildStaffPaymentsTab(),
                           _buildSubjectsTab(details),
                           _buildEquipmentsTab(details),
                           _buildLocationsTab(details),
@@ -310,54 +312,46 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     );
   }
 
-  Widget _buildStaffTab(Map<String, dynamic> details) {
-    final List staff = details['staff'] as List? ?? [];
+  Widget _buildStaffTab(Map<String, dynamic> schoolDetails) {
+    if (schoolDetails == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final List staff = (schoolDetails!['staff'] as List?) ?? [];
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: staff.isEmpty
-          ? const Text('No staff data available.')  
-          : Column(
-              children: staff.map((s) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 24),
-                  child: ListTile(
-                    title: Text(s['user_name'] ?? 'No Name'),
-                    subtitle: Text((s['roles'] as List).join(', ')),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit,
-                          color: Colors.orange),
-                      onPressed: () {},
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: staff.isNotEmpty
+            ? buildStaffSection(
+                List<dynamic>.from(staff),
+                context: context,
+                schoolDetails: schoolDetails!,
+                schoolNameController: _schoolNameController,
+              )
+            : const Text("No staff data available."),
+      ),
     );
   }
 
-  Widget _buildStaffPaymentsTab(Map<String, dynamic> details) {
+  Widget buildStaffPaymentsTab() {
+    final provider = context.read<SchoolDataProvider>();
+    Map<String, dynamic>? schoolDetails = provider.schoolDetails;
+    if (schoolDetails == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final Map<String, dynamic> paymentTypes =
-        details['payment_types'] as Map<String, dynamic>? ?? {};
+        (schoolDetails!['payment_types'] as Map<String, dynamic>?) ?? {};
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: paymentTypes.isEmpty
-          ? const Text('No payment types available.')
-          : Column(
-              children: paymentTypes.entries.map((e) {
-                final pt = e.value as Map<String, dynamic>;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 24),
-                  child: ListTile(
-                    title: Text(pt['name'] ?? 'No Name'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit,
-                          color: Colors.orange),
-                      onPressed: () {},
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: paymentTypes.isNotEmpty
+            ? buildPaymentTypesWidget(
+                paymentTypes,
+                context: context,
+                schoolDetails: schoolDetails!,
+                schoolNameController: _schoolNameController,
+              )
+            : const Text("No payment types available."),
+      ),
     );
   }
 
