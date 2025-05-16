@@ -978,7 +978,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
               padding: const EdgeInsets.only(bottom: 16),
               child: TextField(
                 decoration: InputDecoration(
-                  hintText: "Search by date, school, or amount...",
+                  hintText: "Date, School, or Amount...",
                   prefixIcon: const Icon(Icons.search, color: Colors.orange),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(32),

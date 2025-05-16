@@ -112,7 +112,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
               // Forgot password?
               TextButton(
                 onPressed: () {
-                  // Handle forgot password
+                   Navigator.pushReplacementNamed(context, '/forgot-password');
                 },
                 child: const Text(
                   'Forgot your password?',

@@ -5,10 +5,10 @@ import 'package:provider/provider.dart';
 import '../../services/profile_service.dart';
 import '../providers/home_page_provider.dart';
 import 'manage_school.dart';
-import '../../main.dart'; // Ensure this imports your global routeObserver
+import '../../main.dart'; // routeObserver
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({Key? key}) : super(key: key);
 
   @override
   _ProfilePageState createState() => _ProfilePageState();
@@ -17,24 +17,25 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> with RouteAware {
   final storage = const FlutterSecureStorage();
   bool isLoading = true;
-  bool isEditing = false;
+  bool isEditingProfile = false;
 
-  // Controllers for profile fields.
+  // Profile controllers
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
   late TextEditingController _emailController;
-  late TextEditingController _phoneController;
   late TextEditingController _birthdayController;
-
-  // New variable to store the selected phone country code.
   String _phoneCountryCode = 'PT';
+  late TextEditingController _phoneController;
 
-  // Extra fields for role/school switching.
+  // Roles & Schools
   List<String> availableRoles = [];
+  String currentRole = '';
   List<Map<String, dynamic>> availableSchools = [];
-  String currentRole = "";
   String? currentSchoolId;
   String? currentSchoolName;
+
+  // Associated students
+  List<Map<String, dynamic>> associatedStudents = [];
 
   @override
   void initState() {
@@ -73,33 +74,27 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   }
 
   Future<void> fetchProfileData() async {
+    setState(() => isLoading = true);
     try {
       final profileData = await ProfileService.fetchProfileData();
       setState(() {
         _firstNameController.text = profileData.firstName;
         _lastNameController.text = profileData.lastName;
         _emailController.text = profileData.email;
-        // Print the type of phone
-
-        _phoneController.text = profileData.phone?.toString() ?? '';
         _birthdayController.text = profileData.birthday ?? '';
+        _phoneController.text = profileData.phone ?? '';
+        _phoneCountryCode = profileData.countryCode ?? 'PT';
         availableRoles = profileData.availableRoles;
         currentRole = profileData.currentRole;
         availableSchools = profileData.availableSchools;
         currentSchoolId = profileData.currentSchoolId;
         currentSchoolName = profileData.currentSchoolName;
-        if (profileData.countryCode != null &&
-            profileData.countryCode.toString().isNotEmpty) {
-          _phoneCountryCode = profileData.countryCode.toString();
-        }
-        isLoading = false;
+        //associatedStudents = profileData.associatedStudents;
       });
-    } catch (e, stackTrace) {
-      print("Error fetching profile data: $e");
-      print("StackTrace: $stackTrace");
-      setState(() {
-        isLoading = false;
-      });
+    } catch (e) {
+      print('Error fetching profile: $e');
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
@@ -112,86 +107,263 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       'phone': _phoneController.text,
       'birthday': _birthdayController.text,
     };
-
     try {
-      final message = await ProfileService.updateProfileData(payload);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-      setState(() {
-        isEditing = false;
-      });
+      final msg = await ProfileService.updateProfileData(payload);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      setState(() => isEditingProfile = false);
       await fetchProfileData();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error updating profile: $e")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> changeRole(String newRole) async {
-    try {
-      final message = await ProfileService.changeRole(newRole);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-      Provider.of<HomePageProvider>(context, listen: false).currentRole = newRole;
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+    final msg = await ProfileService.changeRole(newRole);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    Provider.of<HomePageProvider>(context, listen: false).currentRole = newRole;
+    Navigator.pushNamedAndRemoveUntil(context, '/main', (r) => false);
   }
 
   Future<void> changeSchool(String schoolId) async {
-    try {
-      final message = await ProfileService.changeSchool(schoolId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+    final msg = await ProfileService.changeSchool(schoolId);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    Navigator.pushNamedAndRemoveUntil(context, '/main', (r) => false);
   }
 
   Future<void> logout() async {
     await storage.delete(key: 'auth_token');
-    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
   }
 
-  Widget buildProfileInputField(
-      String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        controller: controller,
-        readOnly: !isEditing,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+  void _showBirthdayPicker() async {
+    DateTime initial = DateTime.now();
+    if (_birthdayController.text.isNotEmpty) {
+      initial = DateTime.tryParse(_birthdayController.text) ?? DateTime.now();
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      _birthdayController.text = picked.toIso8601String().split('T').first;
+    }
+  }
+
+  void _openEditStudent(Map<String, dynamic> student) {
+    final nameCtrl = TextEditingController(text: student['name']);
+    final emailCtrl = TextEditingController(text: student['email']);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Edit Student'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(labelText: 'Name')),
+            TextField(
+                controller: emailCtrl,
+                decoration: InputDecoration(labelText: 'Email')),
+          ],
         ),
-        style: const TextStyle(fontSize: 16),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final payload = {'name': nameCtrl.text, 'email': emailCtrl.text};
+              //await ProfileService.updateStudent(student['id'].toString(), payload);
+              Navigator.pop(context);
+              fetchProfileData();
+            },
+            child: Text('Save'),
+          ),
+        ],
       ),
     );
   }
 
-  /// Uses IntlPhoneField to show phone and country.
+  @override
+  Widget build(BuildContext context) {
+    final isAdmin = currentRole == 'Admin';
+    final tabs = <Tab>[Tab(text: 'Info'), Tab(text: 'Students')];
+    if (isAdmin) tabs.add(Tab(text: 'School'));
+
+    return DefaultTabController(
+      length: tabs.length,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Profile'),
+          bottom: TabBar(tabs: tabs),
+          actions: [IconButton(icon: Icon(Icons.logout), onPressed: logout)],
+        ),
+        body: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [
+                  // Info Tab
+                  SingleChildScrollView(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 16),
+                        _buildInput('First Name', _firstNameController,
+                            readOnly: !isEditingProfile),
+                        _buildInput('Last Name', _lastNameController,
+                            readOnly: !isEditingProfile),
+                        _buildInput('Email', _emailController,
+                            readOnly: !isEditingProfile),
+                        SizedBox(height: 8),
+                        _buildBirthdayField(),
+                        SizedBox(height: 8),
+                        buildIntlPhoneField(),
+                        if (isEditingProfile) ...[
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                              onPressed: updateProfile,
+                              child: Text('Save Profile')),
+                        ] else ...{
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                              onPressed: () => setState(
+                                  () => isEditingProfile = !isEditingProfile),
+                              child: Text('Edit Profile')),
+                        },
+                      ],
+                    ),
+                  ),
+
+                  // Students Tab
+                  Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Students',
+                                style: TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold)),
+                            ElevatedButton(
+                              onPressed: () => _openEditStudent(
+                                  {'id': '', 'name': '', 'email': ''}),
+                              child: Text('Add'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: associatedStudents.length,
+                            itemBuilder: (ctx, i) {
+                              final st = associatedStudents[i];
+                              return ListTile(
+                                title: Text(st['name']),
+                                subtitle: Text(st['email']),
+                                trailing: IconButton(
+                                    icon: Icon(Icons.edit),
+                                    onPressed: () => _openEditStudent(st)),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // School Tab (Admin)
+                  if (isAdmin)
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SchoolSetupPage(
+                              isCreatingSchool: availableSchools.isEmpty,
+                              fetchProfileData: fetchProfileData,
+                            ),
+                          ),
+                        ),
+                        child: Text(availableSchools.isEmpty
+                            ? 'Create School'
+                            : 'Manage School'),
+                      ),
+                    ),
+                ],
+              ),
+        bottomNavigationBar: SafeArea(
+          child: SizedBox(
+            height: 80, // adjust as needed
+            child: Align(
+              alignment: Alignment.center,
+              child: ToggleButtons(
+                isSelected:
+                    availableRoles.map((r) => r == currentRole).toList(),
+                onPressed: (index) => changeRole(availableRoles[index]),
+                borderRadius: BorderRadius.circular(8),
+                fillColor: Colors.transparent,
+                selectedBorderColor: Theme.of(context).primaryColor,
+                children: availableRoles
+                    .map((r) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(r),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInput(String label, TextEditingController ctrl,
+      {bool readOnly = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        controller: ctrl,
+        readOnly: readOnly,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+
+  // Replace your existing buildIntlPhoneField with this:
+
   Widget buildIntlPhoneField() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: IntlPhoneField(
         initialCountryCode: _phoneCountryCode,
         initialValue: _phoneController.text,
-        enabled: isEditing,
+        enabled: isEditingProfile,
         decoration: InputDecoration(
           labelText: 'Phone Number',
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: BorderRadius.circular(32.0),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(32.0),
+            borderSide: BorderSide(color: Colors.orange, width: 2),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(32.0),
+            borderSide: BorderSide(color: Colors.orange, width: 2),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(32.0),
+            borderSide: BorderSide(color: Colors.orange, width: 2),
           ),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -210,189 +382,24 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
   }
 
-  Widget buildBirthdayField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: _birthdayController,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: "Birthday",
-                border: OutlineInputBorder(),
-                hintText: "Select a date",
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              ),
-              style: const TextStyle(fontSize: 16),
+  Widget _buildBirthdayField() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: _birthdayController,
+            readOnly: true,
+            decoration: InputDecoration(
+              labelText: 'Birthday',
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: isEditing ? _showBirthdayPicker : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showBirthdayPicker() async {
-    DateTime initialDate = DateTime.now();
-    try {
-      if (_birthdayController.text.isNotEmpty) {
-        initialDate = DateTime.parse(_birthdayController.text);
-      }
-    } catch (e) {
-      // fallback to now
-    }
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-    );
-    if (pickedDate != null) {
-      setState(() {
-        _birthdayController.text = pickedDate.toIso8601String().split('T')[0];
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              color: Colors.orange,
-              backgroundColor: Colors.white,
-              onRefresh: fetchProfileData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    // Profile Info Card
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  "Profile Info",
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      isEditing = !isEditing;
-                                    });
-                                  },
-                                  child: Text(isEditing ? "Cancel" : "Edit"),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            buildProfileInputField(
-                                "First Name", _firstNameController),
-                            buildProfileInputField(
-                                "Last Name", _lastNameController),
-                            buildProfileInputField("Email", _emailController),
-                            buildBirthdayField(),
-                            // Use the updated IntlPhoneField widget.
-                            buildIntlPhoneField(),
-                            if (isEditing)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 16.0),
-                                child: ElevatedButton(
-                                  onPressed: updateProfile,
-                                  child: const Text("Save Profile"),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Role Switching Buttons.
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availableRoles.map((role) {
-                        return ElevatedButton(
-                          onPressed: () => changeRole(role),
-                          child: Text("Switch to $role"),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                    // School Switching Buttons (only for Admin if more than one school).
-                    if (currentRole == "Admin" &&
-                        availableSchools.length > 1) ...[
-                      Text(
-                        "Current School: ${currentSchoolName ?? 'Not Set'}",
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: availableSchools
-                            .where((school) =>
-                                school['id'].toString() != currentSchoolId)
-                            .map((school) => ElevatedButton(
-                                  onPressed: () =>
-                                      changeSchool(school['id'].toString()),
-                                  child: Text("Switch to ${school['name']}"),
-                                ))
-                            .toList(),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    // Manage School / Create School button (for Admin).
-                    if (currentRole == "Admin")
-                      ElevatedButton(
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SchoolSetupPage(
-                                isCreatingSchool: availableSchools.isEmpty,
-                                fetchProfileData: fetchProfileData,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Text(availableSchools.isEmpty
-                            ? "Create School"
-                            : "Manage School"),
-                      ),
-                    const SizedBox(height: 20),
-                    // Logout Button.
-                    ElevatedButton(
-                      onPressed: logout,
-                      style:
-                          ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      child: const Text("Logout",
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+        ),
+        IconButton(
+            icon: Icon(Icons.calendar_today),
+            onPressed: isEditingProfile ? _showBirthdayPicker : null),
+      ],
     );
   }
 }

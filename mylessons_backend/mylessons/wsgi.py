@@ -11,6 +11,20 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
+# ─── Firebase Admin init ─────────────────────────────────
+import firebase_admin
+from firebase_admin import credentials
+
+if not firebase_admin._apps:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # Now build the full path to the JSON file inside "mylessons_backend".
+    json_path = os.path.join(BASE_DIR, "mylessons-7b4ed-firebase-adminsdk-fbsvc-d901fb586d.json")
+    cred = credentials.Certificate(json_path)
+    firebase_admin.initialize_app(cred)
+# ───────────────────────────────────────────────────────────
+
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mylessons.settings')
 
 application = get_wsgi_application()

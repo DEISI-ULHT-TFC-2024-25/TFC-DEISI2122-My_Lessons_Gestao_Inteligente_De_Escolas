@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}My Lessons{% endblock %}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    /* quick reset + some defaults */
+    body { font-family: sans-serif; background:#f9f9f9; margin:0; padding:0; }
+    a { color:#f60; text-decoration:none; }
+    button { cursor:pointer; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header style="padding:1rem; background:#fff; border-bottom:1px solid #ddd;">
+    <h1 style="margin:0; font-size:1.25rem;">MyLessons</h1>
+  </header>
+
+  <main style="padding:1rem;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer style="padding:1rem; text-align:center; color:#666; font-size:.85rem;">
+    © {{ now.year }} My Lessons
+  </footer>
+</body>
+</html>

@@ -23,6 +23,59 @@ Future<Map<String, String>> getAuthHeaders() async {
   };
 }
 
+Future<String> getYourSavedAuthToken() async {
+  // use the same key you wrote it under when you logged in
+  return await storage.read(key: 'auth_token') ?? '';
+}
+
+// --- define the function ---
+Future<void> sendTokenToBackend(String token, String authToken) async {
+  final uri = Uri.parse('$baseUrl/api/notifications/register-token/');
+  final resp = await http.post(
+    uri,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Token $authToken',
+    },
+    body: jsonEncode({'token': token}),
+  );
+  if (resp.statusCode == 200) {
+    print('✅ Token registered successfully');
+  } else {
+    print('🚨 Failed to register token: ${resp.statusCode} ${resp.body}');
+  }
+}
+
+Future<void> requestPasswordReset(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/users/password-reset/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to request password reset');
+    }
+  }
+
+  Future<void> confirmPasswordReset({
+    required String uid,
+    required String token,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/users/password-reset-confirm/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'uid': uid,
+        'token': token,
+        'new_password': newPassword,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reset password');
+    }
+  }
+
 Future<String> fetchCurrentRole() async {
   final headers = await getAuthHeaders();
   final url = '$baseUrl/api/users/current_role/';

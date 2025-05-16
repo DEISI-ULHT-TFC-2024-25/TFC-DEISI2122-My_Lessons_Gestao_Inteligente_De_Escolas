@@ -3,7 +3,27 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import Notification
+from rest_framework import permissions, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from fcm_django.models import FCMDevice
 
+class RegisterDeviceToken(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create or update the device entry for this user
+        device, created = FCMDevice.objects.update_or_create(
+            user=request.user,
+            registration_id=token,
+            defaults={"type": "ios"},
+        )
+        return Response({"status": "registered"})
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def mark_notification_as_read(request):

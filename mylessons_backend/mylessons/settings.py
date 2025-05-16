@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'fcm_django',
 
     # Project apps
     'users',                 # User management and roles
@@ -62,6 +63,10 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
+FCM_DJANGO_SETTINGS = {
+    "APP_VERBOSE_NAME": "My Lessons",
+    "ONE_DEVICE_per_USER": False,  # allow multiple devices per user
+}
 
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -232,13 +237,15 @@ SWAGGER_SETTINGS = {
 # Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+FRONTEND_RESET_SCHEME = "mylessons://password-reset"
+
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'mylessons.test@gmail.com'
-EMAIL_HOST_PASSWORD = 'ckhn lcmd nwnp cgfn'  # Google App Password
+EMAIL_HOST_USER = 'info@mylessons.pt'
+EMAIL_HOST_PASSWORD = 'hwbz onjl luaa qncy'  # Google App Password
 
 
 # Import local settings for local development overrides

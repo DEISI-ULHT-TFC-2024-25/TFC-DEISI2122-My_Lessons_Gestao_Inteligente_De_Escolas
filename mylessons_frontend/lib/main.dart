@@ -8,6 +8,7 @@ import 'package:mylessons_frontend/providers/school_data_provider.dart';
 import 'package:mylessons_frontend/providers/school_provider.dart';
 import 'package:provider/provider.dart';
 import 'pages/email_login_page.dart';
+import 'pages/forgot_password_page.dart';
 import 'pages/landing_page.dart';
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
@@ -16,9 +17,13 @@ import 'pages/payment_success_page.dart';
 import 'pages/payment_fail_page.dart';
 import 'package:flutter/rendering.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
+
+import 'pages/reset_password_page.dart';
+import 'services/api_service.dart';
 
 // Create a global RouteObserver instance.
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -37,7 +42,28 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   debugPaintSizeEnabled = false;
- 
+
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  // Request permission on iOS
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  String? token = await FirebaseMessaging.instance.getToken();
+  print("Device token: $token");
+
+  if (token != null) {
+    final djangoAuthToken = await getYourSavedAuthToken();
+    if (djangoAuthToken.isNotEmpty) {
+      await sendTokenToBackend(token, djangoAuthToken);
+    } else {
+      print("⚠️ No Django auth token found—user may not be logged in yet.");
+    }
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -59,19 +85,48 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  StreamSubscription<Uri?>? _linkSubscription;
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri?>? _linkSub;
 
   @override
   void initState() {
     super.initState();
+    // 1) Handle cold-start deep link:
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) _handleDeepLink(uri);
+    }).catchError((err) {
+      debugPrint('getInitialLink error: $err');
+    });
+
+    // 2) Handle links when app is already running:
+    _linkSub = _appLinks.uriLinkStream.listen((uri) {
+      if (uri != null) _handleDeepLink(uri);
+    }, onError: (err) {
+      debugPrint('uriLinkStream error: $err');
+    });
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _linkSubscription?.cancel();
+    _linkSub?.cancel();
     super.dispose();
+  }
+
+  void _handleDeepLink(Uri uri) {
+    print('got deep link: $uri');
+  print('  host: ${uri.host}  path: ${uri.path}');
+    if (uri.path == '/password-reset') {
+      final uid = uri.queryParameters['uid'];
+      final token = uri.queryParameters['token'];
+      if (uid != null && token != null) {
+        navigatorKey.currentState?.pushNamed(
+          '/password-reset',
+          arguments: {'uid': uid, 'token': token},
+        );
+      }
+    }
   }
 
   @override
@@ -243,6 +298,36 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/register_landing_page': (context) => const RegisterLandingPage(),
         '/register_page': (context) => const RegisterPage(),
         '/email_login': (context) => const EmailLoginPage(),
+        '/forgot-password': (ctx) => ForgotPasswordPage(),
+        // We leave '/reset-password' unimplemented here; we'll handle it below
+      },
+      // 2) Parse incoming links (deep-links or Navigator.pushNamed) here:
+      onGenerateRoute: (settings) {
+        if (settings.name == '/password-reset') {
+          String? uid, token;
+
+          // 1) first try the arguments map
+          if (settings.arguments is Map<String, String>) {
+            final args = settings.arguments as Map<String, String>;
+            uid = args['uid'];
+            token = args['token'];
+          }
+
+          // 2) fallback to parsing a query-string in the name
+          if (uid == null || token == null) {
+            final uri = Uri.parse(settings.name!);
+            uid = uri.queryParameters['uid'];
+            token = uri.queryParameters['token'];
+          }
+
+          if (uid != null && token != null) {
+            return MaterialPageRoute(
+              builder: (_) => ResetPasswordPage(uid: uid!, token: token!),
+            );
+          }
+        }
+        // Fallback to a “not found” page or your home
+        return MaterialPageRoute(builder: (_) => ForgotPasswordPage());
       },
       navigatorObservers: [routeObserver],
     );

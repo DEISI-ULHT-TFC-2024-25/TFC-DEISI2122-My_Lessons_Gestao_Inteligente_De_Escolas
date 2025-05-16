@@ -1,6 +1,10 @@
 from django.db import models
 from django.utils.timezone import now
 from schools.models import School
+from .utils import notify_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Notification(models.Model):
     id = models.AutoField(primary_key=True)
@@ -80,6 +84,16 @@ class Notification(models.Model):
             notification.activities.set(activities)
 
         notification.save()
+        
+        try:
+            notify_user(user=user, title=subject, body=message)
+        except Exception:
+            # logs full traceback at ERROR level
+            logger.exception(
+                "Failed to send push notification for Notification(id=%s) to user %s",
+                notification.id,
+                user.pk,
+            )
         return notification
 
     @classmethod
