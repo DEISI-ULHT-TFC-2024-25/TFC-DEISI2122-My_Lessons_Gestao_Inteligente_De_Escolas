@@ -1,6 +1,7 @@
 // home_page.dart
 import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -60,6 +61,7 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
+    registerFcmTokenIfNeeded();
 
     _headerAnimationController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
@@ -107,6 +109,21 @@ class _HomePageState extends State<HomePage>
     _packsScrollController.dispose();
     super.dispose();
   }
+
+  bool _fcmTokenSent = false;
+
+  Future<void> registerFcmTokenIfNeeded() async {
+  if (_fcmTokenSent) return; // ensure it's done only once
+  final token = await FirebaseMessaging.instance.getToken();
+  final authToken = await getYourSavedAuthToken();
+
+  if (token != null && authToken.isNotEmpty) {
+    await sendTokenToBackend(token, authToken);
+    _fcmTokenSent = true;
+  } else {
+    print('⚠️ Not logged in or no FCM token');
+  }
+}
 
   /// Modal methods (using provider values as needed).
   void showLessonCardOptions(dynamic lesson) {

@@ -41,6 +41,17 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    print('🔁 FCM token refreshed: $newToken');
+    final authToken = await getYourSavedAuthToken();
+    if (authToken.isNotEmpty) {
+      await sendTokenToBackend(newToken, authToken);
+    } else {
+      print('⚠️ Skipped sending refreshed token — user not logged in');
+    }
+  });
+  
   debugPaintSizeEnabled = false;
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
