@@ -1,1 +1,5 @@
 mylessons_backend/mylessons-7b4ed-firebase-adminsdk-fbsvc-9390c43ae3.json
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
