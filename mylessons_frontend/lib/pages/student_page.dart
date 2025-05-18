@@ -75,7 +75,11 @@ class _StudentPageState extends State<StudentPage> {
   }
 
   Future<dynamic> _fetchJson(String path) async {
-    final resp = await http.get(Uri.parse('$baseUrl$path'));
+    final headers = await getAuthHeaders();
+    final resp = await http.get(
+      Uri.parse('$baseUrl$path'),
+      headers: headers,
+    );
     if (resp.statusCode != 200) {
       throw Exception('Failed to load $path (${resp.statusCode})');
     }

@@ -1150,7 +1150,8 @@ class PasswordResetConfirmView(APIView):
         user.save()
         return Response({'detail': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
     
-
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def student(request, id: int):
     student = get_object_or_404(Student, pk=id)
     return JsonResponse({
@@ -1161,7 +1162,8 @@ def student(request, id: int):
         "level": student.level,
     })
 
-
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def student_progress_records(request, id: int):
     student = get_object_or_404(Student, pk=id)
     records = student.progress_records.all().order_by("-date")
@@ -1190,7 +1192,8 @@ def student_progress_records(request, id: int):
         })
     return JsonResponse(data, safe=False)
 
-
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def student_packs(request, id: int):
     student = get_object_or_404(Student, pk=id)
     packs = student.packs.all().order_by("-date_time")
@@ -1211,7 +1214,8 @@ def student_packs(request, id: int):
         })
     return JsonResponse(data, safe=False)
 
-
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def student_lessons(request, id: int):
     student = get_object_or_404(Student, pk=id)
     lessons = Lesson.objects.filter(students=student).order_by("date", "start_time")
