@@ -38,6 +38,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.urls import reverse
+from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
 
@@ -1148,3 +1149,125 @@ class PasswordResetConfirmView(APIView):
         user.set_password(new_password)
         user.save()
         return Response({'detail': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+    
+
+def student(request, id: int):
+    student = get_object_or_404(Student, pk=id)
+    return JsonResponse({
+        "id": student.id,
+        "first_name": student.first_name,
+        "last_name": student.last_name,
+        "birthday": student.birthday.isoformat(),
+        "level": student.level,
+    })
+
+
+def student_progress_records(request, id: int):
+    student = get_object_or_404(Student, pk=id)
+    records = student.progress_records.all().order_by("-date")
+    data = []
+    for pr in records:
+        goals_data = []
+        for g in pr.goals.all():
+            goals_data.append({
+                "id": g.id,
+                "skill_id": g.skill.id,
+                "skill_name": g.skill.name,
+                "description": g.description or "",
+                "start_datetime": g.start_datetime.isoformat() if g.start_datetime else None,
+                "target_date": g.target_date.isoformat() if g.target_date else None,
+                "level": g.level,
+                "last_updated": g.last_updated.isoformat(),
+                "is_completed": g.is_completed,
+                "completed_date": g.completed_date.isoformat() if g.completed_date else None,
+            })
+        data.append({
+            "id": pr.id,
+            "date": pr.date.isoformat(),
+            "notes": pr.notes or "",
+            "lesson_id": pr.lesson.id if pr.lesson else None,
+            "goals": goals_data,
+        })
+    return JsonResponse(data, safe=False)
+
+
+def student_packs(request, id: int):
+    student = get_object_or_404(Student, pk=id)
+    packs = student.packs.all().order_by("-date_time")
+    data = []
+    today = date.today()
+    for p in packs:
+        days_until = None
+        if p.expiration_date:
+            days_until = (p.expiration_date - today).days
+        data.append({
+            "id": p.id,
+            "date": p.date.isoformat(),
+            "type": p.type,
+            "lessons_remaining": p.number_of_classes_left,
+            "unscheduled_lessons": p.number_of_classes - p.number_of_classes_left,
+            "days_until_expiration": days_until,
+            "students_name": f"{student.first_name} {student.last_name}",
+        })
+    return JsonResponse(data, safe=False)
+
+
+def student_lessons(request, id: int):
+    student = get_object_or_404(Student, pk=id)
+    lessons = Lesson.objects.filter(students=student).order_by("date", "start_time")
+    data = []
+    for l in lessons:
+        data.append({
+            "id": l.id,
+            "date": l.date.isoformat() if l.date else None,
+            "start_time": l.start_time.isoformat() if l.start_time else None,
+            "end_time": l.end_time.isoformat() if l.end_time else None,
+            "duration_in_minutes": l.duration_in_minutes,
+            "is_done": l.is_done,
+            "extras": l.extras or {},
+        })
+    return JsonResponse(data, safe=False)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_debt(request, id: int):
+    """
+    Returns the current outstanding debt for the specified student,
+    plus a list of unpaid pack‐items for that student.
+    """
+    student = get_object_or_404(Student, pk=id)
+
+    # All packs where this student is enrolled and there is a remaining debt
+    unpaid_packs = Pack.objects.filter(students=student, debt__gt=0)
+
+    # Sum up the debt field on each pack
+    total_debt = sum((p.debt for p in unpaid_packs), Decimal('0.00'))
+
+    # Build itemized list
+    items = []
+    for pack in unpaid_packs:
+        items.append({
+            "pack_id": pack.id,
+            "date": pack.date.strftime("%Y-%m-%d") if pack.date else "",
+            "time": pack.date_time.strftime("%H:%M") if pack.date_time else "",
+            "description": str(pack),     # e.g. "Private pack – 10 lessons"
+            "amount": str(pack.debt),     # as string to preserve decimal precision
+        })
+
+    return Response({
+        "current_debt": str(total_debt),
+        "items": items,
+    })
+
+def student_parents(request, id: int):
+    student = get_object_or_404(Student, pk=id)
+    parents = student.parents.all()
+    data = []
+    for p in parents:
+        data.append({
+            "id": p.id,
+            "first_name": getattr(p, "first_name", ""),
+            "last_name": getattr(p, "last_name", ""),
+            "email": getattr(p, "email", ""),
+        })
+    return JsonResponse(data, safe=False)

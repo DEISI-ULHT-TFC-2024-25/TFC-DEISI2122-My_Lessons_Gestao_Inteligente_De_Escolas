@@ -36,8 +36,15 @@ target 'Runner' do
   end
 end
 
+# Single post_install hook that does BOTH tasks:
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    # 1) Ensure Flutter helper settings are applied:
     flutter_additional_ios_build_settings(target)
+
+    # 2) Force every pod’s iOS deployment target to 14.0:
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+    end
   end
 end

@@ -15,23 +15,24 @@ class ProfileData {
   final List<String> availableRoles;
   final String currentRole;
   final List<Map<String, dynamic>> availableSchools;
+  final List<Map<String, dynamic>>? associatedStudents;
   final String? currentSchoolId;
   final String? currentSchoolName;
 
-  ProfileData({
-    required this.firstName,
-    required this.lastName,
-    required this.email,
-    required this.countryCode,
-    required this.phone,
-    required this.birthday,
-    required this.photo,
-    required this.availableRoles,
-    required this.currentRole,
-    required this.availableSchools,
-    this.currentSchoolId,
-    this.currentSchoolName,
-  });
+  ProfileData(
+      {required this.firstName,
+      required this.lastName,
+      required this.email,
+      required this.countryCode,
+      required this.phone,
+      required this.birthday,
+      required this.photo,
+      required this.availableRoles,
+      required this.currentRole,
+      required this.availableSchools,
+      this.currentSchoolId,
+      this.currentSchoolName,
+      this.associatedStudents});
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
     return ProfileData(
@@ -48,6 +49,10 @@ class ProfileData {
           [],
       currentRole: json['current_role']?.toString() ?? '',
       availableSchools: (json['available_schools'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [],
+      associatedStudents: (json['associated_students'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e))
               .toList() ??
           [],
@@ -102,6 +107,8 @@ class ProfileService {
     }
 
     List<Map<String, dynamic>> availableSchools = [];
+    List<Map<String, dynamic>> associatedStudents = [];
+
     String? currentSchoolId;
     String? currentSchoolName;
     if (currentRole == "Admin") {
@@ -130,6 +137,18 @@ class ProfileService {
       } else {
         print("Failed to fetch current school: ${currentSchoolResponse.body}");
       }
+    } else if (currentRole == "Parent") {
+      final studentsResponse = await http.get(
+        Uri.parse('$baseUrl/api/users/students/'),
+        headers: headers,
+      );
+      if (studentsResponse.statusCode == 200) {
+        final data = json.decode(utf8.decode(studentsResponse.bodyBytes));
+        associatedStudents =
+            List<Map<String, dynamic>>.from(data['associated_students']);
+      } else {
+        print("Failed to fetch students: ${studentsResponse.body}");
+      }
     }
 
     final profileResponse = await http.get(
@@ -150,6 +169,7 @@ class ProfileService {
       'available_schools': availableSchools,
       'current_school_id': currentSchoolId,
       'current_school_name': currentSchoolName,
+      'associated_students': associatedStudents,
     };
     return ProfileData.fromJson(mergedJson);
   }

@@ -33,28 +33,34 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  print('▶️ main() start');
+
   // Initialize Stripe with your publishable key
   Stripe.publishableKey =
       'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
   // ... Initialize Firebase if needed, etc.
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    print('  • before Firebase.initializeApp');
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('  • after Firebase.initializeApp');
+  } catch (e, st) {
+    print('❌ Firebase.initializeApp failed: $e\n$st');
+  }
 
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-    print('🔁 FCM token refreshed: $newToken');
-    final authToken = await getYourSavedAuthToken();
-    if (authToken.isNotEmpty) {
-      await sendTokenToBackend(newToken, authToken);
-    } else {
-      print('⚠️ Skipped sending refreshed token — user not logged in');
-    }
-  });
-  
-  debugPaintSizeEnabled = false;
+  try {
+    print('  • before Stripe.publishableKey');
+    Stripe.publishableKey =
+      'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
+    print('  • after Stripe.publishableKey');
+  } catch (e, st) {
+    print('❌ Stripe setup failed: $e\n$st');
+  }
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
+  
+  debugPaintSizeEnabled = false;
 
   // Request permission on iOS
   NotificationSettings settings = await messaging.requestPermission(
@@ -63,10 +69,12 @@ Future<void> main() async {
     sound: true,
   );
 
-  String? token = await FirebaseMessaging.instance.getToken();
-  print("Device token: $token");
+  try {
+    print('  • before getToken');
+    String? token = await messaging.getToken();
+    print('  • got token: $token');
 
-  if (token != null) {
+    if (token != null) {
     final djangoAuthToken = await getYourSavedAuthToken();
     if (djangoAuthToken.isNotEmpty) {
       await sendTokenToBackend(token, djangoAuthToken);
@@ -74,6 +82,13 @@ Future<void> main() async {
       print("⚠️ No Django auth token found—user may not be logged in yet.");
     }
   }
+  } catch (e, st) {
+    print('❌ getToken failed: $e\n$st');
+  }
+
+  print("code reached after token");
+
+  print('✅ reached runApp()');
 
   runApp(
     MultiProvider(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:mylessons_frontend/pages/student_page.dart';
 import 'package:provider/provider.dart';
 import '../../services/profile_service.dart';
 import '../providers/home_page_provider.dart';
@@ -89,7 +90,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         availableSchools = profileData.availableSchools;
         currentSchoolId = profileData.currentSchoolId;
         currentSchoolName = profileData.currentSchoolName;
-        //associatedStudents = profileData.associatedStudents;
+        associatedStudents = profileData.associatedStudents ?? [];
       });
     } catch (e) {
       print('Error fetching profile: $e');
@@ -244,31 +245,28 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Students',
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold)),
-                            ElevatedButton(
-                              onPressed: () => _openEditStudent(
-                                  {'id': '', 'name': '', 'email': ''}),
-                              child: Text('Add'),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
                         Expanded(
                           child: ListView.builder(
                             itemCount: associatedStudents.length,
                             itemBuilder: (ctx, i) {
                               final st = associatedStudents[i];
                               return ListTile(
-                                title: Text(st['name']),
-                                subtitle: Text(st['email']),
+                                title: Text(
+                                    "${st['first_name']} ${st['last_name']}"),
+                                subtitle: Text(st['birthday']),
                                 trailing: IconButton(
-                                    icon: Icon(Icons.edit),
-                                    onPressed: () => _openEditStudent(st)),
+                                  icon: Icon(Icons.info),
+                                  onPressed: () {
+                                    print("student tapped");
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            StudentPage(studentId: st["id"]),
+                                      ),
+                                    );
+                                  },
+                                ),
                               );
                             },
                           ),
