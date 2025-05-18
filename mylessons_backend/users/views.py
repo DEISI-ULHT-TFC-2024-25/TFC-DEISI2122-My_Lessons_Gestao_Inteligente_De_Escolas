@@ -1198,7 +1198,7 @@ def student_packs(request, id: int):
     student = get_object_or_404(Student, pk=id)
     packs = student.packs.all().order_by("-date_time")
     data = []
-    today = date.today()
+    today = now.date()
     for p in packs:
         days_until = None
         if p.expiration_date:
