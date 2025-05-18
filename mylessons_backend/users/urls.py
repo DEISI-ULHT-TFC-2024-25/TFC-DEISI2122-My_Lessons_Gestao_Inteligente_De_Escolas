@@ -2,13 +2,13 @@ from django.urls import path
 from .views import  PasswordResetConfirmView, PasswordResetRequestView, check_username_availability, daily_timeline, firebase_login, get_selected_instructors, get_selected_students, login_view, profile_view, register_user, student, student_debt, student_lessons, student_packs, student_parents, student_progress_records, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
 
 urlpatterns = [
-    path('student/<id:int>', student, name='student'),
-    path('student/<id:int>/progress_records/', student_progress_records, name='student_progress_records'),
-    path('student/<id:int>/packs/', student_packs, name='student_packs'),
-    path('student/<id:int>/lessons/', student_lessons, name='student_lessons'),
-    path('student/<id:int>/events/', student_parents, name='student_events'),
-    path('student/<id:int>/parents/', student_parents, name='student_parents'),
-    path('student/<id:int>/debt/', student_debt, name='student_debt'),
+    path('student/<int:id>/', student, name='student'),
+    path('student/<int:id>/progress_records/', student_progress_records, name='student_progress_records'),
+    path('student/<int:id>/packs/', student_packs, name='student_packs'),
+    path('student/<int:id>/lessons/', student_lessons, name='student_lessons'),
+    path('student/<int:id>/events/', student_parents, name='student_events'),
+    path('student/<int:id>/parents/', student_parents, name='student_parents'),
+    path('student/<int:id>/debt/', student_debt, name='student_debt'),
     path('login/', login_view, name='login'),
     path('register/', register_user, name='register-user'),
     path('profile/', user_profile, name='user-profile'),
