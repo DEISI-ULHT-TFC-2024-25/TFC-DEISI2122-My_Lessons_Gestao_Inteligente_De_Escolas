@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import Student, Unavailability, UserAccount, Instructor
+from .models import GoogleCredentials, Student, Unavailability, UserAccount, Instructor
 from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, UserAccountSerializer, StudentSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
@@ -1341,7 +1341,7 @@ def connect_calendar(request):
         return Response({'detail': f'Code exchange failed: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
     creds = flow.credentials
-    """
+    
     # Persist
     GoogleCredentials.objects.update_or_create(
         user=request.user,
@@ -1355,5 +1355,5 @@ def connect_calendar(request):
             'expiry':        creds.expiry,
         }
     )
-    """
+
     return Response({'success': True})

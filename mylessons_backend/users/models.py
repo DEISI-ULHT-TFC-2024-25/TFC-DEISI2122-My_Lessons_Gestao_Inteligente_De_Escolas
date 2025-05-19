@@ -466,15 +466,15 @@ class GoogleCredential(models.Model):
         # Implement logic here to validate the credentials using Google's API client library if needed.
         pass
     
-    class GoogleCredentials(models.Model):
-        user          = models.OneToOneField(UserAccount, on_delete=models.CASCADE)
-        token         = models.TextField()
-        refresh_token = models.TextField()
-        token_uri     = models.TextField()
-        client_id     = models.TextField()
-        client_secret = models.TextField()
-        scopes        = models.TextField(help_text="Comma-separated scopes")
-        expiry        = models.DateTimeField()
-        
-        def __str__(self):
-            return f"Google Credential for {self.user.username}"
+class GoogleCredentials(models.Model):
+    user          = models.OneToOneField(UserAccount, on_delete=models.CASCADE)
+    token         = models.TextField()
+    refresh_token = models.TextField()
+    token_uri     = models.TextField()
+    client_id     = models.TextField()
+    client_secret = models.TextField()
+    scopes        = models.TextField(help_text="Comma-separated scopes")
+    expiry        = models.DateTimeField()
+    
+    def __str__(self):
+        return f"Google Credential for {self.user.username}"
