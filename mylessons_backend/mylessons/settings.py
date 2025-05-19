@@ -148,18 +148,32 @@ CANCEL_URL = "https://mylessons.pythonanywhere.com/deeplink/payment-fail?session
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
+# path to the JSON you downloaded from GCP (Web OAuth client)
+GOOGLE_OAUTH2_CLIENT_SECRETS = BASE_DIR / "google_client_secret.json"
+
+# calendar.events is enough to create/update events
+GOOGLE_OAUTH2_SCOPES = [
+    "https://www.googleapis.com/auth/calendar.events",
+]
+
+# If you like, you can set your postmessage redirect here,
+# but 'postmessage' is a magic value for mobile flows:
+GOOGLE_OAUTH2_REDIRECT_URI = "postmessage"
+
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': [
             'profile',
             'email',
+            'https://www.googleapis.com/auth/calendar.events',
         ],
         'AUTH_PARAMS': {
-            'access_type': 'online',
+            'access_type': 'offline',   # request a refresh token
+            'prompt': 'consent',        # force showing the consent screen so we get a refresh token
         },
         'APP': {
-            'client_id': '147437937321-v39oeirc3e8hjgiejeugp3eia6vlmjbg.apps.googleusercontent.com',
-            'secret': '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',
+            'client_id': '768650226651-hn51uf6gvp12tn96b683me6epae9abju.apps.googleusercontent.com',
+            'secret': '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',
             'key': ''
         }
     }

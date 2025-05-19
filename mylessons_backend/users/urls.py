@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  PasswordResetConfirmView, PasswordResetRequestView, check_username_availability, daily_timeline, firebase_login, get_selected_instructors, get_selected_students, login_view, profile_view, register_user, student, student_debt, student_lessons, student_packs, student_parents, student_progress_records, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
+from .views import  PasswordResetConfirmView, PasswordResetRequestView, check_username_availability, connect_calendar, daily_timeline, firebase_login, get_selected_instructors, get_selected_students, login_view, profile_view, register_user, student, student_debt, student_lessons, student_packs, student_parents, student_progress_records, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
 
 urlpatterns = [
     path('student/<int:id>/', student, name='student'),
@@ -14,6 +14,7 @@ urlpatterns = [
     path('profile/', user_profile, name='user-profile'),
     path('current_role/', current_role, name='current-role'),
     path('change_role/', change_role, name='change_role'),
+    path('connect_calendar/', connect_calendar, name='connect_calendar'),
     path('number_of_active_students/', number_of_active_students, name='number-of-students'),
     path("current_balance/", current_balance, name="current_balance"),
     path("available_roles/", available_roles, name="available_roles"),

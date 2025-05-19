@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import GoogleCredential, Student, Unavailability, UserAccount, Instructor
+from .models import Student, Unavailability, UserAccount, Instructor
 from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, UserAccountSerializer, StudentSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
@@ -39,6 +39,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.urls import reverse
 from django.http import JsonResponse
+from google_auth_oauthlib.flow import Flow
 
 logger = logging.getLogger(__name__)
 
@@ -1318,3 +1319,41 @@ def student_parents(request, id: int):
             "email": getattr(p, "email", ""),
         })
     return JsonResponse(data, safe=False)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def connect_calendar(request):
+    # at this point, request.user is your Django User
+    google_auth_code = request.data.get('google_auth_code')
+    if not google_auth_code:
+        return Response({'detail': 'google_auth_code required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Exchange the code…
+    flow = Flow.from_client_secrets_file(
+        str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
+        scopes=['https://www.googleapis.com/auth/calendar.events'],
+        redirect_uri='postmessage',
+    )
+    try:
+        flow.fetch_token(code=google_auth_code)
+    except Exception as e:
+        return Response({'detail': f'Code exchange failed: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    creds = flow.credentials
+    """
+    # Persist
+    GoogleCredentials.objects.update_or_create(
+        user=request.user,
+        defaults={
+            'token':         creds.token,
+            'refresh_token': creds.refresh_token,
+            'token_uri':     creds.token_uri,
+            'client_id':     creds.client_id,
+            'client_secret': creds.client_secret,
+            'scopes':        ','.join(creds.scopes),
+            'expiry':        creds.expiry,
+        }
+    )
+    """
+    return Response({'success': True})

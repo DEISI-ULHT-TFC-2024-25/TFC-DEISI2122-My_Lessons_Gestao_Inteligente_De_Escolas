@@ -9,6 +9,7 @@ import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:mylessons_frontend/providers/lessons_modal_provider.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/home_page_provider.dart';
 import '../widgets/pack_card.dart';
 
 class StudentPage extends StatefulWidget {
@@ -27,6 +28,13 @@ class _StudentPageState extends State<StudentPage> {
   Map<String, dynamic>? debtData;
   List<dynamic> debtItems = [];
   List<dynamic> parents = [];
+  bool _showToggleRow = true;
+  int _lessonsActiveTabIndex = 0; // 0: Active lessons, 1: History
+  int _packsActiveTabIndex = 0; // 0: Active packs, 1: History
+    String upcomingSearchQuery = "";
+  List<Map<String, String>> upcomingFilters = [];
+  String lastLessonsSearchQuery = "";
+  List<Map<String, String>> lastLessonsFilters = [];
 
   bool loading = true;
   String? error;
@@ -84,15 +92,13 @@ class _StudentPageState extends State<StudentPage> {
   }
 
   void _editProfile() {
-    Navigator.pushNamed(context, '/student/${widget.studentId}/edit')
-        .then((_) => _loadAll());
+    
   }
 
   Widget _buildProfileCard() {
     final photoUrl   = _safeString('photo_url', student!['photo_url']);
     final birthRaw   = _safeString('birthday',  student!['birthday']);
     final birthday   = DateTime.tryParse(birthRaw);
-    final levelValue = _safeString('level',      student!['level']);
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -119,8 +125,6 @@ class _StudentPageState extends State<StudentPage> {
                 const SizedBox(height: 4),
                 if (birthday != null)
                   Text('Birthday: ${DateFormat.yMMMMd().format(birthday)}'),
-                const SizedBox(height: 4),
-                Text('Level: $levelValue'),
               ],
             ),
           ),
@@ -186,16 +190,256 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
+  void _showLessonFilterModal(bool isUpcoming, List<dynamic> lessons) {
+    const options = ['Group', 'Private'];
+    List<Map<String, String>> tempFilters =
+        isUpcoming ? List.from(upcomingFilters) : List.from(lastLessonsFilters);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setModalState) {
+          bool isSelected(String value) {
+            return tempFilters
+                .any((f) => f['type'] == 'lessonType' && f['value'] == value);
+          }
+
+          return Padding(
+            padding: MediaQuery.of(context).viewInsets,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ExpansionTile(
+                    title: const Text('Lesson Type'),
+                    children: options.map((opt) {
+                      return CheckboxListTile(
+                        title: Text(opt),
+                        value: isSelected(opt),
+                        onChanged: (checked) {
+                          setModalState(() {
+                            if (checked == true) {
+                              tempFilters.insert(
+                                  0, {'type': 'lessonType', 'value': opt});
+                            } else {
+                              tempFilters.removeWhere((f) =>
+                                  f['type'] == 'lessonType' &&
+                                  f['value'] == opt);
+                            }
+                          });
+                          setState(() {
+                            if (isUpcoming) {
+                              upcomingFilters = List.from(tempFilters);
+                            } else {
+                              lastLessonsFilters = List.from(tempFilters);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close',
+                          style: TextStyle(color: Colors.black)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+
+  Widget _buildToggleRowForLessons() {
+    return AnimatedOpacity(
+      opacity: _showToggleRow ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.search, color: Colors.orange),
+                onPressed: () {
+                  // Implement search functionality.
+                  print("Search pressed in lessons tab");
+                },
+              ),
+            ),
+            Center(
+              child: ToggleButtons(
+                borderRadius: BorderRadius.circular(16),
+                isSelected: [
+                  _lessonsActiveTabIndex == 0,
+                  _lessonsActiveTabIndex == 1,
+                ],
+                onPressed: (int index) {
+                  setState(() {
+                    _lessonsActiveTabIndex = index;
+                  });
+                },
+                selectedColor: Colors.white,
+                fillColor: Colors.orange,
+                color: Colors.orange,
+                borderColor: Colors.orange,
+                borderWidth: 2.0,
+                selectedBorderColor: Colors.orange,
+                constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
+                children: [
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_lessonsActiveTabIndex == 0)
+                          const Icon(Icons.check,
+                              color: Colors.black, size: 16),
+                        if (_lessonsActiveTabIndex == 0)
+                          const SizedBox(width: 4),
+                        const Text(
+                          "Active",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_lessonsActiveTabIndex == 1)
+                          const Icon(Icons.check,
+                              color: Colors.black, size: 16),
+                        if (_lessonsActiveTabIndex == 1)
+                          const SizedBox(width: 4),
+                        const Text(
+                          "History",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.filter_list, color: Colors.orange),
+                onPressed: () {
+                  if (_lessonsActiveTabIndex == 0) {
+                    _showLessonFilterModal(
+                        true,
+                        Provider.of<HomePageProvider>(context, listen: false)
+                            .upcomingLessons);
+                  } else {
+                    _showLessonFilterModal(
+                        false,
+                        Provider.of<HomePageProvider>(context, listen: false)
+                            .lastLessons);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   void _showLessonsModal() {
     final lessonModal = Provider.of<LessonModalProvider>(context, listen: false);
     final lessonsOnly = lessons.where((l) => l['is_event'] != true).toList();
-    print(lessonsOnly);
+
     _showModal(
-      ListView(
-        shrinkWrap: true,
-        children: lessonsOnly
-            .map((l) => lessonModal.buildLessonCard(context, l, []))
-            .toList(),
+      RefreshIndicator(
+        color: Colors.orange,
+        backgroundColor: Colors.white,
+        onRefresh: () async {},
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildToggleRowForLessons(),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Active lessons grouped by status
+                    Builder(builder: (context) {
+                      final Map<String, List<dynamic>> grouped = {
+                        'Need Reschedule': [], 'Today': [], 'Upcoming': []
+                      };
+                      for (var l in lessonsOnly) {
+                        final s = l['status'] ?? 'Upcoming';
+                        grouped[s]?.add(l);
+                      }
+                      final Map<String, Color> colors = {
+                        'Need Reschedule': Colors.red,
+                        'Today': Colors.orange,
+                        'Upcoming': Colors.grey,
+                      };
+                      return Column(
+                        children: grouped.entries
+                          .where((e) => e.value.isNotEmpty)
+                          .map((e) {
+                            final widgets = e.value.map((lesson) => lessonModal.buildLessonCard(context, lesson, [], isLastLesson: false)).toList();
+                            return buildGroupedLessonCard(e.key, colors[e.key]!, widgets);
+                          }).toList(),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    // History lessons
+                    Text('History', style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Column(
+                      children: lessonsOnly
+                        .where((l) => l['is_done'] == true)
+                        .map((lesson) => lessonModal.buildLessonCard(context, lesson, [], isLastLesson: true))
+                        .toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildGroupedLessonCard(String title, Color color, List<Widget> children) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+            color: color.withOpacity(0.2),
+            child: Text(title, style: GoogleFonts.lato(fontWeight: FontWeight.bold, color: color)),
+          ),
+          const SizedBox(height: 4),
+          ...children,
+        ],
       ),
     );
   }
@@ -241,14 +485,6 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  void _showStatsModal() {
-    _showModal(
-      Container(
-        padding: const EdgeInsets.all(16),
-        child: const Text('Stats will appear here...'),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -267,8 +503,7 @@ class _StudentPageState extends State<StudentPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          '${_safeString('first', student!['first_name'])} '
-          '${_safeString('last',  student!['last_name'])}',
+          "Student"
         ),
       ),
       body: RefreshIndicator(
@@ -327,14 +562,6 @@ class _StudentPageState extends State<StudentPage> {
                 icon: Icons.people,
                 subtitle: 'View and manage parents',
                 onTap: _showParentsModal,
-              ),
-              const SizedBox(height: 8),
-
-              _sectionCard(
-                title: 'Stats',
-                icon: Icons.bar_chart,
-                subtitle: 'View student statistics',
-                onTap: _showStatsModal,
               ),
               const SizedBox(height: 16),
             ],
