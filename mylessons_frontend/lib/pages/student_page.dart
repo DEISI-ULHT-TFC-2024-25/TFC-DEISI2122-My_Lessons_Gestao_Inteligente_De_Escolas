@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,12 +9,10 @@ import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:mylessons_frontend/providers/lessons_modal_provider.dart';
 import 'package:provider/provider.dart';
 
-// Helper widgets (you can move these into their own files)
 import '../widgets/pack_card.dart';
 
 class StudentPage extends StatefulWidget {
   final int studentId;
-
   const StudentPage({Key? key, required this.studentId}) : super(key: key);
 
   @override
@@ -45,24 +44,25 @@ class _StudentPageState extends State<StudentPage> {
     });
 
     try {
-      final results = await Future.wait([
-        _fetchJson('/api/users/student/${widget.studentId}/'),
-        _fetchJson('/api/users/student/${widget.studentId}/progress_records/'),
-        _fetchJson('/api/users/student/${widget.studentId}/packs/'),
-        _fetchJson('/api/users/student/${widget.studentId}/lessons/'),
-        _fetchJson('/api/users/student/${widget.studentId}/debt/'),
-        _fetchJson('/api/users/student/${widget.studentId}/parents/'),
-      ]);
+      final paths = [
+        '/api/users/student/${widget.studentId}/',
+        '/api/users/student/${widget.studentId}/progress_records/',
+        '/api/users/student/${widget.studentId}/packs/',
+        '/api/users/student/${widget.studentId}/lessons/',
+        '/api/users/student/${widget.studentId}/debt/',
+        '/api/users/student/${widget.studentId}/parents/',
+      ];
+      final results = await Future.wait(paths.map(_fetchJson));
 
       setState(() {
         student         = results[0] as Map<String, dynamic>;
         progressRecords = results[1] as List<dynamic>;
         packs           = results[2] as List<dynamic>;
         lessons         = results[3] as List<dynamic>;
-
         debtData        = results[4] as Map<String, dynamic>;
-        debtItems       = debtData!['items'] as List<dynamic>;
-
+        debtItems       = (debtData!['items'] is List)
+            ? debtData!['items'] as List<dynamic>
+            : [];
         parents         = results[5] as List<dynamic>;
         loading         = false;
       });
@@ -76,10 +76,7 @@ class _StudentPageState extends State<StudentPage> {
 
   Future<dynamic> _fetchJson(String path) async {
     final headers = await getAuthHeaders();
-    final resp = await http.get(
-      Uri.parse('$baseUrl$path'),
-      headers: headers,
-    );
+    final resp = await http.get(Uri.parse('$baseUrl$path'), headers: headers);
     if (resp.statusCode != 200) {
       throw Exception('Failed to load $path (${resp.statusCode})');
     }
@@ -88,13 +85,173 @@ class _StudentPageState extends State<StudentPage> {
 
   void _editProfile() {
     Navigator.pushNamed(context, '/student/${widget.studentId}/edit')
-      .then((_) => _loadAll());
+        .then((_) => _loadAll());
+  }
+
+  Widget _buildProfileCard() {
+    final photoUrl   = _safeString('photo_url', student!['photo_url']);
+    final birthRaw   = _safeString('birthday',  student!['birthday']);
+    final birthday   = DateTime.tryParse(birthRaw);
+    final levelValue = _safeString('level',      student!['level']);
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          CircleAvatar(
+            radius: 40,
+            backgroundImage:
+                photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            child:
+                photoUrl.isEmpty ? const Icon(Icons.person, size: 40) : null,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_safeString('first_name', student!['first_name'])} '
+                  '${_safeString('last_name',  student!['last_name'])}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                if (birthday != null)
+                  Text('Birthday: ${DateFormat.yMMMMd().format(birthday)}'),
+                const SizedBox(height: 4),
+                Text('Level: $levelValue'),
+              ],
+            ),
+          ),
+          IconButton(icon: const Icon(Icons.edit), onPressed: _editProfile),
+        ]),
+      ),
+    );
+  }
+
+  Widget _sectionCard({
+    required String title,
+    required IconData icon,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: Icon(icon, color: Colors.orange),
+        title: Text(title, style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _showModal(Widget body) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: body,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showProgressModal() {
+    _showModal(
+      ListView.separated(
+        shrinkWrap: true,
+        itemCount: progressRecords.length,
+        separatorBuilder: (_, __) => const Divider(),
+        itemBuilder: (_, i) => _buildProgressRecordCard(progressRecords[i]),
+      ),
+    );
+  }
+
+  void _showPacksModal() {
+    _showModal(
+      ListView(
+        shrinkWrap: true,
+        children: packs.map((p) => PackCard(pack: p)).toList(),
+      ),
+    );
+  }
+
+  void _showLessonsModal() {
+    final lessonModal = Provider.of<LessonModalProvider>(context, listen: false);
+    final lessonsOnly = lessons.where((l) => l['is_event'] != true).toList();
+    print(lessonsOnly);
+    _showModal(
+      ListView(
+        shrinkWrap: true,
+        children: lessonsOnly
+            .map((l) => lessonModal.buildLessonCard(context, l, []))
+            .toList(),
+      ),
+    );
+  }
+
+  void _showEventsModal() {
+    final lessonModal = Provider.of<LessonModalProvider>(context, listen: false);
+    final eventsOnly = lessons.where((l) => l['is_event'] == true).toList();
+    _showModal(
+      ListView(
+        shrinkWrap: true,
+        children: eventsOnly
+            .map((l) => lessonModal.buildLessonCard(context, l, []))
+            .toList(),
+      ),
+    );
+  }
+
+  void _showDebtsModal() {
+    _showModal(
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Total debt: €${_safeString('current_debt', debtData!['current_debt'])}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          ...debtItems.map(_buildDebtRow),
+        ],
+      ),
+    );
+  }
+
+  void _showParentsModal() {
+    _showModal(
+      ListView.separated(
+        shrinkWrap: true,
+        itemCount: parents.length,
+        separatorBuilder: (_, __) => const Divider(),
+        itemBuilder: (_, i) => _buildParentRow(parents[i]),
+      ),
+    );
+  }
+
+  void _showStatsModal() {
+    _showModal(
+      Container(
+        padding: const EdgeInsets.all(16),
+        child: const Text('Stats will appear here...'),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final lessonModal = Provider.of<LessonModalProvider>(context, listen: false);
-
     if (loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -103,19 +260,16 @@ class _StudentPageState extends State<StudentPage> {
     if (error != null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Student')),
-        body: Center(child: Text('Error: $error')),
+        body: Center(child: Text('Error: $error')), 
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${student!['first_name']} ${student!['last_name']}'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _editProfile,
-          ),
-        ],
+        title: Text(
+          '${_safeString('first', student!['first_name'])} '
+          '${_safeString('last',  student!['last_name'])}',
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadAll,
@@ -128,40 +282,61 @@ class _StudentPageState extends State<StudentPage> {
               _buildProfileCard(),
               const SizedBox(height: 16),
 
-              _buildSectionTitle('Progress Records'),
-              ...progressRecords.map(_buildProgressRecordCard),
-              const SizedBox(height: 16),
-
-              _buildSectionTitle('Packs'),
-              ...packs.map((p) => PackCard(pack: p)),
-              const SizedBox(height: 16),
-
-              _buildSectionTitle('Lessons & Events'),
-              ...lessons.map((l) => lessonModal.buildLessonCard(context, l, [])),
-              const SizedBox(height: 16),
-
-              _buildSectionTitle('Debts & Payments'),
-              Text(
-                'Total debt: €${debtData!['current_debt']}',
-                style: Theme.of(context).textTheme.titleMedium,
+              _sectionCard(
+                title: 'Progress Records',
+                icon: Icons.track_changes,
+                subtitle: 'View all progress records',
+                onTap: _showProgressModal,
               ),
               const SizedBox(height: 8),
-              ...debtItems.map(_buildDebtRow),
-              const SizedBox(height: 16),
 
-              _buildSectionTitle('Parents'),
-              ...parents.map(_buildParentRow),
-              const SizedBox(height: 16),
-
-              _buildSectionTitle('Stats'),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text('Stats will appear here...'),
+              _sectionCard(
+                title: 'Packs',
+                icon: Icons.inventory,
+                subtitle: 'View all packs',
+                onTap: _showPacksModal,
               ),
+              const SizedBox(height: 8),
+
+              _sectionCard(
+                title: 'Lessons',
+                icon: Icons.school,
+                subtitle: 'View all lessons',
+                onTap: _showLessonsModal,
+              ),
+              const SizedBox(height: 8),
+
+              _sectionCard(
+                title: 'Events',
+                icon: Icons.event,
+                subtitle: 'View all events',
+                onTap: _showEventsModal,
+              ),
+              const SizedBox(height: 8),
+
+              _sectionCard(
+                title: 'Debts & Payments',
+                icon: Icons.payment,
+                subtitle: 'View debts and make payments',
+                onTap: _showDebtsModal,
+              ),
+              const SizedBox(height: 8),
+
+              _sectionCard(
+                title: 'Parents',
+                icon: Icons.people,
+                subtitle: 'View and manage parents',
+                onTap: _showParentsModal,
+              ),
+              const SizedBox(height: 8),
+
+              _sectionCard(
+                title: 'Stats',
+                icon: Icons.bar_chart,
+                subtitle: 'View student statistics',
+                onTap: _showStatsModal,
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -169,92 +344,42 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  Widget _buildProfileCard() {
-    final photoUrl = student!['photo_url'] as String?;
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundImage:
-                  photoUrl != null ? NetworkImage(photoUrl) : null,
-              child: photoUrl == null
-                  ? const Icon(Icons.person, size: 40)
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${student!['first_name']} ${student!['last_name']}',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Birthday: ${DateFormat.yMMMMd().format(DateTime.parse(student!['birthday']))}',
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Level: ${student!['level']}'),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: _editProfile,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: Theme.of(context)
-          .textTheme
-          .titleMedium!
-          .copyWith(fontWeight: FontWeight.bold),
-    );
-  }
-
   Widget _buildProgressRecordCard(dynamic pr) {
-    final date = DateTime.parse(pr['date']);
-    final notes = pr['notes'] as String?;
-    final goals = pr['goals'] as List<dynamic>;
+    final dateRaw = _safeString('pr.date', pr['date']);
+    final date    = DateTime.tryParse(dateRaw);
+    final notes   = (pr['notes'] as String?) ?? '';
+    final goals   = (pr['goals'] as List<dynamic>?) ?? [];
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: ExpansionTile(
-        title: Text(DateFormat.yMMMd().format(date)),
-        subtitle: (notes != null && notes.isNotEmpty)
-            ? Text(notes, maxLines: 1, overflow: TextOverflow.ellipsis)
-            : null,
-        children: goals
-            .map((g) => ListTile(
-                  title: Text(g['skill_name']),
-                  subtitle: Text(
-                    'Level: ${g['level']}${g['is_completed'] ? ' ✅' : ''}'
-                  ),
-                ))
-            .toList(),
-      ),
+    return ExpansionTile(
+      title: Text(date != null
+          ? DateFormat.yMMMd().format(date)
+          : 'Date unknown'),
+      subtitle: notes.isNotEmpty
+          ? Text(notes, maxLines: 1, overflow: TextOverflow.ellipsis)
+          : null,
+      children: goals.map<Widget>((g) {
+        final skill = _safeString('g.skill_name', g['skill_name']);
+        final level = _safeString('g.level',      g['level']);
+        final done  = g['is_completed'] == true;
+        return ListTile(
+          title: Text(skill),
+          subtitle: Text('Level: $level${done ? ' ✅' : ''}'),
+        );
+      }).toList(growable: false),
     );
   }
 
   Widget _buildDebtRow(dynamic d) {
-    // d has: pack_id, date, time, description, amount
+    final desc = _safeString('d.description', d['description']);
+    final date = _safeString('d.date',        d['date']);
+    final time = _safeString('d.time',        d['time']);
+    final amt  = _safeString('d.amount',      d['amount']);
+
     return ListTile(
-      title: Text(d['description']),
-      subtitle: Text('${d['date']} at ${d['time']}'),
+      title: Text(desc),
+      subtitle: Text('$date at $time'),
       trailing: TextButton(
-        child: Text('Pay €${d['amount']}'),
+        child: Text('Pay €$amt'),
         onPressed: () {
           Navigator.pushNamed(
             context,
@@ -267,25 +392,36 @@ class _StudentPageState extends State<StudentPage> {
   }
 
   Widget _buildParentRow(dynamic p) {
+    final first = _safeString('p.first_name', p['first_name']);
+    final last  = _safeString('p.last_name',  p['last_name']);
+    final email = _safeString('p.email',      p['email']);
+
     return ListTile(
       leading: const Icon(Icons.person),
-      title: Text('${p['first_name']} ${p['last_name']}'),
-      subtitle: Text(p['email'] ?? ''),
+      title: Text('$first $last'),
+      subtitle: Text(email),
       trailing: IconButton(
         icon: const Icon(Icons.link_off),
         onPressed: () async {
-          final resp = await http.delete(Uri.parse(
-              '$baseUrl/api/users/student/${widget.studentId}/parents/${p['id']}/'));
+          final headers = await getAuthHeaders();
+          final resp = await http.delete(
+            Uri.parse(
+                '$baseUrl/api/users/student/${widget.studentId}/parents/${p['id']}/'),
+            headers: headers,
+          );
           if (resp.statusCode == 204) _loadAll();
         },
       ),
     );
   }
 
+  String _safeString(String label, dynamic v) {
+    return v?.toString() ?? '';
+  }
+
   Widget _buildPackCard(dynamic pack) {
     final isGroup = pack['type'].toString().toLowerCase() == 'group';
     return InkWell(
-      //onTap: () => _showPackCardOptions(pack),
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -296,7 +432,7 @@ class _StudentPageState extends State<StudentPage> {
               const SizedBox(width: 16),
               InkWell(
                 onTap: () {
-                  if (pack['type'].toString().toLowerCase() == 'group') {
+                  if (isGroup) {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -311,16 +447,12 @@ class _StudentPageState extends State<StudentPage> {
                         ],
                       ),
                     );
-                  } else {
-                    //_showScheduleMultipleLessonsModal(
-                    //    pack['lessons'], pack["expiration_date"]);
                   }
                 },
-                child: SizedBox(
+                child: const SizedBox(
                   width: 40,
                   height: 40,
-                  child: const Icon(Icons.calendar_today,
-                      size: 28, color: Colors.orange),
+                  child: Icon(Icons.calendar_today, size: 28, color: Colors.orange),
                 ),
               ),
               const SizedBox(width: 16),
@@ -330,16 +462,14 @@ class _StudentPageState extends State<StudentPage> {
                   children: [
                     Text(
                       pack['students_name'],
-                      style: GoogleFonts.lato(
-                          fontWeight: FontWeight.bold, fontSize: 16),
+                      style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${pack['lessons_remaining']} lessons remaining\n'
                       '${pack['unscheduled_lessons']} unscheduled lessons\n'
                       '${pack['days_until_expiration']} days until expiration',
-                      style:
-                          GoogleFonts.lato(fontSize: 14, color: Colors.black54),
+                      style: GoogleFonts.lato(fontSize: 14, color: Colors.black54),
                     ),
                   ],
                 ),
@@ -347,19 +477,9 @@ class _StudentPageState extends State<StudentPage> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    isGroup ? Icons.groups : Icons.person,
-                    size: 20,
-                    color: Colors.grey,
-                  ),
+                  Icon(isGroup ? Icons.groups : Icons.person, size: 20, color: Colors.grey),
                   const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () {
-                      //showPackDetailsModal(pack);
-                    },
-                    child: const Icon(Icons.more_vert,
-                        size: 28, color: Colors.orange),
-                  ),
+                  const Icon(Icons.more_vert, size: 28, color: Colors.orange),
                 ],
               ),
               const SizedBox(width: 8),
@@ -369,5 +489,4 @@ class _StudentPageState extends State<StudentPage> {
       ),
     );
   }
-
 }

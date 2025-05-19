@@ -1214,22 +1214,65 @@ def student_packs(request, id: int):
         })
     return JsonResponse(data, safe=False)
 
-@api_view(['GET'])
+api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_lessons(request, id: int):
     student = get_object_or_404(Student, pk=id)
-    lessons = Lesson.objects.filter(students=student).order_by("date", "start_time")
+    lessons = (
+        Lesson.objects
+        .filter(students=student)
+        .select_related('sport', 'school')
+        .prefetch_related('packs')
+        .order_by('date', 'start_time')
+    )
+
+    today = now().date()
     data = []
     for l in lessons:
+        # Basic lesson info
+        date_str = l.date.strftime("%d %b %Y") if l.date else "None"
+        start_str = l.start_time.strftime("%H:%M") if l.start_time else "None"
+        # Pack info (assume first pack)
+        pack = l.packs.filter(students=student).first()
+        lesson_number = str(l.class_number) if l.class_number else "None"
+        number_of_lessons = (
+            str(pack.number_of_classes)
+            if pack and pack.number_of_classes is not None
+            else "None"
+        )
+        expiration_date = (
+            pack.expiration_date.strftime("%d %b %Y")
+            if pack and pack.expiration_date
+            else "None"
+        )
+        # Build status
+        if l.date:
+            if l.date == today:
+                status = "Today"
+            elif l.date > today:
+                status = "Upcoming"
+            else:
+                status = "Need Reschedule"
+        else:
+            status = "Unknown"
+
         data.append({
-            "id": l.id,
-            "date": l.date.isoformat() if l.date else None,
-            "start_time": l.start_time.isoformat() if l.start_time else None,
-            "end_time": l.end_time.isoformat() if l.end_time else None,
+            "lesson_id": l.id,
+            "date": date_str,
+            "start_time": start_str,
+            "lesson_number": lesson_number,
+            "number_of_lessons": number_of_lessons,
+            "students_name": l.get_students_name(),
+            "type": l.type,
             "duration_in_minutes": l.duration_in_minutes,
+            "expiration_date": expiration_date,
+            "school": str(l.school) if l.school else "",
+            "subject_id": l.sport.id if l.sport else "Unknown",
+            "subject_name": l.sport.name if l.sport else "",
             "is_done": l.is_done,
-            "extras": l.extras or {},
+            "status": status,
         })
+
     return JsonResponse(data, safe=False)
 
 @api_view(['GET'])

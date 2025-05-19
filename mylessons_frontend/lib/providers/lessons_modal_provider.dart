@@ -132,178 +132,188 @@ class LessonModalProvider with ChangeNotifier {
   }
 
   /// Builds and returns a card widget representing a lesson.
-  Widget buildLessonCard(
-      BuildContext context, dynamic lesson, dynamic unschedulableLessons,
-      {bool isLastLesson = false}) {
-    final bool isGroup = lesson['type']?.toString().toLowerCase() == 'group';
+/// Builds and returns a card widget representing a lesson.
+Widget buildLessonCard(
+    BuildContext context,
+    dynamic lesson,
+    dynamic unschedulableLessons, {
+    bool isLastLesson = false,
+  }) {
+  // Determine whether this is a group lesson.
+  final bool isGroup = lesson['type']?.toString().toLowerCase() == 'group';
 
-    // Parse the lesson date string. Make sure the format ("dd MMM yyyy") matches your data.
-    DateTime? lessonDate;
-    try {
-      if (lesson['date'] != null) {
-        lessonDate = DateFormat("dd MMM yyyy").parse(lesson['date']);
+  // Safely extract all potentially-null fields as strings.
+  final String studentName = lesson['students_name']?.toString() ?? 'Unknown student';
+  final String subjectName = lesson['subject_name']?.toString()  ?? '';
+  final String dateRaw     = lesson['date']?.toString()          ?? '';
+  final String startRaw    = lesson['start_time']?.toString()    ?? '';
+  final String endRaw      = lesson['end_time']?.toString()      ?? '';
+
+  // Attempt to parse the date string, trying ISO first then fallback.
+  DateTime? lessonDate;
+  if (dateRaw.isNotEmpty) {
+    lessonDate = DateTime.tryParse(dateRaw);
+    if (lessonDate == null) {
+      try {
+        lessonDate = DateFormat('dd MMM yyyy').parse(dateRaw);
+      } catch (_) {
+        lessonDate = null;
       }
-    } catch (e) {
-      lessonDate = null;
     }
+  }
 
-    // Get today's date (only year, month, day for comparison).
-    final now = DateTime.now();
-    final todayOnly = DateTime(now.year, now.month, now.day);
+  // Determine whether the lesson is today, in the past, or upcoming.
+  final DateTime now       = DateTime.now();
+  final DateTime todayOnly = DateTime(now.year, now.month, now.day);
+  bool isToday = false;
+  bool isPast  = false;
+  if (lessonDate != null) {
+    final DateTime lessonOnly = DateTime(lessonDate.year, lessonDate.month, lessonDate.day);
+    isToday = lessonOnly == todayOnly;
+    isPast  = lessonOnly.isBefore(todayOnly) && lesson["is_done"] == false;
+  }
 
-    // Determine if the lesson is today, past, or upcoming.
-    bool isToday = false;
-    bool isPast = false;
-    if (lessonDate != null) {
-      final lessonOnly =
-          DateTime(lessonDate.year, lessonDate.month, lessonDate.day);
-      isToday = lessonOnly == todayOnly;
-      isPast = lessonOnly.isBefore(todayOnly) && lesson["is_done"] == false;
-    }
-
-    // Determine display string and its text color.
-    String dateTimeStr = '';
-    Color dateTextColor = Colors.black54;
-    if (lessonDate != null) {
-      if (isPast) {
-        dateTimeStr = '${lesson['date']} at ${lesson['start_time']}';
-        dateTextColor = Colors.red;
-      } else if (isToday) {
-        dateTimeStr = 'Today at ${lesson['start_time']}';
-        dateTextColor = Colors.orange;
-      } else {
-        dateTimeStr = '${lesson['date']} at ${lesson['start_time']}';
-        dateTextColor = Colors.black54;
-      }
+  // Build a display string for the date/time, with color coding.
+  String dateTimeStr;
+  Color dateTextColor = Colors.black54;
+  if (lessonDate != null) {
+    if (isPast) {
+      dateTimeStr    = '$dateRaw at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
+      dateTextColor = Colors.red;
+    } else if (isToday) {
+      dateTimeStr    = 'Today at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
+      dateTextColor = Colors.orange;
     } else {
-      dateTimeStr = 'Unknown';
+      dateTimeStr    = '$dateRaw at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
     }
+  } else {
+    dateTimeStr = 'Unknown';
+  }
 
-    return InkWell(
-      onTap: () => showLessonCardOptions(context, lesson),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              // Calendar or report icon.
-              InkWell(
-                onTap: () {
-                  if (isLastLesson) {
-                    // Call your lesson report handler.
-                    handleLessonReport(context, lesson);
-                  } else if ((unschedulableLessons ?? [])
-                      .contains(lesson['lesson_id']?.toString() ?? '')) {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Reschedule Unavailable"),
-                        content:
-                            const Text("The reschedule period has passed!"),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text("OK"),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else if (lesson['type']?.toString().toLowerCase() ==
-                      'group') {
-                    // For group lessons, scheduling might be unavailable.
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Scheduling Unavailable"),
-                        content: const Text(
-                            "To change the schedule of a group lesson, please contact the school."),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text("OK"),
-                          )
-                        ],
-                      ),
-                    );
-                  } else {
-                    showScheduleLessonModal(context, lesson);
-                  }
-                },
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: Icon(
-                    isLastLesson ? Icons.article : Icons.calendar_today,
-                    size: 28,
-                    color: Colors.orange,
-                  ),
+  return InkWell(
+    onTap: () => showLessonCardOptions(context, lesson),
+    child: Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+
+            // Calendar or report icon.
+            InkWell(
+              onTap: () {
+                if (isLastLesson) {
+                  handleLessonReport(context, lesson);
+                } else if ((unschedulableLessons ?? [])
+                    .contains(lesson['lesson_id']?.toString() ?? '')) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Reschedule Unavailable"),
+                      content: const Text("The reschedule period has passed!"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (isGroup) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Scheduling Unavailable"),
+                      content: const Text(
+                          "To change the schedule of a group lesson, please contact the school."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text("OK"),
+                        )
+                      ],
+                    ),
+                  );
+                } else {
+                  showScheduleLessonModal(context, lesson);
+                }
+              },
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(
+                  isLastLesson ? Icons.article : Icons.calendar_today,
+                  size: 28,
+                  color: Colors.orange,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      lesson['students_name'],
-                      style: GoogleFonts.lato(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Main column with text info.
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    studentName,
+                    style: GoogleFonts.lato(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                    if (lesson["subject_name"] != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        lesson["subject_name"],
-                        style: GoogleFonts.lato(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54
-                        ),
-                      ),
-                    ],
+                  ),
+                  if (subjectName.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      dateTimeStr,
+                      subjectName,
                       style: GoogleFonts.lato(
                         fontSize: 14,
-                        color: dateTextColor,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black54,
                       ),
                     ),
                   ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isGroup ? Icons.groups : Icons.person,
-                    size: 20,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 8),
-                  // Three dots icon to open details.
-                  InkWell(
-                    onTap: () {
-                      showLessonDetailsModal(context, lesson);
-                    },
-                    child: const Icon(
-                      Icons.more_vert,
-                      size: 28,
-                      color: Colors.orange,
+                  const SizedBox(height: 4),
+                  Text(
+                    dateTimeStr,
+                    style: GoogleFonts.lato(
+                      fontSize: 14,
+                      color: dateTextColor,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 8),
-            ],
-          ),
+            ),
+
+            // Group/person icon and details button.
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isGroup ? Icons.groups : Icons.person,
+                  size: 20,
+                  color: Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => showLessonDetailsModal(context, lesson),
+                  child: const Icon(
+                    Icons.more_vert,
+                    size: 28,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(width: 8),
+          ],
         ),
       ),
-    );
-  }
-}
+    ),
+  );
+}}
