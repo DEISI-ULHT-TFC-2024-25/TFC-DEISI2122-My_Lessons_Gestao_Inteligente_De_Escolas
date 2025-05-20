@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import GoogleCredentials, Student, Unavailability, UserAccount, Instructor
+from .models import GoogleCredentials, Student, Unavailability, UserAccount, Instructor, UserCredentials
 from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, UserAccountSerializer, StudentSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
@@ -1387,7 +1387,7 @@ def oauth2callback(request):
         flow.fetch_token(authorization_response=request.build_absolute_uri())
         creds = flow.credentials
 
-        """
+        
         # Check if we already have credentials for this user
         user_credentials, created = UserCredentials.objects.get_or_create(user=request.user)
 
@@ -1395,7 +1395,7 @@ def oauth2callback(request):
         user_credentials.credentials = creds.to_json()
         user_credentials.save()
 
-        """
+        
         return Response({'success': True})
     except Exception as e:
         # Handle any errors, log them, and return a failure message

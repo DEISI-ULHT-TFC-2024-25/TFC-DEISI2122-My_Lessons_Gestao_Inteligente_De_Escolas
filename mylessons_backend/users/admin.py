@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     GoogleCredentials, UserAccount, Student,
     Instructor, Monitor, Unavailability,
-    Discount
+    Discount, UserCredentials
 )
 
 @admin.register(UserAccount)
@@ -60,4 +60,8 @@ class DiscountAdmin(admin.ModelAdmin):
 
 @admin.register(GoogleCredentials)
 class GoogleCredentialsAdmin(admin.ModelAdmin):
+    list_display = ('user', )
+    
+@admin.register(UserCredentials)
+class UserCredentialsAdmin(admin.ModelAdmin):
     list_display = ('user', )
