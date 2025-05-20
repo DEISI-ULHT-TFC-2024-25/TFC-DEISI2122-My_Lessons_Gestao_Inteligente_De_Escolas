@@ -22,6 +22,8 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>GIDClientID</key>
+	<string>768650226651-hn51uf6gvp12tn96b683me6epae9abju.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -29,7 +31,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.368273500882-813i1dn6kojsob4dmlbd3i26lgrsmh0a</string>
+				<string>com.googleusercontent.apps.768650226651-17hrhqb3cs9cmk5q2c3ao2k41aiqnqrg</string>
 				<string>mylessons</string>
 			</array>
 		</dict>

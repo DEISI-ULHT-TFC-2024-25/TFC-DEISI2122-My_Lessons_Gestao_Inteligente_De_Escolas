@@ -1,8 +1,8 @@
 from django.contrib import admin
 from .models import (
-    UserAccount, Student,
+    GoogleCredentials, UserAccount, Student,
     Instructor, Monitor, Unavailability,
-    Discount, GoogleCredential
+    Discount
 )
 
 @admin.register(UserAccount)
@@ -58,7 +58,6 @@ class DiscountAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'discount_percentage', 'discount_value')
     list_filter = ('date', 'expiration_date')
 
-@admin.register(GoogleCredential)
-class GoogleCredentialAdmin(admin.ModelAdmin):
-    list_display = ('user', 'credentials')
-    search_fields = ('user__username', 'credentials')
+@admin.register(GoogleCredentials)
+class GoogleCredentialsAdmin(admin.ModelAdmin):
+    list_display = ('user', )

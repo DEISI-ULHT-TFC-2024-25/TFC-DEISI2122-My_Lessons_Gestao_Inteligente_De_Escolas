@@ -41,29 +41,28 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyB7zeDW-2AMg8aEoOHZmE63QIaH0V2QS-I',
-    appId: '1:368273500882:web:3ede5bf7cb27a946f15b0b',
-    messagingSenderId: '368273500882',
-    projectId: 'mylessons-7b4ed',
-    authDomain: 'mylessons-7b4ed.firebaseapp.com',
-    storageBucket: 'mylessons-7b4ed.firebasestorage.app',
-    measurementId: 'G-7XPJK2X34H',
+    apiKey: 'AIzaSyAAR9cU07q-tShEAN8HHGcmp5L2l9tMIFQ',
+    appId: '1:768650226651:web:d44c8896f55ea458ca55fe',
+    messagingSenderId: '768650226651',
+    projectId: 'my-lessons-460316',
+    authDomain: 'my-lessons-460316.firebaseapp.com',
+    storageBucket: 'my-lessons-460316.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBhZLl-1j99yImJd2HM-7pG9gP8sTbKxPU',
-    appId: '1:368273500882:android:be6411a9765c0f93f15b0b',
-    messagingSenderId: '368273500882',
-    projectId: 'mylessons-7b4ed',
-    storageBucket: 'mylessons-7b4ed.firebasestorage.app',
+    apiKey: 'AIzaSyDez5gsI0EW_iM0gzo-gh3LNcW1Ya9H_tY',
+    appId: '1:768650226651:android:5e60ab479126b0f5ca55fe',
+    messagingSenderId: '768650226651',
+    projectId: 'my-lessons-460316',
+    storageBucket: 'my-lessons-460316.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyARpXszWp2ZunONwZugrEqC7IXEZpY5_ms',
-    appId: '1:368273500882:ios:709b94d918b5ef1ef15b0b',
-    messagingSenderId: '368273500882',
-    projectId: 'mylessons-7b4ed',
-    storageBucket: 'mylessons-7b4ed.firebasestorage.app',
+    apiKey: 'AIzaSyDkUZf3vxnJ8lFsCxaZMjqjB_N6Oggp-nE',
+    appId: '1:768650226651:ios:a5c9b31fd1bac3e6ca55fe',
+    messagingSenderId: '768650226651',
+    projectId: 'my-lessons-460316',
+    storageBucket: 'my-lessons-460316.firebasestorage.app',
     iosBundleId: 'com.example.mylessonsFrontend',
   );
 
@@ -73,6 +72,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '368273500882',
     projectId: 'mylessons-7b4ed',
     storageBucket: 'mylessons-7b4ed.firebasestorage.app',
+    iosClientId: '368273500882-813i1dn6kojsob4dmlbd3i26lgrsmh0a.apps.googleusercontent.com',
     iosBundleId: 'com.example.mylessonsFrontend',
   );
 
@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'mylessons-7b4ed.firebasestorage.app',
     measurementId: 'G-F6NGRWGVVL',
   );
+
 }

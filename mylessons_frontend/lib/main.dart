@@ -37,9 +37,12 @@ Future<void> main() async {
 
   try {
     print('  • before Firebase.initializeApp');
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    // Só inicializa se ainda não tiver sido inicializado
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
     print('  • after Firebase.initializeApp');
   } catch (e, st) {
     print('❌ Firebase.initializeApp failed: $e\n$st');
@@ -48,14 +51,14 @@ Future<void> main() async {
   try {
     print('  • before Stripe.publishableKey');
     Stripe.publishableKey =
-      'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
+        'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
     print('  • after Stripe.publishableKey');
   } catch (e, st) {
     print('❌ Stripe setup failed: $e\n$st');
   }
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
-  
+
   debugPaintSizeEnabled = false;
 
   // Request permission on iOS
@@ -71,13 +74,13 @@ Future<void> main() async {
     print('  • got token: $token');
 
     if (token != null) {
-    final djangoAuthToken = await getYourSavedAuthToken();
-    if (djangoAuthToken.isNotEmpty) {
-      await sendTokenToBackend(token, djangoAuthToken);
-    } else {
-      print("⚠️ No Django auth token found—user may not be logged in yet.");
+      final djangoAuthToken = await getYourSavedAuthToken();
+      if (djangoAuthToken.isNotEmpty) {
+        await sendTokenToBackend(token, djangoAuthToken);
+      } else {
+        print("⚠️ No Django auth token found—user may not be logged in yet.");
+      }
     }
-  }
   } catch (e, st) {
     print('❌ getToken failed: $e\n$st');
   }
@@ -138,7 +141,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   void _handleDeepLink(Uri uri) {
     print('got deep link: $uri');
-  print('  host: ${uri.host}  path: ${uri.path}');
+    print('  host: ${uri.host}  path: ${uri.path}');
     if (uri.path == '/password-reset') {
       final uid = uri.queryParameters['uid'];
       final token = uri.queryParameters['token'];
