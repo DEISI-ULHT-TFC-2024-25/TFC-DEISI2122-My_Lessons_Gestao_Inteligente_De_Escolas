@@ -8,6 +8,8 @@ from django.db import models
 from payments.models import Payment
 from .utils import get_phone
 from django.utils import timezone
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 
 logger = logging.getLogger(__name__)
 
@@ -478,3 +480,33 @@ class GoogleCredentials(models.Model):
     
     def __str__(self):
         return f"Google Credential for {self.user.username}"
+    
+class UserCredentials(models.Model):
+    user = models.OneToOneField(UserAccount, on_delete=models.CASCADE)
+    credentials = models.TextField()  # Store the serialized credentials
+
+    def set_credentials(self, creds):
+        """
+        Save the credentials as a JSON string.
+        """
+        self.credentials = creds.to_json()
+        self.save()
+
+    def get_credentials(self):
+        """
+        Retrieve the credentials from the database and check if the token needs refreshing.
+        """
+        try:
+            creds = Credentials.from_authorized_user_info(json.loads(self.credentials))
+
+            # Refresh the token if it has expired
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                # Update the stored credentials after refreshing
+                self.set_credentials(creds)
+
+            return creds
+
+        except Exception as e:
+            print(f"Error retrieving credentials: {e}")
+            return None

@@ -1320,7 +1320,7 @@ def student_parents(request, id: int):
         })
     return JsonResponse(data, safe=False)
 
-
+"""
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def connect_calendar(request):
@@ -1333,7 +1333,7 @@ def connect_calendar(request):
     flow = Flow.from_client_secrets_file(
         str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
         scopes=['https://www.googleapis.com/auth/calendar.events'],
-        redirect_uri='postmessage',
+        redirect_uri=f'https://mylessons.pythonanywhere.com/oauth2callback/'
     )
     try:
         flow.fetch_token(code=google_auth_code)
@@ -1357,3 +1357,48 @@ def connect_calendar(request):
     )
 
     return Response({'success': True})
+"""
+
+@csrf_exempt
+def connect_calendar(request):
+
+    flow = Flow.from_client_secrets_file(
+        str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
+        scopes=['https://www.googleapis.com/auth/calendar.events'],
+        redirect_uri=f'https://mylessons.pythonanywhere.com/api/users/oauth2callback/'
+    )
+
+    auth_url, _ = flow.authorization_url(prompt='consent')
+
+
+    # Redirect the user to the Google OAuth page
+    return redirect(auth_url)
+
+@csrf_exempt
+def oauth2callback(request):
+
+    flow = Flow.from_client_secrets_file(
+        str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
+        scopes=['https://www.googleapis.com/auth/calendar.events'],
+        redirect_uri=f'https://mylessons.pythonanywhere.com/api/users/oauth2callback/'
+    )
+
+    try:
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        creds = flow.credentials
+
+        """
+        # Check if we already have credentials for this user
+        user_credentials, created = UserCredentials.objects.get_or_create(user=request.user)
+
+        # Save credentials to the database (including refresh token)
+        user_credentials.credentials = creds.to_json()
+        user_credentials.save()
+
+        """
+        return Response({'success': True})
+    except Exception as e:
+        # Handle any errors, log them, and return a failure message
+        print(f"Error fetching token: {e}")
+
+        return Response({'success': False})

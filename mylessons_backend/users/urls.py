@@ -33,6 +33,8 @@ urlpatterns = [
     path('profile_data/', profile_view, name='profile_data'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('link_google_account/', link_google_account, name='link_google_account'),
+    path('oauth2callback/', oauth2callback, name='oauth2callback'),
     
 
     # Add more paths (e.g., /google/callback) as needed
