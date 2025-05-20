@@ -5,6 +5,7 @@ import 'package:mylessons_frontend/pages/student_page.dart';
 import 'package:provider/provider.dart';
 import '../../services/profile_service.dart';
 import '../providers/home_page_provider.dart';
+import '../widgets/connect_calendar_button_widget.dart';
 import 'manage_school.dart';
 import '../../main.dart'; // routeObserver
 
@@ -212,6 +213,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        SizedBox(height: 16),
+                        ConnectCalendarButton(),
                         SizedBox(height: 16),
                         _buildInput('First Name', _firstNameController,
                             readOnly: !isEditingProfile),

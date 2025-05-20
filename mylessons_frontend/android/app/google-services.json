@@ -1,26 +1,36 @@
 {
   "project_info": {
-    "project_number": "368273500882",
-    "project_id": "mylessons-7b4ed",
-    "storage_bucket": "mylessons-7b4ed.firebasestorage.app"
+    "project_number": "768650226651",
+    "project_id": "my-lessons-460316",
+    "storage_bucket": "my-lessons-460316.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:368273500882:android:be6411a9765c0f93f15b0b",
+        "mobilesdk_app_id": "1:768650226651:android:5e60ab479126b0f5ca55fe",
         "android_client_info": {
           "package_name": "com.example.mylessons_frontend"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "768650226651-hn51uf6gvp12tn96b683me6epae9abju.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyBhZLl-1j99yImJd2HM-7pG9gP8sTbKxPU"
+          "current_key": "AIzaSyDez5gsI0EW_iM0gzo-gh3LNcW1Ya9H_tY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "768650226651-hn51uf6gvp12tn96b683me6epae9abju.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

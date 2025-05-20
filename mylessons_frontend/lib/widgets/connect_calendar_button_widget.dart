@@ -67,12 +67,6 @@ class _ConnectCalendarButtonState extends State<ConnectCalendarButton> {
         );
       }
 
-      // 3️⃣ Get the Firebase ID token so your backend can verify identity
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser == null) {
-        throw Exception('Not signed in with Firebase');
-      }
-
       // 4️⃣ POST to your Django endpoint
       final resp = await http.post(
         Uri.parse('$baseUrl/api/users/connect_calendar/'),

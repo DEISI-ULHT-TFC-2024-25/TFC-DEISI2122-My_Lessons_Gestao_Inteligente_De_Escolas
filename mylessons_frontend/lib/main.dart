@@ -35,10 +35,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   print('▶️ main() start');
 
-  // Initialize Stripe with your publishable key
-  Stripe.publishableKey =
-      'pk_test_51QmkhlJwT5CCGmgeZvrzwLxdAQm0Y9vGukn6KVLEsNDHWuJvZYKY49Ve8Kg6U2pWnAAVQRzadpKLiPXTQpYrPJYL005oFEcVGR';
-  // ... Initialize Firebase if needed, etc.
   try {
     print('  • before Firebase.initializeApp');
     await Firebase.initializeApp(
