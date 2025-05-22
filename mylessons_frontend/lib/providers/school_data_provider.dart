@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 import '../services/school_service.dart';
+import 'package:path/path.dart' as path;  // for filename
 
 /// Provides the full school details as fetched from the API, and exposes
 /// nested lists for locations, subjects, and equipments.
@@ -41,18 +43,44 @@ class SchoolDataProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createSchool(String schoolName) async {
-  final url = Uri.parse('$baseUrl/api/schools/create/');
+  Future<void> createSchool(
+  String schoolName, {
+  File? imageFile,
+}) async {
+  final uri = Uri.parse('$baseUrl/api/schools/create/');
   final headers = await getAuthHeaders();
 
-  final payload = jsonEncode({'school_name': schoolName});
-  final response = await http.post(url, headers: headers, body: payload);
+  if (imageFile != null) {
+    // Use multipart request when there's an image
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(headers)
+      ..fields['school_name'] = schoolName
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'image', 
+          imageFile.path,
+          filename: path.basename(imageFile.path),
+        ),
+      );
 
-  if (response.statusCode != 201) {
-    // Decode the response using UTF-8 before parsing JSON
-    final decodedBody = utf8.decode(response.bodyBytes);
-    final data = jsonDecode(decodedBody);
-    throw Exception(data['error'] ?? 'Error creating school');
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode != 201) {
+      final decoded = utf8.decode(response.bodyBytes);
+      final data = jsonDecode(decoded);
+      throw Exception(data['error'] ?? 'Error creating school');
+    }
+  } else {
+    // Fallback to JSON payload if no image
+    final payload = jsonEncode({'school_name': schoolName});
+    final response = await http.post(uri, headers: headers, body: payload);
+
+    if (response.statusCode != 201) {
+      final decoded = utf8.decode(response.bodyBytes);
+      final data = jsonDecode(decoded);
+      throw Exception(data['error'] ?? 'Error creating school');
+    }
   }
 }
 

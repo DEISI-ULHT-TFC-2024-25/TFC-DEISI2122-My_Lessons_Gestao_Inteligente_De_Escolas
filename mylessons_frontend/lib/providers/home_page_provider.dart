@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../main.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
 
@@ -82,10 +83,19 @@ class HomePageProvider extends ChangeNotifier {
           json.decode(utf8.decode(unschedulableLessonsResponse.bodyBytes));
       unschedulableLessons =
           List<String>.from(decodedUnschedulable['lesson_ids']);
+      if (profileResponse.statusCode == 401) {
+        await storage.delete(key: 'auth_token');
+        // Use the global navigator key instead of context:
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          '/',
+          (route) => false,
+        );
 
+        // Optionally return a default or throw.
+        return Future.error('Unauthenticated');
+      }
       if (profileResponse.statusCode == 200 && roleResponse.statusCode == 200) {
-        final profileData =
-            json.decode(utf8.decode(profileResponse.bodyBytes));
+        final profileData = json.decode(utf8.decode(profileResponse.bodyBytes));
         final roleData = json.decode(utf8.decode(roleResponse.bodyBytes));
 
         firstName = (profileData['first_name'] ?? '').toString();
@@ -102,10 +112,9 @@ class HomePageProvider extends ChangeNotifier {
         }
 
         if (schoolResponse.statusCode == 200) {
-          final schoolData =
-              json.decode(utf8.decode(schoolResponse.bodyBytes));
-          schoolId = int.tryParse(schoolData['current_school_id'].toString()) ??
-              0;
+          final schoolData = json.decode(utf8.decode(schoolResponse.bodyBytes));
+          schoolId =
+              int.tryParse(schoolData['current_school_id'].toString()) ?? 0;
           schoolName = schoolData['current_school_name'].toString();
         }
       }
@@ -127,12 +136,10 @@ class HomePageProvider extends ChangeNotifier {
           headers: headers,
         );
         if (lessonsResponse.statusCode == 200) {
-          upcomingLessons =
-              json.decode(utf8.decode(lessonsResponse.bodyBytes));
+          upcomingLessons = json.decode(utf8.decode(lessonsResponse.bodyBytes));
         }
         if (activePacksResponse.statusCode == 200) {
-          activePacks =
-              json.decode(utf8.decode(activePacksResponse.bodyBytes));
+          activePacks = json.decode(utf8.decode(activePacksResponse.bodyBytes));
         }
         if (lastPacksResponse.statusCode == 200) {
           lastPacks = json.decode(utf8.decode(lastPacksResponse.bodyBytes));
@@ -142,8 +149,7 @@ class HomePageProvider extends ChangeNotifier {
           headers: headers,
         );
         if (lastLessonsResponse.statusCode == 200) {
-          lastLessons =
-              json.decode(utf8.decode(lastLessonsResponse.bodyBytes));
+          lastLessons = json.decode(utf8.decode(lastLessonsResponse.bodyBytes));
         }
       }
 
@@ -159,13 +165,14 @@ class HomePageProvider extends ChangeNotifier {
         if (activeStudentsResponse.statusCode == 200) {
           numberOfActiveStudents = int.tryParse(json
                   .decode(utf8.decode(activeStudentsResponse.bodyBytes))[
-              'number_of_active_students']
-              .toString()) ??
+                      'number_of_active_students']
+                  .toString()) ??
               0;
         }
         if (balanceResponse.statusCode == 200) {
           currentBalance = double.tryParse(json
-                  .decode(utf8.decode(balanceResponse.bodyBytes))['current_balance']
+                  .decode(
+                      utf8.decode(balanceResponse.bodyBytes))['current_balance']
                   .toString()) ??
               0.0;
         }
@@ -187,44 +194,51 @@ class HomePageProvider extends ChangeNotifier {
     final formattedEnd = DateFormat('yyyy-MM-dd').format(endDate);
 
     final bookingsResponse = await http.get(
-      Uri.parse('$baseUrl/api/schools/number_of_booked_lessons/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          '$baseUrl/api/schools/number_of_booked_lessons/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
     final studentsResponse = await http.get(
-      Uri.parse('$baseUrl/api/schools/number_of_students/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          '$baseUrl/api/schools/number_of_students/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
     final instructorsResponse = await http.get(
-      Uri.parse('$baseUrl/api/schools/number_of_instructors/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          '$baseUrl/api/schools/number_of_instructors/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
     final revenueResponse = await http.get(
-      Uri.parse('$baseUrl/api/schools/school-revenue/$schoolId/$formattedStart/$formattedEnd/'),
+      Uri.parse(
+          '$baseUrl/api/schools/school-revenue/$schoolId/$formattedStart/$formattedEnd/'),
       headers: headers,
     );
 
     numberOfBookings = bookingsResponse.statusCode == 200
-        ? int.tryParse(
-                json.decode(utf8.decode(bookingsResponse.bodyBytes))['number_of_lessons_booked']
-                    .toString()) ??
+        ? int.tryParse(json
+                .decode(utf8.decode(bookingsResponse.bodyBytes))[
+                    'number_of_lessons_booked']
+                .toString()) ??
             0
         : 0;
     numberOfStudents = studentsResponse.statusCode == 200
-        ? int.tryParse(
-                json.decode(utf8.decode(studentsResponse.bodyBytes))['total_students']
-                    .toString()) ??
+        ? int.tryParse(json
+                .decode(
+                    utf8.decode(studentsResponse.bodyBytes))['total_students']
+                .toString()) ??
             0
         : 0;
     numberOfInstructors = instructorsResponse.statusCode == 200
-        ? int.tryParse(
-                json.decode(utf8.decode(instructorsResponse.bodyBytes))['total_instructors']
-                    .toString()) ??
+        ? int.tryParse(json
+                .decode(utf8.decode(instructorsResponse.bodyBytes))[
+                    'total_instructors']
+                .toString()) ??
             0
         : 0;
     totalRevenue = revenueResponse.statusCode == 200
-        ? double.tryParse(
-                json.decode(utf8.decode(revenueResponse.bodyBytes))['total_revenue']
-                    .toString()) ??
+        ? double.tryParse(json
+                .decode(utf8.decode(revenueResponse.bodyBytes))['total_revenue']
+                .toString()) ??
             0.0
         : 0.0;
     notifyListeners();

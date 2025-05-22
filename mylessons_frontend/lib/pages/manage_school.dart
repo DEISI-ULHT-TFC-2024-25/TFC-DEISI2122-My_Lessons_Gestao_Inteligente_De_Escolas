@@ -1,6 +1,9 @@
 // lib/pages/manage_school.dart
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -35,6 +38,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   late TabController _tabController;
   final TextEditingController _schoolNameController = TextEditingController();
   bool _isCreated = false;
+  File? _schoolImage; // optional image file
+  final ImagePicker _picker = ImagePicker();
 
   final List<String> _tabLabels = [
     'Service',
@@ -64,6 +69,15 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _schoolImage = File(picked.path);
+      });
+    }
+  }
+
   Future<void> _onCreateSchool() async {
     final name = _schoolNameController.text.trim();
     if (name.isEmpty) {
@@ -73,7 +87,11 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return;
     }
     try {
-      await context.read<SchoolDataProvider>().createSchool(name);
+      // Pass optional image to provider (you may need to update createSchool signature)
+      await context.read<SchoolDataProvider>().createSchool(
+        name,
+        imageFile: _schoolImage,
+      );
       _isCreated = true;
       await widget.fetchProfileData();
       await context.read<SchoolDataProvider>().loadSchoolDetails();
@@ -147,7 +165,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         // We now know `details` is non-null and `isLoading` is false
         final String? critical = details['critical_message'] as String?;
 
-        // If still in creation mode, show the create form
         if (widget.isCreatingSchool && !_isCreated) {
           return Scaffold(
             appBar: AppBar(title: const Text('School Setup')),
@@ -170,6 +187,21 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                       labelText: 'School Name',
                       border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Optional Image Input
+                  if (_schoolImage != null)
+                    Center(
+                      child: Image.file(
+                        _schoolImage!,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ElevatedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.image),
+                    label: const Text('Upload Image (optional)'),
                   ),
                   const SizedBox(height: 24),
                   Center(
