@@ -66,6 +66,7 @@ def profile_view(request):
             'phone': user.phone,
             'birthday': user.birthday.isoformat() if user.birthday else None,
             'photo': user.photo.url if user.photo else None,
+            'has_calendar_token': True if user.calendar_token else False
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -101,6 +102,7 @@ def profile_view(request):
             'phone': user.phone,
             'birthday': user.birthday.isoformat() if user.birthday else None,
             'photo': user.photo.url if user.photo else None,
+            'has_calendar_token': True if user.calendar_token else False
         }
         return Response({'message': 'Profile updated successfully', 'profile': updated_data}, status=status.HTTP_200_OK)
 

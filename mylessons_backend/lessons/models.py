@@ -286,6 +286,11 @@ class Lesson(models.Model):
     packs = models.ManyToManyField(Pack, related_name='lessons_many', blank=True)
     type = models.CharField(max_length=50, default='private')
     sport = models.ForeignKey('sports.Sport', related_name='lessons', on_delete=models.SET_NULL, blank=True, null=True)
+    # Map of user‐PKs to Google Calendar event IDs:
+    # e.g. { "23": "evt_abcdef123", "42": "evt_987xyz" }
+    calendar_event_ids = models.JSONField(default=dict, blank=True)
+    needs_calendar_sync = models.BooleanField(default=True)
+    last_calendar_sync = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         if self.date and self.start_time:
@@ -299,6 +304,13 @@ class Lesson(models.Model):
             else: 
                 return f"{self.get_students_name()} {self.type} lesson"
     
+    def get_event_id(self, user: UserAccount) -> str | None:
+        return self.calendar_event_ids.get(str(user.pk))
+
+    def set_event_id(self, user: UserAccount, event_id: str) -> None:
+        d = self.calendar_event_ids
+        d[str(user.pk)] = event_id
+        self.calendar_event_ids = d
 
     def list_available_lesson_times(self, date, increment):
         """
@@ -719,8 +731,8 @@ class Lesson(models.Model):
             self.date = date
             self.start_time = time
             self.end_time = (datetime.combine(self.date, time) + timedelta(minutes=self.duration_in_minutes)).time()
+            self.needs_calendar_sync = True
             self.save()
-            
             return True
         return False
     
@@ -730,6 +742,7 @@ class Lesson(models.Model):
         self.date = None
         self.start_time = None
         self.end_time = None
+        self.needs_calendar_sync = True
         self.save()
         return True
 

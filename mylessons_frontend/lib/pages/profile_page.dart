@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
@@ -28,6 +30,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   late TextEditingController _birthdayController;
   String _phoneCountryCode = 'PT';
   late TextEditingController _phoneController;
+  
+  late bool hasCalendarToken = false;
 
   // Roles & Schools
   List<String> availableRoles = [];
@@ -92,6 +96,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         currentSchoolId = profileData.currentSchoolId;
         currentSchoolName = profileData.currentSchoolName;
         associatedStudents = profileData.associatedStudents ?? [];
+        hasCalendarToken = profileData.hasCalendarToken ?? false;
       });
     } catch (e) {
       print('Error fetching profile: $e');
@@ -214,7 +219,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SizedBox(height: 16),
-                        ConnectCalendarButton(),
+                        hasCalendarToken == false ? 
+                        ConnectCalendarButton() : SizedBox(height: 0,),
                         SizedBox(height: 16),
                         _buildInput('First Name', _firstNameController,
                             readOnly: !isEditingProfile),

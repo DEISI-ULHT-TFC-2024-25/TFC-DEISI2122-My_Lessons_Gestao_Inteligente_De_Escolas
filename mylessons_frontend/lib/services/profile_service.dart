@@ -18,6 +18,7 @@ class ProfileData {
   final List<Map<String, dynamic>>? associatedStudents;
   final String? currentSchoolId;
   final String? currentSchoolName;
+  final bool? hasCalendarToken;
 
   ProfileData(
       {required this.firstName,
@@ -32,7 +33,8 @@ class ProfileData {
       required this.availableSchools,
       this.currentSchoolId,
       this.currentSchoolName,
-      this.associatedStudents});
+      this.associatedStudents,
+      this.hasCalendarToken});
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
     return ProfileData(
@@ -58,6 +60,7 @@ class ProfileData {
           [],
       currentSchoolId: json['current_school_id']?.toString(),
       currentSchoolName: json['current_school_name']?.toString() ?? '',
+      hasCalendarToken: json['has_calendar_token'] ?? false,
     );
   }
 }
