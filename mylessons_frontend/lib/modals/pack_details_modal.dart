@@ -520,10 +520,18 @@ class PackDetailsContent extends StatelessWidget {
                                                     );
                                                   },
                                                 );
-                                                
                                               } else if (label == "Debt" &&
                                                   currentRole == "Parent") {
                                                 Navigator.pop(context);
+
+                                                Navigator.of(context)
+                                                    .pushNamedAndRemoveUntil(
+                                                  '/main',
+                                                  (route) => false,
+                                                  arguments: {
+                                                    'initialIndex': 2
+                                                  },
+                                                );
                                                 return;
                                               } else if (label == "Subject" &&
                                                   currentRole != "Parent") {

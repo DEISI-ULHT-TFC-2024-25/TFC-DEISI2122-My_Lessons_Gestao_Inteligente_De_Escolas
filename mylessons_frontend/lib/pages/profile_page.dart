@@ -30,7 +30,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   late TextEditingController _birthdayController;
   String _phoneCountryCode = 'PT';
   late TextEditingController _phoneController;
-  
+
   late bool hasCalendarToken = false;
 
   // Roles & Schools
@@ -219,8 +219,11 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SizedBox(height: 16),
-                        hasCalendarToken == false ? 
-                        ConnectCalendarButton() : SizedBox(height: 0,),
+                        hasCalendarToken == false
+                            ? ConnectCalendarButton()
+                            : SizedBox(
+                                height: 0,
+                              ),
                         SizedBox(height: 16),
                         _buildInput('First Name', _firstNameController,
                             readOnly: !isEditingProfile),
@@ -244,6 +247,30 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                                   () => isEditingProfile = !isEditingProfile),
                               child: Text('Edit Profile')),
                         },
+                        SizedBox(
+                          height: 80, // adjust as needed
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: ToggleButtons(
+                              isSelected: availableRoles
+                                  .map((r) => r == currentRole)
+                                  .toList(),
+                              onPressed: (index) =>
+                                  changeRole(availableRoles[index]),
+                              borderRadius: BorderRadius.circular(8),
+                              fillColor: Colors.transparent,
+                              selectedBorderColor:
+                                  Theme.of(context).primaryColor,
+                              children: availableRoles
+                                  .map((r) => Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        child: Text(r),
+                                      ))
+                                  .toList(),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -304,28 +331,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                     ),
                 ],
               ),
-        bottomNavigationBar: SafeArea(
-          child: SizedBox(
-            height: 80, // adjust as needed
-            child: Align(
-              alignment: Alignment.center,
-              child: ToggleButtons(
-                isSelected:
-                    availableRoles.map((r) => r == currentRole).toList(),
-                onPressed: (index) => changeRole(availableRoles[index]),
-                borderRadius: BorderRadius.circular(8),
-                fillColor: Colors.transparent,
-                selectedBorderColor: Theme.of(context).primaryColor,
-                children: availableRoles
-                    .map((r) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(r),
-                        ))
-                    .toList(),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
