@@ -13,6 +13,61 @@ from datetime import timedelta, datetime
 import pytz
 import re
 
+# lib/utils.py
+from django.conf import settings
+from cryptography.fernet import Fernet, InvalidToken
+
+# Ensure you have set FERNET_KEY in your Django settings:
+# FERNET_KEY = os.environ.get('MY_APP_FERNET_KEY')
+# You can generate one with: Fernet.generate_key().decode()
+
+
+def _get_fernet() -> Fernet:
+    """
+    Internal helper to get a Fernet instance using the FERNET_KEY from settings.
+    """
+    key = getattr(settings, 'FERNET_KEY', None)
+    if not key:
+        raise RuntimeError('FERNET_KEY is not set in Django settings.')
+    return Fernet(key.encode() if isinstance(key, str) else key)
+
+
+def encrypt(plaintext: str) -> str:
+    """
+    Encrypts a plaintext string and returns the ciphertext as a URL-safe base64-encoded string.
+
+    Args:
+        plaintext: The string to encrypt.
+
+    Returns:
+        A string containing the encrypted data.
+    """
+    f = _get_fernet()
+    token = f.encrypt(plaintext.encode('utf-8'))
+    return token.decode('utf-8')
+
+
+def decrypt(token: str) -> str:
+    """
+    Decrypts a Fernet token (URL-safe base64-encoded string) back to plaintext.
+
+    Args:
+        token: The encrypted string to decrypt.
+
+    Returns:
+        The original plaintext string.
+
+    Raises:
+        cryptography.fernet.InvalidToken: If the token is invalid or expired.
+    """
+    f = _get_fernet()
+    try:
+        plaintext = f.decrypt(token.encode('utf-8'))
+    except InvalidToken as e:
+        raise InvalidToken('Invalid or corrupted token') from e
+    return plaintext.decode('utf-8')
+
+
 """
 def update_calendar(user, classes, group_class):
 
@@ -237,25 +292,29 @@ def create_google_event(service, class_instance, start_datetime, end_datetime, l
 """
 
 def get_calendar_service(user):
-    """
-    Retrieves the Google Calendar service for a given user.
-    Refreshes the credentials if they are expired.
-    """
-    try:
-        user_credentials = UserCredentials.objects.get(user=user)
-        creds = user_credentials.get_credentials()
+    # 1) Decrypt the blob
+    blob = json.loads(decrypt(user.calendar_token))
 
-        if creds:
-            # Build and return the Google Calendar service object
-            service = build('calendar', 'v3', credentials=creds)
-            return service
+    # 2) Rebuild Credentials
+    creds = Credentials(
+        token=blob['token'],
+        refresh_token=blob['refresh_token'],
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=settings.GOOGLE_OAUTH_WEB_CLIENT_ID,
+        client_secret=settings.GOOGLE_OAUTH_WEB_CLIENT_SECRET,
+        scopes=['https://www.googleapis.com/auth/calendar'],
+    )
 
-        return None
+    # 3) Refresh if needed
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        # persist updated token
+        blob['token'] = creds.token
+        user.calendar_token = encrypt(json.dumps(blob))
+        user.save()
 
-    except UserCredentials.DoesNotExist:
-        # Handle the case where no credentials are stored for the user
-        return None
-
+    # 4) Build & return the service
+    return build('calendar', 'v3', credentials=creds)
 
 def get_users_name(users_list):
     

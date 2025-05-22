@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, time
 import json
+import requests
 from django.contrib.auth import authenticate, get_user_model
 from events.models import Activity
 from locations.models import Location
 from mylessons import settings
+from users.utils import encrypt
 from sports.models import Sport
 from payments.models import Payment
 from rest_framework.decorators import api_view, permission_classes
@@ -40,6 +42,7 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from django.http import JsonResponse
 from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
 
 logger = logging.getLogger(__name__)
 
@@ -1323,51 +1326,54 @@ def student_parents(request, id: int):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def connect_calendar(request):
+def exchange_code(request):
+    # 1) Grab the one-time code
+    code = request.data.get('code')
+    if not code:
+        return Response({'error': 'Missing code'}, status=400)
 
-    credentials_path = os.path.join(settings.BASE_DIR, 'google_client_secret.json')
-
-    flow = Flow.from_client_secrets_file(
-        credentials_path,
-        scopes=['https://www.googleapis.com/auth/calendar.events'],
-        redirect_uri='https://mylessons.pythonanywhere.com/oauth2callback/'
+    # 2) Exchange it at Google’s token endpoint
+    token_resp = requests.post(
+        'https://oauth2.googleapis.com/token',
+        data={
+          'code': code,
+          'client_id': settings.GOOGLE_OAUTH_WEB_CLIENT_ID,
+          'client_secret': settings.GOOGLE_OAUTH_WEB_CLIENT_SECRET,
+          'grant_type': 'authorization_code',
+        }
     )
+    token_resp.raise_for_status()
+    data = token_resp.json()
 
-    auth_url, _ = flow.authorization_url(prompt='consent')
+    # 1) turn expires_in into a real datetime
+    expires_in = data.get('expires_in')            # e.g. 3599
+    if expires_in is not None:
+        expiry_dt = now() + timedelta(seconds=expires_in)
+    else:
+        expiry_dt = None
 
-
-    # Redirect the user to the Google OAuth page
-    return redirect(auth_url)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def oauth2callback(request):
-
-    credentials_path = os.path.join(settings.BASE_DIR, 'google_client_secret.json')
-
-    flow = Flow.from_client_secrets_file(
-        credentials_path,
+    creds = Credentials(
+        token=data['access_token'],
+        refresh_token=data.get('refresh_token'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=settings.GOOGLE_OAUTH_WEB_CLIENT_ID,
+        client_secret=settings.GOOGLE_OAUTH_WEB_CLIENT_SECRET,
         scopes=['https://www.googleapis.com/auth/calendar'],
-        redirect_uri='https://mylessons.pythonanywhere.com/oauth2callback/'
     )
+    # inject the expiry
+    creds.expiry = expiry_dt
 
-    try:
-        flow.fetch_token(authorization_response=request.build_absolute_uri())
-        creds = flow.credentials
+    # 3) serialize your blob using expiry_dt.isoformat()
+    blob = {
+        'token': creds.token,
+        'refresh_token': creds.refresh_token,
+        'expiry': expiry_dt.isoformat() if expiry_dt else None,
+    }
 
-        # Check if we already have credentials for this user
-        user_credentials, created = UserCredentials.objects.get_or_create(user=request.user)
+    user = request.user
+    user.calendar_token = encrypt(json.dumps(blob))
+    user.save()
 
-        # Save credentials to the database (including refresh token)
-        user_credentials.credentials = creds.to_json()
-        user_credentials.save()
-
-        return Response({'success': True})
-    
-    except Exception as e:
-        # Handle any errors, log them, and return a failure message
-        print(f"Error fetching token: {e}")
-
-        return Response({'success': False})
+    return Response({'status': 'ok'})
         
         

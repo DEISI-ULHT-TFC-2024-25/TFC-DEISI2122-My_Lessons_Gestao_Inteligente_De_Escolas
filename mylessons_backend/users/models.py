@@ -39,6 +39,7 @@ class UserAccount(AbstractUser):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     balance_history = models.JSONField(null=True, blank=True, default=list)
     payment_types = models.JSONField(blank=True, null=True, default=dict) 
+    calendar_token = models.TextField(blank=True, null=True)
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

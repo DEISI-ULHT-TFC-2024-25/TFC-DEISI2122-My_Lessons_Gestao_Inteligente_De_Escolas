@@ -5,9 +5,22 @@ Django settings for MyLessons project.
 from pathlib import Path
 
 import os
-
+import environ
 # Base Directory
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Initialize django-environ
+env = environ.Env(
+    # you can set defaults/casting here
+    DEBUG=(bool, False),
+)
+# tell it where to find .env
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+# Now load your Fernet key
+FERNET_KEY = env('MY_APP_FERNET_KEY')
+if not FERNET_KEY:
+    raise RuntimeError('Missing MY_APP_FERNET_KEY in .env')
 
 # Security Settings
 SECRET_KEY = 'your-secret-key'
@@ -159,8 +172,10 @@ GOOGLE_OAUTH2_CLIENT_SECRETS = BASE_DIR / "google_client_secret.json"
 
 # calendar.events is enough to create/update events
 GOOGLE_OAUTH2_SCOPES = [
-    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar",
 ]
+GOOGLE_OAUTH_WEB_CLIENT_ID = '768650226651-hn51uf6gvp12tn96b683me6epae9abju.apps.googleusercontent.com'
+GOOGLE_OAUTH_WEB_CLIENT_SECRET = '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'
 
 # If you like, you can set your postmessage redirect here,
 # but 'postmessage' is a magic value for mobile flows:
@@ -171,7 +186,7 @@ SOCIALACCOUNT_PROVIDERS = {
         'SCOPE': [
             'profile',
             'email',
-            'https://www.googleapis.com/auth/calendar.events',
+            'https://www.googleapis.com/auth/calendar',
         ],
         'AUTH_PARAMS': {
             'access_type': 'offline',   # request a refresh token

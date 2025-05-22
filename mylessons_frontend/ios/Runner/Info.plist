@@ -31,8 +31,8 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>com.googleusercontent.apps.768650226651-hn51uf6gvp12tn96b683me6epae9abju</string>
 				<string>com.googleusercontent.apps.768650226651-17hrhqb3cs9cmk5q2c3ao2k41aiqnqrg</string>
-				<string>mylessons</string>
 			</array>
 		</dict>
 	</array>

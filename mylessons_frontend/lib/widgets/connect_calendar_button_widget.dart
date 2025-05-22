@@ -1,16 +1,12 @@
 // lib/widgets/connect_calendar_button.dart
 
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'package:mylessons_frontend/services/api_service.dart';
-
-// Replace with your actual OAuth client ID
-const String _googleClientId = '768650226651-hn51uf6gvp12tn96b683me6epae9abju.apps.googleusercontent.com';
+import 'package:http/http.dart' as http;
+import 'package:mylessons_frontend/services/google_calendar_service.dart';
 
 class ConnectCalendarButton extends StatefulWidget {
   const ConnectCalendarButton({Key? key}) : super(key: key);
@@ -21,59 +17,24 @@ class ConnectCalendarButton extends StatefulWidget {
 
 class _ConnectCalendarButtonState extends State<ConnectCalendarButton> {
   bool _isConnecting = false;
-  late final GoogleSignIn _googleSignIn;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // On Web: use clientId
-    // On Android/iOS: use serverClientId so we get a serverAuthCode
-    if (kIsWeb) {
-      _googleSignIn = GoogleSignIn(
-        clientId: _googleClientId,
-        scopes: <String>[
-          'email',
-          'https://www.googleapis.com/auth/calendar.events',
-        ],
-      );
-    } else {
-      _googleSignIn = GoogleSignIn(
-        scopes: <String>[
-          'email',
-          'https://www.googleapis.com/auth/calendar.events',
-        ],
-        serverClientId: _googleClientId,
-      );
-    }
-  }
+  final _calendarService = GoogleCalendarService();
 
   Future<void> _connectCalendar() async {
     setState(() => _isConnecting = true);
 
     try {
-      // 1️⃣ Kick off the Google sign-in / consent flow
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        // user cancelled
+      // 1️⃣ Trigger the sign-in flow and get the one-time code
+      final code = await _calendarService.getServerAuthCode();
+      if (code == null) {
+        // user cancelled or no code
         return;
       }
 
-      // 2️⃣ Grab the serverAuthCode directly from the account
-      final serverAuthCode = googleUser.serverAuthCode;
-      if (serverAuthCode == null) {
-        throw Exception(
-          'Missing serverAuthCode; check that your client ID is correct and authorized for this origin',
-        );
-      }
-
-      // 4️⃣ POST to your Django endpoint
+      // 3️⃣ Exchange the code on your Django backend
       final resp = await http.post(
-        Uri.parse('$baseUrl/api/users/connect_calendar/'),
+        Uri.parse('$baseUrl/calendar/oauth2/exchange/'),
         headers: await getAuthHeaders(),
-        body: jsonEncode({
-          'google_auth_code': serverAuthCode,
-        }),
+        body: jsonEncode({'code': code}),
       );
 
       if (resp.statusCode == 200) {

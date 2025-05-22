@@ -17,11 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
-from users.views import oauth2callback
+from users.views import exchange_code
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('oauth2callback/', oauth2callback, name="oauth2callback"),
+    path('calendar/oauth2/exchange/', exchange_code),
     path('accounts/', include('allauth.urls')),
     path('api/payments/', include('payments.urls')), 
     path('api/users/', include('users.urls')), 
