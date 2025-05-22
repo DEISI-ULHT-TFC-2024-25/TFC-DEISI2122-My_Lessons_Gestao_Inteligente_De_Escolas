@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  PasswordResetConfirmView, PasswordResetRequestView, check_username_availability, connect_calendar, daily_timeline, firebase_login, get_selected_instructors, get_selected_students, login_view, oauth2callback, profile_view, register_user, student, student_debt, student_lessons, student_packs, student_parents, student_progress_records, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
+from .views import  PasswordResetConfirmView, PasswordResetRequestView, check_username_availability, connect_calendar, daily_timeline, firebase_login, get_selected_instructors, get_selected_students, login_view, profile_view, register_user, student, student_debt, student_lessons, student_packs, student_parents, student_progress_records, update_availability, user_profile, current_role, number_of_active_students, current_balance, change_role, available_roles, change_school_id, current_school_id, available_schools, students, create_student, book_pack_view
 
 urlpatterns = [
     path('student/<int:id>/', student, name='student'),
@@ -33,7 +33,6 @@ urlpatterns = [
     path('profile_data/', profile_view, name='profile_data'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
-    path('oauth2callback/', oauth2callback, name='oauth2callback'),
     
 
     # Add more paths (e.g., /google/callback) as needed

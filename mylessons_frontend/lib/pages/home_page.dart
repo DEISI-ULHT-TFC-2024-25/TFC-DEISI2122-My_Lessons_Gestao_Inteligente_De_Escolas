@@ -115,10 +115,8 @@ class _HomePageState extends State<HomePage>
   Future<void> registerFcmTokenIfNeeded() async {
   if (_fcmTokenSent) return; // ensure it's done only once
   final token = await FirebaseMessaging.instance.getToken();
-  final authToken = await getYourSavedAuthToken();
-
-  if (token != null && authToken.isNotEmpty) {
-    await sendTokenToBackend(token, authToken);
+  if (token != null ) {
+    await sendTokenToBackend(token);
     _fcmTokenSent = true;
   } else {
     print('⚠️ Not logged in or no FCM token');

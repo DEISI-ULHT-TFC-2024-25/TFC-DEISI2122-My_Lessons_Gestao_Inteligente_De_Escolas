@@ -39,7 +39,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.urls import reverse
 from django.http import JsonResponse
-from google_auth_oauthlib.flow import Flow
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 logger = logging.getLogger(__name__)
 
@@ -1359,79 +1359,22 @@ def connect_calendar(request):
     return Response({'success': True})
 """
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def connect_calendar(request):
-    flow = Flow.from_client_secrets_file(
-        str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
-        scopes=['https://www.googleapis.com/auth/calendar.events'],
-        redirect_uri='https://mylessons.pythonanywhere.com/api/users/oauth2callback/'
-    )
-
-    # include access_type='offline' if you need a refresh token
-    auth_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        prompt='consent'
-    )
-
-    # DEBUG OUTPUT
-    logger.debug("=== connect_calendar ===")
-    logger.debug("Generated auth_url: %s", auth_url)
-    logger.debug("Generated state:    %s", state)
-    logger.debug("Redirect URI:       %s", flow.redirect_uri)
-
-    # Save state & redirect_uri in session so we can re-use them in the callback
-    request.session['oauth2_state'] = state
-    request.session['oauth2_redirect_uri'] = flow.redirect_uri
-
-    return redirect(auth_url)
-
-
-@csrf_exempt
-def oauth2callback(request):
-    full_url = request.build_absolute_uri()
-    params   = dict(request.GET.items())
-    saved_state = request.session.get('oauth2_state')
-    saved_redirect = request.session.get('oauth2_redirect_uri')
-
-    # DEBUG OUTPUT
-    logger.debug("=== oauth2callback ===")
-    logger.debug("Full callback URL:    %s", full_url)
-    logger.debug("GET params:           %s", params)
-    logger.debug("State in request:     %s", params.get('state'))
-    logger.debug("State in session:     %s", saved_state)
-    logger.debug("Redirect URI in sess: %s", saved_redirect)
-
-    # Check for state mismatch
-    if params.get('state') != saved_state:
-        logger.warning("State mismatch between request and session!")
-
-    # Re-create the Flow with the same redirect_uri + state
-    flow = Flow.from_client_secrets_file(
-        str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
-        scopes=['https://www.googleapis.com/auth/calendar.events'],
-        redirect_uri=saved_redirect,
-        state=saved_state
-    )
-
-    try:
-        # This is where Google will return your code and you exchange it for tokens
-        flow.fetch_token(authorization_response=full_url)
-        creds = flow.credentials
-
-        # DEBUG OUTPUT
-        logger.debug("Fetched credentials: %s", creds.to_json())
-
-        # Persist to your model
-        user_credentials, created = UserCredentials.objects.get_or_create(user=request.user)
-        user_credentials.credentials = creds.to_json()
-        user_credentials.save()
-
-        return Response({'success': True})
-    except Exception as e:
-        # log full stack trace + repr(e)
-        logger.exception("Error fetching token from Google")
-        return Response({
-            'success': False,
-            'error': repr(e),
-        }, status=400)
+    print(f"Conecting to calendar...")
+    SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+    # at this point request.user is guaranteed to be a real User, not AnonymousUser
+    uc, created = UserCredentials.objects.get_or_create(user=request.user)
+    if created or uc.credentials == "":
+        print("Starting flow...")
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
+            SCOPES,
+        )
+        creds = flow.run_local_server(port=0)
+        print(f"CREDENTIALS --- {creds}")
+        uc.credentials = creds.token
+        uc.save()
+    return Response({'success': True})
+        

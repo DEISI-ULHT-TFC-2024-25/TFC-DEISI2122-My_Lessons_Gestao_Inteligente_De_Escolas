@@ -8,12 +8,13 @@ const String baseUrl = 'https://mylessons.pythonanywhere.com'; // hosting
 //const String baseUrl = 'http://127.0.0.1:8000'; // localhost
 //const String baseUrl = 'http://192.168.1.66:8000'; // net da sala
 //const String baseUrl = 'http://172.19.72.130:8000'; // freeulusofona
-//const String baseUrl = 'http://169.254.207.48:8000'; // hotspot
+//const String baseUrl = 'http://172.20.10.3:8000'; // hotspot
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 
 Future<Map<String, String>> getAuthHeaders() async {
   String? token = await storage.read(key: 'auth_token');
+
   if (token == null) {
     throw Exception("No auth token found");
   }
@@ -23,20 +24,12 @@ Future<Map<String, String>> getAuthHeaders() async {
   };
 }
 
-Future<String> getYourSavedAuthToken() async {
-  // use the same key you wrote it under when you logged in
-  return await storage.read(key: 'auth_token') ?? '';
-}
-
 // --- define the function ---
-Future<void> sendTokenToBackend(String token, String authToken) async {
+Future<void> sendTokenToBackend(String token) async {
   final uri = Uri.parse('$baseUrl/api/notifications/register-token/');
   final resp = await http.post(
     uri,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Token $authToken',
-    },
+    headers: await getAuthHeaders(),
     body: jsonEncode({'token': token}),
   );
   if (resp.statusCode == 200) {

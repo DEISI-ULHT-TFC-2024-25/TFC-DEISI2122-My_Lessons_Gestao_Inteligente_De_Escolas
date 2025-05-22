@@ -68,25 +68,6 @@ Future<void> main() async {
     sound: true,
   );
 
-  try {
-    print('  • before getToken');
-    String? token = await messaging.getToken();
-    print('  • got token: $token');
-
-    if (token != null) {
-      final djangoAuthToken = await getYourSavedAuthToken();
-      if (djangoAuthToken.isNotEmpty) {
-        await sendTokenToBackend(token, djangoAuthToken);
-      } else {
-        print("⚠️ No Django auth token found—user may not be logged in yet.");
-      }
-    }
-  } catch (e, st) {
-    print('❌ getToken failed: $e\n$st');
-  }
-
-  print("code reached after token");
-
   print('✅ reached runApp()');
 
   runApp(

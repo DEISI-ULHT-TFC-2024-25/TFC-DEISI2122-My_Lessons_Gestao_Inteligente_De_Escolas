@@ -14,6 +14,12 @@ SECRET_KEY = 'your-secret-key'
 DEBUG = True  # Change to False in production
 ALLOWED_HOSTS = ['*']  # Adjust for production
 
+CORS_ALLOWED_ORIGINS = [
+  'https://mylessons.pythonanywhere.com',
+  'http://localhost:8000',
+  'http://172.20.10.3:8000',
+]
+
 # Installed Apps
 INSTALLED_APPS = [
     # Django default apps
