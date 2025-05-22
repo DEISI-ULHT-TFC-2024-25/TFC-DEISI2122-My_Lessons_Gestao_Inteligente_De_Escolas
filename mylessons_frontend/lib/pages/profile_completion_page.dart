@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
+
+import '../services/api_service.dart';
 
 class ProfileCompletionPage extends StatefulWidget {
   // Optional initial values (from your backend)
@@ -25,6 +30,8 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
   late final TextEditingController _lastNameController;
   // We'll store the phone number in a separate variable.
   String _phoneNumber = '';
+
+  bool _isSubmitting = false;
 
   // Save the ISO country code (e.g., "PT")
   String _selectedCountryCode = 'PT';
@@ -82,13 +89,56 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
     }
   }
 
-  void _completeProfile() {
-    Navigator.of(context).pop({
+  Future<void> _completeProfile() async {
+    setState(() => _isSubmitting = true);
+
+    final headers = await getAuthHeaders();
+  
+
+    final body = jsonEncode({
+      'first_name':   _firstNameController.text.trim(),
+      'last_name':    _lastNameController.text.trim(),
+      'country_code': _selectedCountryCode,
+      'phone':        _phoneNumber.trim(),
+    });
+
+    final resp = await http.put(
+      Uri.parse('$baseUrl/api/users/profile_data/'),
+      headers: headers,
+      body: body,
+    );
+
+    
+
+    setState(() => _isSubmitting = false);
+
+    if (resp.statusCode == 200) {
+      Navigator.of(context).pop({
       'firstName': _firstNameController.text.trim(),
       'lastName': _lastNameController.text.trim(),
       'id': _selectedCountryCode, // ISO country code
       'phone': _phoneNumber.trim(),
     });
+    } else {
+      String err = 'Failed to update profile. (${resp.statusCode})';
+      try {
+        final json = jsonDecode(resp.body);
+        if (json['error'] != null) err = json['error'];
+      } catch (_) {}
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(err),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildNamePage() {

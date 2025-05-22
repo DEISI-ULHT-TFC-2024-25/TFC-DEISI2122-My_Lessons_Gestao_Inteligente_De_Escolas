@@ -14,7 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../modals/profile_completion_modal.dart';
+import 'profile_completion_page.dart';
 import '../providers/lessons_modal_provider.dart';
 import '../services/api_service.dart';
 import '../services/profile_service.dart';
@@ -44,6 +44,8 @@ class _HomePageState extends State<HomePage>
   List<Map<String, String>> activePacksFilters = [];
   String lastPacksSearchQuery = "";
   List<Map<String, String>> lastPacksFilters = [];
+
+  bool _didNavigateToProfile = false;
 
   int _lessonsActiveTabIndex = 0; // 0: Active lessons, 1: History
   int _packsActiveTabIndex = 0; // 0: Active packs, 1: History
@@ -113,15 +115,15 @@ class _HomePageState extends State<HomePage>
   bool _fcmTokenSent = false;
 
   Future<void> registerFcmTokenIfNeeded() async {
-  if (_fcmTokenSent) return; // ensure it's done only once
-  final token = await FirebaseMessaging.instance.getToken();
-  if (token != null ) {
-    await sendTokenToBackend(token);
-    _fcmTokenSent = true;
-  } else {
-    print('⚠️ Not logged in or no FCM token');
+    if (_fcmTokenSent) return; // ensure it's done only once
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await sendTokenToBackend(token);
+      _fcmTokenSent = true;
+    } else {
+      print('⚠️ Not logged in or no FCM token');
+    }
   }
-}
 
   /// Modal methods (using provider values as needed).
   void showLessonCardOptions(dynamic lesson) {
@@ -1155,6 +1157,31 @@ class _HomePageState extends State<HomePage>
       create: (_) => HomePageProvider(),
       child: Consumer<HomePageProvider>(
         builder: (context, homeProvider, child) {
+          // ——————————————————————————————————————
+          // Once loading is done and we haven’t yet navigated,
+          // if any required field is empty, push the completion flow.
+          if (!homeProvider.isLoading &&
+              !_didNavigateToProfile &&
+              (homeProvider.firstName.isEmpty ||
+                  homeProvider.lastName.isEmpty ||
+                  homeProvider.phone.isEmpty)) {
+            _didNavigateToProfile = true;
+            // Use pushReplacement if you want to replace HomePage
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context)
+                  .push(
+                MaterialPageRoute(
+                  builder: (_) => ProfileCompletionPage(
+                    initialFirstName: homeProvider.firstName,
+                    initialLastName: homeProvider.lastName,
+                    initialPhone: homeProvider.phone,
+                    initialCountryCode: homeProvider.countryCode,
+                  ),
+                ),
+              );         
+            });
+          }
+          // ——————————————————————————————————————
           // Build Lessons Tab.
           Widget lessonsTab = _lessonsActiveTabIndex == 0
               ? RefreshIndicator(
