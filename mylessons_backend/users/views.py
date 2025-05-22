@@ -39,7 +39,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.urls import reverse
 from django.http import JsonResponse
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 
 logger = logging.getLogger(__name__)
 
@@ -1320,61 +1320,54 @@ def student_parents(request, id: int):
         })
     return JsonResponse(data, safe=False)
 
-"""
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def connect_calendar(request):
-    # at this point, request.user is your Django User
-    google_auth_code = request.data.get('google_auth_code')
-    if not google_auth_code:
-        return Response({'detail': 'google_auth_code required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Exchange the code…
+    credentials_path = os.path.join(settings.BASE_DIR, 'google_client_secret.json')
+
     flow = Flow.from_client_secrets_file(
-        str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
+        credentials_path,
         scopes=['https://www.googleapis.com/auth/calendar.events'],
-        redirect_uri=f'https://mylessons.pythonanywhere.com/oauth2callback/'
-    )
-    try:
-        flow.fetch_token(code=google_auth_code)
-    except Exception as e:
-        return Response({'detail': f'Code exchange failed: {e}'}, status=status.HTTP_400_BAD_REQUEST)
-
-    creds = flow.credentials
-    
-    # Persist
-    GoogleCredentials.objects.update_or_create(
-        user=request.user,
-        defaults={
-            'token':         creds.token,
-            'refresh_token': creds.refresh_token,
-            'token_uri':     creds.token_uri,
-            'client_id':     creds.client_id,
-            'client_secret': creds.client_secret,
-            'scopes':        ','.join(creds.scopes),
-            'expiry':        creds.expiry,
-        }
+        redirect_uri='https://mylessons.pythonanywhere.com/oauth2callback/'
     )
 
-    return Response({'success': True})
-"""
+    auth_url, _ = flow.authorization_url(prompt='consent')
+
+
+    # Redirect the user to the Google OAuth page
+    return redirect(auth_url)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def connect_calendar(request):
-    print(f"Conecting to calendar...")
-    SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
-    # at this point request.user is guaranteed to be a real User, not AnonymousUser
-    uc, created = UserCredentials.objects.get_or_create(user=request.user)
-    if created or uc.credentials == "":
-        print("Starting flow...")
-        flow = InstalledAppFlow.from_client_secrets_file(
-            str(settings.GOOGLE_OAUTH2_CLIENT_SECRETS),
-            SCOPES,
-        )
-        creds = flow.run_local_server(port=0)
-        print(f"CREDENTIALS --- {creds}")
-        uc.credentials = creds.token
-        uc.save()
-    return Response({'success': True})
+def oauth2callback(request):
+
+    credentials_path = os.path.join(settings.BASE_DIR, 'google_client_secret.json')
+
+    flow = Flow.from_client_secrets_file(
+        credentials_path,
+        scopes=['https://www.googleapis.com/auth/calendar'],
+        redirect_uri='https://mylessons.pythonanywhere.com/oauth2callback/'
+    )
+
+    try:
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        creds = flow.credentials
+
+        # Check if we already have credentials for this user
+        user_credentials, created = UserCredentials.objects.get_or_create(user=request.user)
+
+        # Save credentials to the database (including refresh token)
+        user_credentials.credentials = creds.to_json()
+        user_credentials.save()
+
+        return Response({'success': True})
+    
+    except Exception as e:
+        # Handle any errors, log them, and return a failure message
+        print(f"Error fetching token: {e}")
+
+        return Response({'success': False})
+        
         
