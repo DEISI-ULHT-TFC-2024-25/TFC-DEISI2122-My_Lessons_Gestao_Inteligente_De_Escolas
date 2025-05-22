@@ -597,22 +597,7 @@ class _LessonDetailsPageState extends State<LessonDetailsPage> {
                                               } else if (label == "Subject" &&
                                                   currentRole != "Parent") {
                                                 bool? updated =
-                                                    await showModalBottomSheet<
-                                                        bool>(
-                                                  context: context,
-                                                  isScrollControlled: true,
-                                                  shape:
-                                                      const RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.vertical(
-                                                            top:
-                                                                Radius.circular(
-                                                                    16)),
-                                                  ),
-                                                  builder: (context) =>
-                                                      SubjectModal(
-                                                          lessonId: lessonId),
-                                                );
+                                                    await showSubjectModal(context, lessonId: lessonId);
                                                 if (updated == true) {
                                                   await homeProvider
                                                       .fetchData();

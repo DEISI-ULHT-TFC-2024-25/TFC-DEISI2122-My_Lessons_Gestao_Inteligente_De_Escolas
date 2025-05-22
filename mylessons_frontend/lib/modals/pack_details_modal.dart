@@ -536,25 +536,12 @@ class PackDetailsContent extends StatelessWidget {
                                               } else if (label == "Subject" &&
                                                   currentRole != "Parent") {
                                                 updated =
-                                                    await showModalBottomSheet<
-                                                        bool>(
-                                                  context: context,
-                                                  isScrollControlled: true,
-                                                  shape:
-                                                      const RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.vertical(
-                                                            top:
-                                                                Radius.circular(
-                                                                    16)),
-                                                  ),
-                                                  builder: (context) =>
-                                                      SubjectModal(
-                                                    packId: provider
-                                                            .pack['pack_id'] ??
-                                                        provider.pack['id'],
-                                                  ),
-                                                );
+                                                    await showSubjectModal(
+                                                        context,
+                                                        packId: provider.pack[
+                                                                'pack_id'] ??
+                                                            provider
+                                                                .pack['id']);
                                               }
                                               if (updated == true &&
                                                   fetchData != null) {

@@ -105,11 +105,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         );
         break;
       case 3:
-        await showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => SubjectModal(schoolId: schoolId),
-        );
+        await showSubjectModal(context, schoolId: schoolId);
         break;
       case 4:
         await showModalBottomSheet<bool>(
@@ -130,8 +126,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     await provider.loadSchoolDetails();
   }
 
-  String _getBottomButtonLabel() =>
-      'Add ${_tabLabels[_tabController.index]}';
+  String _getBottomButtonLabel() => 'Add ${_tabLabels[_tabController.index]}';
 
   @override
   Widget build(BuildContext context) {
@@ -142,9 +137,8 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         if (provider.isLoading || details == null) {
           return Scaffold(
             appBar: AppBar(
-              title: Text(widget.isCreatingSchool
-                  ? 'School Setup'
-                  : 'School Settings'),
+              title: Text(
+                  widget.isCreatingSchool ? 'School Setup' : 'School Settings'),
             ),
             body: const Center(child: CircularProgressIndicator()),
           );
@@ -256,8 +250,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                           style: ElevatedButton.styleFrom(
                             shape: const StadiumBorder(),
                             backgroundColor: Colors.orange,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           child: Text(
                             _getBottomButtonLabel(),
@@ -269,7 +262,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                     ],
                   ),
                 ),
-              ],  
+              ],
             ),
           ),
         );
@@ -295,15 +288,12 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                   child: ListTile(
                     title: Text(
                       s['name'] ?? 'No Name',
-                      style:
-                          const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.edit,
-                          color: Colors.orange),
+                      icon: const Icon(Icons.edit, color: Colors.orange),
                       onPressed: () =>
-                          showAddEditServiceModal(context, details,
-                              service: s),
+                          showAddEditServiceModal(context, details, service: s),
                     ),
                   ),
                 );
@@ -366,8 +356,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                 return Card(
                   margin: const EdgeInsets.only(bottom: 24),
                   child: ListTile(
-                    title:
-                        Text(sub['subject_name'] ?? 'No Name'),
+                    title: Text(sub['subject_name'] ?? 'No Name'),
                   ),
                 );
               }).toList(),
@@ -376,38 +365,38 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   }
 
   Widget _buildEquipmentsTab(Map<String, dynamic> details) {
-  final List eqs = details['equipment'] as List? ?? [];
-  return SingleChildScrollView(
-    padding: const EdgeInsets.all(24),
-    child: eqs.isEmpty
-        ? const Text('No equipments available.')
-        : Column(
-            children: eqs.map((e) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: ListTile(
-                  title: Text(e['equipment_name'] ?? 'No Name'),
-                  subtitle: Text(
-                    '${e['location_name'] ?? ''} • ${e['size'] ?? ''}',
+    final List eqs = details['equipment'] as List? ?? [];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: eqs.isEmpty
+          ? const Text('No equipments available.')
+          : Column(
+              children: eqs.map((e) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: ListTile(
+                    title: Text(e['equipment_name'] ?? 'No Name'),
+                    subtitle: Text(
+                      '${e['location_name'] ?? ''} • ${e['size'] ?? ''}',
+                    ),
+                    trailing: TextButton(
+                      child: const Text('Details'),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) => EquipmentDetailsModal(
+                            equipment: e,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  trailing: TextButton(
-                    child: const Text('Details'),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => EquipmentDetailsModal(
-                          equipment: e,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-  );
-}
+                );
+              }).toList(),
+            ),
+    );
+  }
 
   Widget _buildLocationsTab(Map<String, dynamic> details) {
     final List locs = details['locations'] as List? ?? [];
@@ -420,8 +409,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                 return Card(
                   margin: const EdgeInsets.only(bottom: 24),
                   child: ListTile(
-                    title:
-                        Text(l['location_name'] ?? 'No Name'),
+                    title: Text(l['location_name'] ?? 'No Name'),
                     subtitle: Text(l['address'] ?? ''),
                   ),
                 );

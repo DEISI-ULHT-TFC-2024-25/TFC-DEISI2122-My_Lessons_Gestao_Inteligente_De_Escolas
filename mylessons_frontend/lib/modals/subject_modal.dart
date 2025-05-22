@@ -3,6 +3,41 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart'; // Exports getAuthHeaders() and baseUrl
 
+
+Future<T?> showSubjectModal<T>(
+  BuildContext context, {
+  int? lessonId,
+  int? packId,
+  int? schoolId,
+}) {
+  // sanity-check: exactly one non-null
+  final provided = [lessonId, packId, schoolId].where((x) => x != null);
+  assert(
+    provided.length == 1,
+    'You must provide exactly one of lessonId, packId or schoolId',
+  );
+
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (context) {
+      final maxHeight = MediaQuery.of(context).size.height * 0.9;
+      return SizedBox(
+        height: maxHeight,
+        child: SubjectModal(
+          // only one of these will be non-null
+          lessonId: lessonId,
+          packId: packId,
+          schoolId: schoolId,
+        ),
+      );
+    },
+  );
+}
+
 class SubjectModal extends StatefulWidget {
   final int? lessonId;
   final int? packId;
