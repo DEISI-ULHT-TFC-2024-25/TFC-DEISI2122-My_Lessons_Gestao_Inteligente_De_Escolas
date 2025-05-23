@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
   final bool? cameFromPaymentsPage;
+
   /// Instead of a list of pack IDs, we now accept a map of
   /// each pack's ID to the amount paid.
   final Map<dynamic, double>? packAmounts;
@@ -58,7 +59,8 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
     };
 
     try {
-      final url = Uri.parse("$baseUrl/api/payments/create_debt_payment_record/");
+      final url =
+          Uri.parse("$baseUrl/api/payments/create_debt_payment_record/");
       final headers = await getAuthHeaders();
 
       final response = await http.post(
@@ -68,7 +70,8 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint("Debt Payment record created successfully: ${response.body}");
+        debugPrint(
+            "Debt Payment record created successfully: ${response.body}");
       } else {
         debugPrint(
           "Failed to create debt payment record: ${response.statusCode}, ${response.body}",
@@ -115,6 +118,14 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         "price": item['price'],
         "payment": item['price'],
         "discount_id": null,
+        "subject": {
+          "id": checkoutDetails['subject']['id'] ?? "",
+          "name": checkoutDetails['subject']['name'] ?? ""
+        },
+        "location": {
+          "id": checkoutDetails['location']['id'] ?? "",
+          "name": checkoutDetails['location']['name'] ?? ""
+        },
         "type": service['type'],
         // Flag to indicate that this booking comes from the success page.
         "user_paid": true,
@@ -140,6 +151,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         setState(() {
           bookedPacks = decodedResponse["booked_packs"];
         });
+        
       } else {
         debugPrint(
             "Failed to book packs. Status: ${response.statusCode}, Body: ${response.body}");

@@ -45,41 +45,70 @@ class _ScheduleLessonModalState extends State<ScheduleLessonModal> {
   }
 
   Future<void> _openDatePicker() async {
-    DateTime now = DateTime.now();
-    DateTime initialDate = widget.currentRole == "Parent"
-        ? now.add(Duration(hours: widget.schoolScheduleTimeLimit))
-        : now;
-    DateTime firstDate = initialDate;
-    DateTime lastDate = widget.expirationDate != "None"
-        ? DateTime.parse(widget.expirationDate)
-        : now.add(const Duration(days: 365));
+  final now = DateTime.now();
+  final initialDate = widget.currentRole == "Parent"
+      ? now.add(Duration(hours: widget.schoolScheduleTimeLimit))
+      : now;
+  final firstDate = initialDate;
 
-    DateTime? pickedDate = await showDatePicker(
+  // Parse expiration (or 1 year out if “None”)
+  final parsedExp = widget.expirationDate != "None"
+      ? DateTime.parse(widget.expirationDate)
+      : now.add(const Duration(days: 365));
+
+  // If the pack has already expired before firstDate, show popup and close.
+  if (parsedExp.isBefore(firstDate)) {
+    await showDialog(
       context: context,
-      initialDate: initialDate,
-      firstDate: firstDate,
-      lastDate: lastDate,
+      barrierDismissible: false, // force user to tap button
+      builder: (ctx) => AlertDialog(
+        title: const Text("Pack Expired"),
+        content: const Text(
+          "This lesson pack has expired and can no longer be scheduled.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();       // close dialog
+              Navigator.of(context).pop();   // close modal
+            },
+            child: const Text("OK"),
+          ),
+        ],
+      ),
     );
+    return;
+  }
 
-    if (pickedDate != null) {
-      setState(() {
-        selectedDate = pickedDate;
-        isLoading = true;
-        availableTimes = [];
-      });
-      widget
-          .fetchAvailableTimes(widget.lessonId, selectedDate!, increment)
-          .then((times) {
+  // Clamp lastDate to at least firstDate
+  final lastDate = parsedExp.isBefore(firstDate) ? firstDate : parsedExp;
+
+  // …now safe to show the date picker…
+  final pickedDate = await showDatePicker(
+    context: context,
+    initialDate: initialDate,
+    firstDate: firstDate,
+    lastDate: lastDate,
+  );
+
+  if (pickedDate != null) {
+    setState(() {
+      selectedDate = pickedDate;
+      isLoading = true;
+      availableTimes = [];
+    });
+    widget
+      .fetchAvailableTimes(widget.lessonId, selectedDate!, increment)
+      .then((times) {
         setState(() {
           availableTimes = times;
           isLoading = false;
         });
       });
-    } else {
-      // Dismiss the modal if no date is selected.
-      Navigator.of(context).pop();
-    }
+  } else {
+    Navigator.of(context).pop();
   }
+}
 
   Widget buildTimeSelection() {
     return Container(

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../modals/payment_modal.dart';
+import '../modals/payment_type_modal.dart';
 
 Widget buildPaymentDetailsWidget(dynamic details) {
   if (details is Map<String, dynamic>) {

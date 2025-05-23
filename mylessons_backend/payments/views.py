@@ -72,9 +72,7 @@ def new_payment(request):
             for pack_id in packs:
                 pack = Pack.objects.get(id=pack_id)
                 payment.packs.add(pack)
-                for lesson in pack.lessons_many.all():
-                    payment.lessons.add(lesson)
-
+                
             # Process individual activities
             activities = data.get("activities", [])
             for activity_id in activities:
@@ -284,6 +282,11 @@ def create_debt_payment_record_view(request):
     """
     data = request.data
     pack_amounts = data.get("pack_amounts", None)
+    user = data.get("user", None)
+    if user is None:
+        user = request.user
+    else:
+        user = UserAccount.objects.get(pk=user)
 
     if pack_amounts:
         # Expecting pack_amounts to be a mapping (keys as pack IDs, values as amounts).
@@ -311,7 +314,7 @@ def create_debt_payment_record_view(request):
             return Response({"error": "Error processing pack_amounts: " + str(e)}, status=400)
     else:
         # Calculate total value based on the full price of each pack.
-        total_value = sum(pack.price for pack in packs)
+        total_value = sum(pack.debt for pack in packs)
 
     # Retrieve the school from the first pack (assuming all packs are from the same school).
     school = packs.first().school if packs.exists() else None
@@ -319,7 +322,7 @@ def create_debt_payment_record_view(request):
     # Create the Payment record.
     payment = Payment.objects.create(
         value=total_value,
-        user=request.user,
+        user=user,
         school=school,
         description={
             "debt_payment": "Payment record for debt update",

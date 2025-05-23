@@ -10,7 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../modals/add_equipment_modal.dart';
 import '../modals/add_staff_modal.dart';
 import '../modals/equipment_details_modal.dart';
-import '../modals/payment_modal.dart';
+import '../modals/payment_type_modal.dart';
 import '../modals/service_modal.dart';
 import '../modals/subject_modal.dart';
 import '../modals/location_modal.dart';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mylessons_frontend/modals/add_payment_modal.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/home_page_provider.dart';
@@ -157,6 +158,9 @@ class PackDetailsContent extends StatelessWidget {
           if (details.containsKey("date")) {
             details["date"] = provider.formatDate(details["date"].toString());
           }
+          if (details.containsKey("expiration_date")) {
+            details["expiration_date"] = provider.formatDate(details["expiration_date"].toString());
+          }
 
           // Instead of relying solely on provider.currentRole,
           // read currentRole from HomePageProvider (so updates are reflected).
@@ -175,6 +179,7 @@ class PackDetailsContent extends StatelessWidget {
           if (currentRole == "Parent") {
             gridItems.addAll([
               {'label': 'Date', 'value': details['date'] ?? ''},
+              {'label': 'Expiration Date', 'value': details['expiration_date'] ?? ''},
               {
                 'label': 'Lessons Remaining',
                 'value':
@@ -189,10 +194,12 @@ class PackDetailsContent extends StatelessWidget {
                 'value': details['instructors_name'] ?? ''
               },
               {'label': 'Subject', 'value': details['subject'] ?? ''},
+  
             ]);
 
             leftIconMapping.addAll({
               'Date': Icons.calendar_today,
+              'Expiration Date': Icons.calendar_today,
               'Lessons Remaining': Icons.confirmation_number,
               'Debt': Icons.payments_outlined,
               'Students': Icons.person,
@@ -222,6 +229,7 @@ class PackDetailsContent extends StatelessWidget {
           } else if (currentRole == "Instructor" || currentRole == "Admin") {
             gridItems.addAll([
               {'label': 'Date', 'value': details['date'] ?? ''},
+              {'label': 'Expiration Date', 'value': details['expiration_date'] ?? ''},
               {
                 'label': 'Lessons Remaining',
                 'value':
@@ -240,6 +248,7 @@ class PackDetailsContent extends StatelessWidget {
 
             leftIconMapping.addAll({
               'Date': Icons.calendar_today,
+              'Expiration Date': Icons.calendar_today,
               'Lessons Remaining': Icons.confirmation_number,
               'Debt': Icons.payments_outlined,
               'Students': Icons.edit,
@@ -250,9 +259,10 @@ class PackDetailsContent extends StatelessWidget {
             });
 
             labelsWithAction.addAll(
-                ['Debt', 'School', 'Instructors', 'Students', 'Subject']);
+                ['Debt', 'Expiration Date', 'School', 'Instructors', 'Students', 'Subject']);
             actionIconMapping.addAll({
               'Debt': Icons.payment,
+              'Expiration Date': Icons.edit,
               'Students': Icons.edit,
               'School': Icons.phone,
               'Instructors': Icons.edit,
@@ -260,6 +270,7 @@ class PackDetailsContent extends StatelessWidget {
             });
             actionNoteMapping.addAll({
               'Debt': 'Add payment',
+              'Expiration Date': 'Edit expiration date',
               'Students': 'Edit students',
               'School': 'Contact school',
               'Instructors': 'Edit instructors',
@@ -520,8 +531,15 @@ class PackDetailsContent extends StatelessWidget {
                                                     );
                                                   },
                                                 );
-                                              } else if (label == "Debt" &&
-                                                  currentRole == "Parent") {
+                                              } /*else if (label == "Expiration Date" &&
+                                                  currentRole == "Admin") {
+                                                await 
+
+                                                
+                                   
+                                  
+                                              }*/ else if (label == "Debt") {
+                                                if(currentRole == "Parent") {
                                                 Navigator.pop(context);
 
                                                 Navigator.of(context)
@@ -533,6 +551,9 @@ class PackDetailsContent extends StatelessWidget {
                                                   },
                                                 );
                                                 return;
+                                              } else if (currentRole == "Admin" || currentRole == "Instructor") {
+                                                updated = await showAddPaymentModal(context, pack: details);
+                                              }
                                               } else if (label == "Subject" &&
                                                   currentRole != "Parent") {
                                                 updated =
