@@ -142,6 +142,11 @@ def all_schools(request):
     schools = School.objects.all()
     data = []
     for school in schools:
+        if school.logo and hasattr(school.logo, 'url'):
+            logo_url = request.build_absolute_uri(school.logo.url)
+        else:
+            logo_url = ""
+            
         data.append({
             'school_id': school.id,
             'school_name': school.name,
@@ -153,6 +158,7 @@ def all_schools(request):
             'services': school.services,
             'currency': school.currency if school.currency else "EUR",
             'contacts': school.contacts,
+            'image' : logo_url,
             'subjects': [{
                 'id': subject.id,
                 'name': subject.name,

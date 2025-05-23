@@ -148,7 +148,7 @@ Future<List<Map<String, dynamic>>> fetchSchools() async {
     return data.map<Map<String, dynamic>>((jsonSchool) {
       return {
         'name': (jsonSchool['school_name'] ?? '').toString(),
-        'image': 'https://via.placeholder.com/150',
+        'image': jsonSchool['image'],
         'description': '',
         'rating': 0.0,
         'locations': (jsonSchool['list_of_locations'] as List<dynamic>?)

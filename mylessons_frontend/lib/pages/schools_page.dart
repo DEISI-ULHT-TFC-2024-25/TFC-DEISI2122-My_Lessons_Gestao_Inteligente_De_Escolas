@@ -114,9 +114,9 @@ class _SchoolsPageState extends State<SchoolsPage> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
-                        school['image'] ?? "https://www.placeholder.com/150/",
-                        height: 40,
-                        width: 40,
+                        school['image'],
+                        height: 80,
+                        width: 80,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -139,18 +139,20 @@ class _SchoolsPageState extends State<SchoolsPage> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
                               const Icon(Icons.star, size: 16, color: Colors.amber),
                               const SizedBox(width: 4),
                               Text(school['rating'].toString()),
-                              const SizedBox(width: 8),
+                              
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                               Text(
                                 '(${school['reviews'] ?? 0} reviews)',
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                               ),
-                            ],
-                          ),
                         ],
                       ),
                     ),
