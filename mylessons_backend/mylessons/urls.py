@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
+from schools.views import BulkImportView, ExcelTemplateView
 from users.views import exchange_code
 from django.conf import settings
 from django.conf.urls.static import static
@@ -32,6 +33,8 @@ urlpatterns = [
     path('api/schools/', include('schools.urls')),
     path('api/progress/', include('progress.urls')),
     path('api/events/', include('events.urls')),
+    path('api/import-excel/', BulkImportView.as_view(), name='bulk-import'),
+    path('api/import-excel/template/', ExcelTemplateView.as_view(), name='excel-template'),
     path(
         'password-reset-confirm/<uidb64>/<token>/',
         auth_views.PasswordResetConfirmView.as_view(

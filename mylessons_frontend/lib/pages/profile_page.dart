@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../services/profile_service.dart';
 import '../providers/home_page_provider.dart';
 import '../widgets/connect_calendar_button_widget.dart';
+import 'bulk_import_page.dart';
 import 'manage_school.dart';
 import '../../main.dart'; // routeObserver
 
@@ -311,22 +312,39 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
 
                   // School Tab (Admin)
                   if (isAdmin)
-                    Center(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SchoolSetupPage(
-                              isCreatingSchool: availableSchools.isEmpty,
-                              fetchProfileData: fetchProfileData,
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SchoolSetupPage(
+                                  isCreatingSchool: availableSchools.isEmpty,
+                                  fetchProfileData: fetchProfileData,
+                                ),
+                              ),
                             ),
+                            child: Text(availableSchools.isEmpty
+                                ? 'Create School'
+                                : 'Manage School'),
                           ),
                         ),
-                        child: Text(availableSchools.isEmpty
-                            ? 'Create School'
-                            : 'Manage School'),
-                      ),
-                    ),
+                        SizedBox(height: 16,),
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BulkImportPage(),
+                              ),
+                            ),
+                            child: Text('Import Data'),
+                          ),
+                        )
+                      ],
+                    )
                 ],
               ),
       ),

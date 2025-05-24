@@ -2,16 +2,17 @@ import json
 from django.shortcuts import render, get_object_or_404
 from locations.models import Location
 from equipment.serializers import EquipmentSerializer
+from schools.serializers import CSVUploadSerializer
 from sports.models import Sport
 from payments.models import Payment
-from users.models import Instructor, Monitor, UserAccount
+from users.models import Instructor, Monitor, Student, UserAccount
 from .models import Review, School
 from datetime import datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, views, serializers
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from google.oauth2 import id_token
@@ -25,6 +26,13 @@ from schools.models import School
 from django.db.models import Q, Sum
 from django.utils.timezone import now
 from django.http import JsonResponse
+from django.db import transaction
+import pandas as pd
+from django.http import HttpResponse
+import io
+from openpyxl import Workbook
+from openpyxl.comments import Comment
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 logger = logging.getLogger(__name__)
 
@@ -1140,3 +1148,264 @@ def create_review(request):
             status=status.HTTP_201_CREATED
         )
     return JsonResponse({'error': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class BulkImportView(views.APIView):
+    """
+    Endpoint to handle bulk Excel import for Students, Packs, Lessons, and Payments.
+    Only Admin users may import. Imported objects are linked to the user's current school.
+    """
+    serializer_class = CSVUploadSerializer  # or ExcelUploadSerializer
+
+    def post(self, request, *args, **kwargs):
+        # 0) Admin check
+        if getattr(request.user, 'current_role', None) != 'Admin':
+            return Response({'detail': 'Admin privileges required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Determine current school
+        try:
+            school = School.objects.get(pk=request.user.current_school_id)
+        except School.DoesNotExist:
+            return Response({'detail': 'Invalid school.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1) Validate upload
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        excel_file = serializer.validated_data['file']
+
+        # 2) Load all sheets (header on row 2)
+        xl = pd.ExcelFile(excel_file)
+        raw_sheets = {sheet: xl.parse(sheet_name=sheet, header=1) for sheet in xl.sheet_names}
+
+        # 3) Clean NaNs → None
+        cleaned = {}
+        for name, df in raw_sheets.items():
+            obj_df = df.astype(object)
+            obj_df = obj_df.where(pd.notna(df), None)
+            cleaned[name] = obj_df
+
+        # 4) Dispatch importers
+        results = {}
+        for sheet_name, df in cleaned.items():
+            target = sheet_name.rstrip('s').lower()
+            import_func = getattr(self, f'_import_{target}', None)
+            if import_func:
+                results[target] = import_func(df, school)
+            else:
+                results[target] = {'error': 'No importer for this sheet.'}
+
+        return Response(results, status=status.HTTP_200_OK)
+
+    def _import_student(self, df: pd.DataFrame, school: School) -> dict:
+        successes, errors = [], []
+        for idx, row in df.iterrows():
+            try:
+                student, created = Student.objects.update_or_create(
+                    first_name=row['first_name'],
+                    last_name=row['last_name'],
+                    defaults={
+                        'birthday': row['birthday'],
+                        'level': row.get('level', None)
+                    }
+                )
+                school.students.add(student)
+                successes.append({'row': idx + 1, 'id': student.id, 'created': created})
+            except Exception as e:
+                errors.append({'row': idx + 1, 'error': str(e)})
+        return {'imported': len(successes), 'errors': errors}
+
+    def _import_pack(self, df: pd.DataFrame, school: School) -> dict:
+        successes, errors = [], []
+        for idx, row in df.iterrows():
+            try:
+                with transaction.atomic():
+                    pack = Pack.objects.create(
+                        date=row['date'],
+                        type=row.get('type', 'private'),
+                        number_of_classes=row['number_of_classes'],
+                        number_of_classes_left=row['number_of_classes'],
+                        duration_in_minutes=row['duration_in_minutes'],
+                        price=row['price'],
+                        expiration_date=row.get('expiration_date', None)
+                    )
+                    school.packs.add(pack)
+                    if row.get('student_ids'):
+                        ids = [int(i) for i in str(row['student_ids']).split(',')]
+                        pack.students.set(Student.objects.filter(id__in=ids))
+                    successes.append({'row': idx + 1, 'id': pack.id})
+            except Exception as e:
+                errors.append({'row': idx + 1, 'error': str(e)})
+        return {'imported': len(successes), 'errors': errors}
+
+    def _import_lesson(self, df: pd.DataFrame, school: School) -> dict:
+        successes, errors = [], []
+        for idx, row in df.iterrows():
+            try:
+                lesson = Lesson.objects.create(
+                    date=row.get('date', None),
+                    start_time=row.get('start_time', None),
+                    duration_in_minutes=row['duration_in_minutes'],
+                    class_number=row.get('class_number', None),
+                    price=row.get('price', None),
+                    type=row.get('type', 'private'),
+                )
+                school.lessons.add(lesson)
+                if row.get('student_ids'):
+                    ids = [int(i) for i in str(row['student_ids']).split(',')]
+                    lesson.students.set(Student.objects.filter(id__in=ids))
+                successes.append({'row': idx + 1, 'id': lesson.id})
+            except Exception as e:
+                errors.append({'row': idx + 1, 'error': str(e)})
+        return {'imported': len(successes), 'errors': errors}
+
+    def _import_payment(self, df: pd.DataFrame, school: School) -> dict:
+        successes, errors = [], []
+        for idx, row in df.iterrows():
+            try:
+                payment = Payment.objects.create(
+                    value=row['value'],
+                    user=UserAccount.objects.get(id=row['user_id'])
+                )
+                school.payments.add(payment)
+                if row.get('pack_ids'):
+                    pack_ids = [int(i) for i in str(row['pack_ids']).split(',')]
+                    payment.packs.set(Pack.objects.filter(id__in=pack_ids))
+                if row.get('lesson_ids'):
+                    lesson_ids = [int(i) for i in str(row['lesson_ids']).split(',')]
+                    payment.lessons.set(Lesson.objects.filter(id__in=lesson_ids))
+                successes.append({'row': idx + 1, 'id': payment.id})
+            except Exception as e:
+                errors.append({'row': idx + 1, 'error': str(e)})
+        return {'imported': len(successes), 'errors': errors}
+
+"""
+class CSVTemplateView(views.APIView):
+    
+    Returns a CSV template for the requested target, with comments describing each column’s expected format.
+    
+    def get(self, request, *args, **kwargs):
+        # 1) Normalize & validate the 'target' query parameter
+        target = request.query_params.get('target', '').lower()
+        templates = {
+            'student': ['first_name', 'last_name', 'birthday', 'level'],
+            'pack':    ['date', 'type', 'number_of_classes', 'duration_in_minutes',
+                        'price', 'expiration_date', 'student_ids', 'instructor_ids'],
+            'lesson':  ['date', 'start_time', 'duration_in_minutes', 'class_number',
+                        'price', 'type', 'student_ids'],
+            'payment': ['value', 'user_id', 'pack_ids', 'lesson_ids'],
+        }
+        if target not in templates:
+            return Response(
+                {'detail': f'Invalid target: "{target}"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 2) Metadata for comments (keys must match 'templates')
+        metadata = {
+            'student': {
+                'first_name': 'Text: student first name',
+                'last_name':  'Text: student last name',
+                'birthday':   'Date (YYYY-MM-DD)',
+                'level':      'Integer, optional',
+            },
+            'pack': {
+                'date':                 'Date (YYYY-MM-DD)',
+                'type':                 "'private' or 'group'",
+                'number_of_classes':    'Integer',
+                'duration_in_minutes':  'Integer (minutes)',
+                'price':                'Decimal (e.g., 50.00)',
+                'expiration_date':      'Date (YYYY-MM-DD) or blank',
+                'student_ids':          'Comma-separated integer IDs (e.g., 1,2,3)',
+                'instructor_ids':       'Comma-separated integer IDs',
+            },
+            'lesson': {
+                'date':                'Date (YYYY-MM-DD) or blank',
+                'start_time':          'Time (HH:MM:SS) or blank',
+                'duration_in_minutes': 'Integer (minutes)',
+                'class_number':        'Integer or blank',
+                'price':               'Decimal or blank',
+                'type':                "'private' or 'group'",
+                'student_ids':         'Comma-separated integer IDs',
+            },
+            'payment': {
+                'value':      'Decimal (e.g., 20.00)',
+                'user_id':    'Integer: ID of user making payment',
+                'pack_ids':   'Comma-separated integer IDs or blank',
+                'lesson_ids': 'Comma-separated integer IDs or blank',
+            },
+        }
+
+        # 3) Build the CSV in-memory
+        buffer = io.StringIO()
+
+        # Excel hint + UTF-8 BOM so Excel splits on commas correctly
+        buffer.write('\ufeffsep=,\r\n')
+
+        # Write comment lines (if any metadata exists for this target)
+        for col, desc in metadata.get(target, {}).items():
+            buffer.write(f"# {col}: {desc}\r\n")
+
+        # Write the header row
+        writer = csv.writer(buffer)
+        writer.writerow(templates[target])
+
+        # 4) Return as an HTTP attachment
+        buffer.seek(0)
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='text/csv; charset=utf-8'
+        )
+        response['Content-Disposition'] = (
+            f'attachment; filename="{target}_template.csv"'
+        )
+        return response
+"""
+
+class ExcelTemplateView(views.APIView):
+    """
+    Returns a single .xlsx file with separate sheets for
+    Students, Packs, Lessons, and Payments.
+    """
+    def get(self, request, *args, **kwargs):
+        # Define columns and metadata
+        templates = {
+            'Student': ['first_name', 'last_name', 'birthday', 'level'],
+            'Pack':   ['date', 'type', 'number_of_classes', 'duration_in_minutes',
+                        'price', 'expiration_date', 'student_ids', 'instructor_ids'],
+            'Lesson': ['date', 'start_time', 'duration_in_minutes', 'class_number',
+                        'price', 'type', 'student_ids'],
+            'Payment':['value', 'user_id', 'pack_ids', 'lesson_ids'],
+        }
+        metadata = {
+            'first_name': 'Text: student first name',
+            'last_name':  'Text: student last name',
+            'birthday':   'Date (YYYY-MM-DD)',
+            # … same as before for all fields …
+        }
+
+        wb = Workbook()
+        wb.remove(wb.active)
+
+        for sheet_name, cols in templates.items():
+            ws = wb.create_sheet(title=sheet_name)
+            # header row
+            for idx, col in enumerate(cols, start=1):
+                ws.cell(row=2, column=idx, value=col)
+                # add a comment in row 2, col idx
+                if col in metadata:
+                    ws.cell(row=2, column=idx).comment = Comment(
+                        text=metadata[col],
+                        author="System"
+            )
+
+        # save to in‐memory buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        resp = HttpResponse(
+            buffer.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        resp['Content-Disposition'] = 'attachment; filename="bulk_import_template.xlsx"'
+        return resp

@@ -151,7 +151,7 @@ class Student(models.Model):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     birthday = models.DateField()
-    level = models.PositiveIntegerField(null=None, blank=None)
+    level = models.PositiveIntegerField(null=True, blank=True)
     parents = models.ManyToManyField(UserAccount, related_name='students')
 
     def __str__(self):
