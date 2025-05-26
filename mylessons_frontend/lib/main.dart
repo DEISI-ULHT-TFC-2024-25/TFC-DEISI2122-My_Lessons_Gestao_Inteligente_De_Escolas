@@ -23,6 +23,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 
 import 'pages/reset_password_page.dart';
+import 'providers/profile_provider.dart';
 import 'services/api_service.dart';
 
 // Create a global RouteObserver instance.
@@ -78,6 +79,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => PackDetailsProvider()),
         ChangeNotifierProvider(create: (_) => HomePageProvider()),
         ChangeNotifierProvider(create: (_) => SchoolDataProvider()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider()),
       ],
       child: const MyApp(),
     ),

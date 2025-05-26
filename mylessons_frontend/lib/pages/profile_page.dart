@@ -1,59 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:mylessons_frontend/pages/student_page.dart';
 import 'package:provider/provider.dart';
-import '../../services/profile_service.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../providers/profile_provider.dart';
 import '../providers/home_page_provider.dart';
+import '../services/profile_service.dart';
 import '../widgets/connect_calendar_button_widget.dart';
+import 'student_page.dart';
 import 'bulk_import_page.dart';
 import 'manage_school.dart';
-import '../../main.dart';
-import 'markdown_page.dart'; // routeObserver
+import '../main.dart';
+import 'markdown_page.dart';
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends StatelessWidget {
   const ProfilePage({Key? key}) : super(key: key);
 
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<ProfileProvider>(
+      create: (_) => ProfileProvider(),
+      child: const _ProfileView(),
+    );
+  }
 }
 
-class _ProfilePageState extends State<ProfilePage> with RouteAware {
-  final storage = const FlutterSecureStorage();
-  bool isLoading = true;
-  bool isEditingProfile = false;
-
-  // Profile controllers
-  late TextEditingController _firstNameController;
-  late TextEditingController _lastNameController;
-  late TextEditingController _emailController;
-  late TextEditingController _birthdayController;
-  String _phoneCountryCode = 'PT';
-  late TextEditingController _phoneController;
-
-  late bool hasCalendarToken = false;
-
-  // Roles & Schools
-  List<String> availableRoles = [];
-  String currentRole = '';
-  List<Map<String, dynamic>> availableSchools = [];
-  String? currentSchoolId;
-  String? currentSchoolName;
-
-  // Associated students
-  List<Map<String, dynamic>> associatedStudents = [];
+class _ProfileView extends StatefulWidget {
+  const _ProfileView({Key? key}) : super(key: key);
 
   @override
-  void initState() {
-    super.initState();
-    _firstNameController = TextEditingController();
-    _lastNameController = TextEditingController();
-    _emailController = TextEditingController();
-    _phoneController = TextEditingController();
-    _birthdayController = TextEditingController();
-    fetchProfileData();
-  }
+  __ProfileViewState createState() => __ProfileViewState();
+}
 
+class __ProfileViewState extends State<_ProfileView> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -66,198 +45,90 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _birthdayController.dispose();
     super.dispose();
   }
 
   @override
   void didPopNext() {
-    fetchProfileData();
-  }
-
-  Future<void> fetchProfileData() async {
-    setState(() => isLoading = true);
-    try {
-      final profileData = await ProfileService.fetchProfileData();
-      setState(() {
-        _firstNameController.text = profileData.firstName;
-        _lastNameController.text = profileData.lastName;
-        _emailController.text = profileData.email;
-        _birthdayController.text = profileData.birthday ?? '';
-        _phoneController.text = profileData.phone ?? '';
-        _phoneCountryCode = profileData.countryCode ?? 'PT';
-        availableRoles = profileData.availableRoles;
-        currentRole = profileData.currentRole;
-        availableSchools = profileData.availableSchools;
-        currentSchoolId = profileData.currentSchoolId;
-        currentSchoolName = profileData.currentSchoolName;
-        associatedStudents = profileData.associatedStudents ?? [];
-        hasCalendarToken = profileData.hasCalendarToken ?? false;
-      });
-    } catch (e) {
-      print('Error fetching profile: $e');
-    } finally {
-      setState(() => isLoading = false);
-    }
-  }
-
-  Future<void> updateProfile() async {
-    final payload = {
-      'first_name': _firstNameController.text,
-      'last_name': _lastNameController.text,
-      'email': _emailController.text,
-      'country_code': _phoneCountryCode,
-      'phone': _phoneController.text,
-      'birthday': _birthdayController.text,
-    };
-    try {
-      final msg = await ProfileService.updateProfileData(payload);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      setState(() => isEditingProfile = false);
-      await fetchProfileData();
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  Future<void> changeRole(String newRole) async {
-    final msg = await ProfileService.changeRole(newRole);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    Provider.of<HomePageProvider>(context, listen: false).currentRole = newRole;
-    Navigator.pushNamedAndRemoveUntil(context, '/main', (r) => false);
-  }
-
-  Future<void> changeSchool(String schoolId) async {
-    final msg = await ProfileService.changeSchool(schoolId);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    Navigator.pushNamedAndRemoveUntil(context, '/main', (r) => false);
-  }
-
-  Future<void> logout() async {
-    await storage.delete(key: 'auth_token');
-    Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
-  }
-
-  void _showBirthdayPicker() async {
-    DateTime initial = DateTime.now();
-    if (_birthdayController.text.isNotEmpty) {
-      initial = DateTime.tryParse(_birthdayController.text) ?? DateTime.now();
-    }
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      _birthdayController.text = picked.toIso8601String().split('T').first;
-    }
-  }
-
-  void _showTos() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => const MarkdownPage(
-        title: 'Termos e Condições',
-        assetPath: 'assets/terms.md',
-      ),
-    ));
-  }
-
-  void _showPrivacy() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => const MarkdownPage(
-        title: 'Política de Privacidade',
-        assetPath: 'assets/privacy.md',
-      ),
-    ));
+    context.read<ProfileProvider>().fetchProfileData();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = currentRole == 'Admin';
-    final tabs = <Tab>[Tab(text: 'Info'), Tab(text: 'Students')];
-    if (isAdmin) tabs.add(Tab(text: 'School'));
-    tabs.add(Tab(text: 'Legal'));
+    final provider = context.watch<ProfileProvider>();
+    final isAdmin = provider.currentRole == 'Admin';
+
+    final tabs = <Tab>[
+      const Tab(text: 'Info'),
+      const Tab(text: 'Students'),
+      if (isAdmin) const Tab(text: 'School'),
+      const Tab(text: 'Legal'),
+    ];
 
     return DefaultTabController(
       length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Profile'),
-          bottom: TabBar(
-            tabs: tabs,
-            isScrollable: true,
-          ),
+          title: const Text('Profile'),
+          bottom: TabBar(tabs: tabs, isScrollable: true),
           actions: [
-            IconButton(icon: Icon(Icons.logout), onPressed: logout),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () => provider.logout(context),
+            ),
           ],
         ),
-        body: isLoading
-            ? Center(child: CircularProgressIndicator())
+        body: provider.isLoading
+            ? const Center(child: CircularProgressIndicator())
             : TabBarView(
                 children: [
                   // Info Tab
                   SingleChildScrollView(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SizedBox(height: 16),
-                        hasCalendarToken == false
-                            ? ConnectCalendarButton()
-                            : SizedBox(
-                                height: 0,
-                              ),
-                        SizedBox(height: 16),
-                        _buildInput('First Name', _firstNameController,
-                            readOnly: !isEditingProfile),
-                        _buildInput('Last Name', _lastNameController,
-                            readOnly: !isEditingProfile),
-                        _buildInput('Email', _emailController,
-                            readOnly: !isEditingProfile),
-                        SizedBox(height: 8),
-                        _buildBirthdayField(),
-                        SizedBox(height: 8),
-                        buildIntlPhoneField(),
-                        if (isEditingProfile) ...[
-                          SizedBox(height: 16),
+                        const SizedBox(height: 16),
+                        if (!provider.hasCalendarToken)
+                          const ConnectCalendarButton(),
+                        const SizedBox(height: 16),
+                        _buildInput(
+                          'First Name',
+                          provider.firstNameController,
+                          readOnly: !provider.isEditingProfile,
+                        ),
+                        _buildInput(
+                          'Last Name',
+                          provider.lastNameController,
+                          readOnly: !provider.isEditingProfile,
+                        ),
+                        _buildInput(
+                          'Email',
+                          provider.emailController,
+                          readOnly: !provider.isEditingProfile,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildBirthdayField(provider),
+                        const SizedBox(height: 8),
+                        _buildPhoneField(provider),
+                        if (provider.isEditingProfile) ...[
+                          const SizedBox(height: 16),
                           ElevatedButton(
-                              onPressed: updateProfile,
-                              child: Text('Save Profile')),
-                        ] else ...{
-                          SizedBox(height: 16),
+                            onPressed: () => provider.updateProfile(context),
+                            child: const Text('Save Profile'),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 16),
                           ElevatedButton(
-                              onPressed: () => setState(
-                                  () => isEditingProfile = !isEditingProfile),
-                              child: Text('Edit Profile')),
-                        },
-                        SizedBox(
-                          height: 80, // adjust as needed
+                            onPressed: provider.toggleEditing,
+                            child: const Text('Edit Profile'),
+                          ),
+                        ],
+                        const SizedBox(
+                          height: 80,
                           child: Align(
                             alignment: Alignment.center,
-                            child: ToggleButtons(
-                              isSelected: availableRoles
-                                  .map((r) => r == currentRole)
-                                  .toList(),
-                              onPressed: (index) =>
-                                  changeRole(availableRoles[index]),
-                              borderRadius: BorderRadius.circular(8),
-                              fillColor: Colors.transparent,
-                              selectedBorderColor:
-                                  Theme.of(context).primaryColor,
-                              children: availableRoles
-                                  .map((r) => Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12),
-                                        child: Text(r),
-                                      ))
-                                  .toList(),
-                            ),
+                            child: ToggleRoleButtons(),
                           ),
                         ),
                       ],
@@ -266,89 +137,93 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
 
                   // Students Tab
                   Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: associatedStudents.length,
-                            itemBuilder: (ctx, i) {
-                              final st = associatedStudents[i];
-                              return ListTile(
-                                title: Text(
-                                    "${st['first_name']} ${st['last_name']}"),
-                                subtitle: Text(st['birthday']),
-                                trailing: IconButton(
-                                  icon: Icon(Icons.info),
-                                  onPressed: () {
-                                    print("student tapped");
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            StudentPage(studentId: st["id"]),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
+                    padding: const EdgeInsets.all(16),
+                    child: ListView.builder(
+                      itemCount: provider.associatedStudents.length,
+                      itemBuilder: (ctx, i) {
+                        final st = provider.associatedStudents[i];
+                        return ListTile(
+                          title: Text(
+                              "${st['first_name']} ${st['last_name']}"),
+                          subtitle: Text(st['birthday']),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.info),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    StudentPage(studentId: st["id"]),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
 
-                  // School Tab (Admin)
+                  // School Tab (Admin only)
                   if (isAdmin)
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Center(
-                          child: ElevatedButton(
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton(
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => SchoolSetupPage(
-                                  isCreatingSchool: availableSchools.isEmpty,
-                                  fetchProfileData: fetchProfileData,
+                                  isCreatingSchool:
+                                      provider.availableSchools.isEmpty,
+                                  fetchProfileData:
+                                      provider.fetchProfileData,
                                 ),
                               ),
                             ),
-                            child: Text(availableSchools.isEmpty
+                            child: Text(provider.availableSchools.isEmpty
                                 ? 'Create School'
                                 : 'Manage School'),
                           ),
-                        ),
-                        SizedBox(
-                          height: 16,
-                        ),
-                        Center(
-                          child: ElevatedButton(
+                          const SizedBox(height: 16),
+                          ElevatedButton(
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => BulkImportPage(),
                               ),
                             ),
-                            child: Text('Import Data'),
+                            child: const Text('Import Data'),
                           ),
-                        )
-                      ],
+                        ],
+                      ),
                     ),
+
                   // Legal Tab
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
                         TextButton(
-                          onPressed: _showTos,
-                          child: Text('Termos e Condições de Utilização'),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const MarkdownPage(
+                                title: 'Termos e Condições',
+                                assetPath: 'assets/terms.md',
+                              ),
+                            ),
+                          ),
+                          child:
+                              const Text('Termos e Condições de Utilização'),
                         ),
                         TextButton(
-                          onPressed: _showPrivacy,
-                          child: Text('Política de Privacidade'),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const MarkdownPage(
+                                title: 'Política de Privacidade',
+                                assetPath: 'assets/privacy.md',
+                              ),
+                            ),
+                          ),
+                          child: const Text('Política de Privacidade'),
                         ),
                       ],
                     ),
@@ -359,30 +234,71 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
   }
 
-  Widget _buildInput(String label, TextEditingController ctrl,
+  Widget _buildInput(
+      String label, TextEditingController controller,
       {bool readOnly = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
-        controller: ctrl,
+        controller: controller,
         readOnly: readOnly,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border:
+              OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
     );
   }
 
-  // Replace your existing buildIntlPhoneField with this:
+  Widget _buildBirthdayField(ProfileProvider provider) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: provider.birthdayController,
+            readOnly: true,
+            decoration: InputDecoration(
+              labelText: 'Birthday',
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.calendar_today),
+          onPressed: provider.isEditingProfile
+              ? () async {
+                  DateTime initial = DateTime.now();
+                  if (provider.birthdayController.text.isNotEmpty) {
+                    initial = DateTime.tryParse(
+                            provider.birthdayController.text) ??
+                        DateTime.now();
+                  }
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initial,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    provider.birthdayController.text =
+                        picked.toIso8601String().split('T').first;
+                  }
+                }
+              : null,
+        ),
+      ],
+    );
+  }
 
-  Widget buildIntlPhoneField() {
+  Widget _buildPhoneField(ProfileProvider provider) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: IntlPhoneField(
-        initialCountryCode: _phoneCountryCode,
-        initialValue: _phoneController.text,
-        enabled: isEditingProfile,
+        initialCountryCode: provider.phoneCountryCode,
+        initialValue: provider.phoneController.text,
+        enabled: provider.isEditingProfile,
         decoration: InputDecoration(
           labelText: 'Phone Number',
           labelStyle: const TextStyle(fontWeight: FontWeight.bold),
@@ -391,51 +307,51 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
-            borderSide: BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
-            borderSide: BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(32.0),
-            borderSide: BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         ),
         onCountryChanged: (country) {
-          setState(() {
-            _phoneCountryCode = country.code;
-          });
+          provider.phoneCountryCode = country.code;
         },
         onChanged: (phone) {
-          setState(() {
-            _phoneController.text = phone.number;
-          });
+          provider.phoneController.text = phone.number;
         },
       ),
     );
   }
+}
 
-  Widget _buildBirthdayField() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextFormField(
-            controller: _birthdayController,
-            readOnly: true,
-            decoration: InputDecoration(
-              labelText: 'Birthday',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ),
-        IconButton(
-            icon: Icon(Icons.calendar_today),
-            onPressed: isEditingProfile ? _showBirthdayPicker : null),
-      ],
+class ToggleRoleButtons extends StatelessWidget {
+  const ToggleRoleButtons({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ProfileProvider>();
+    return ToggleButtons(
+      isSelected:
+          provider.availableRoles.map((r) => r == provider.currentRole).toList(),
+      onPressed: (index) =>
+          provider.changeRole(context, provider.availableRoles[index]),
+      borderRadius: BorderRadius.circular(8),
+      fillColor: Colors.transparent,
+      selectedBorderColor: Theme.of(context).primaryColor,
+      children: provider.availableRoles
+          .map((r) => Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(r),
+              ))
+          .toList(),
     );
   }
 }
