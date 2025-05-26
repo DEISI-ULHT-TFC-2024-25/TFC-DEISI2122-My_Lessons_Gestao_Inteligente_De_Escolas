@@ -8,7 +8,8 @@ import '../providers/home_page_provider.dart';
 import '../widgets/connect_calendar_button_widget.dart';
 import 'bulk_import_page.dart';
 import 'manage_school.dart';
-import '../../main.dart'; // routeObserver
+import '../../main.dart';
+import 'markdown_page.dart'; // routeObserver
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -158,39 +159,22 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     }
   }
 
-  void _openEditStudent(Map<String, dynamic> student) {
-    final nameCtrl = TextEditingController(text: student['name']);
-    final emailCtrl = TextEditingController(text: student['email']);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Edit Student'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(labelText: 'Name')),
-            TextField(
-                controller: emailCtrl,
-                decoration: InputDecoration(labelText: 'Email')),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final payload = {'name': nameCtrl.text, 'email': emailCtrl.text};
-              //await ProfileService.updateStudent(student['id'].toString(), payload);
-              Navigator.pop(context);
-              fetchProfileData();
-            },
-            child: Text('Save'),
-          ),
-        ],
+  void _showTos() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const MarkdownPage(
+        title: 'Termos e Condições',
+        assetPath: 'assets/terms.md',
       ),
-    );
+    ));
+  }
+
+  void _showPrivacy() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const MarkdownPage(
+        title: 'Política de Privacidade',
+        assetPath: 'assets/privacy.md',
+      ),
+    ));
   }
 
   @override
@@ -198,14 +182,20 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     final isAdmin = currentRole == 'Admin';
     final tabs = <Tab>[Tab(text: 'Info'), Tab(text: 'Students')];
     if (isAdmin) tabs.add(Tab(text: 'School'));
+    tabs.add(Tab(text: 'Legal'));
 
     return DefaultTabController(
       length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: Text('Profile'),
-          bottom: TabBar(tabs: tabs),
-          actions: [IconButton(icon: Icon(Icons.logout), onPressed: logout)],
+          bottom: TabBar(
+            tabs: tabs,
+            isScrollable: true,
+          ),
+          actions: [
+            IconButton(icon: Icon(Icons.logout), onPressed: logout),
+          ],
         ),
         body: isLoading
             ? Center(child: CircularProgressIndicator())
@@ -331,7 +321,9 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                                 : 'Manage School'),
                           ),
                         ),
-                        SizedBox(height: 16,),
+                        SizedBox(
+                          height: 16,
+                        ),
                         Center(
                           child: ElevatedButton(
                             onPressed: () => Navigator.push(
@@ -344,7 +336,23 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                           ),
                         )
                       ],
-                    )
+                    ),
+                  // Legal Tab
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        TextButton(
+                          onPressed: _showTos,
+                          child: Text('Termos e Condições de Utilização'),
+                        ),
+                        TextButton(
+                          onPressed: _showPrivacy,
+                          child: Text('Política de Privacidade'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
       ),
