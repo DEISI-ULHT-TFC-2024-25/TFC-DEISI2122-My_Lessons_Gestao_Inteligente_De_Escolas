@@ -1,0 +1,17 @@
+{
+  "name": "MyLessons Dev",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "web",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "extensions": [
+    "ms-python.python",
+    "ms-azuretools.vscode-docker",
+    "dart-code.flutter"
+  ],
+  "settings": {
+    "python.pythonPath": "/opt/venv/bin/python"
+  },
+  "forwardPorts": [8000],
+  "postCreateCommand": "flutter pub get --directory /workspace/mylessons_frontend"
+}
