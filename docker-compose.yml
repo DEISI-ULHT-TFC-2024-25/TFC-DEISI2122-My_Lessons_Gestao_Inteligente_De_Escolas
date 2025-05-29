@@ -1,7 +1,8 @@
-version: "3.9"
-
 services:
   web:
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     build:
       context: .
       dockerfile: .devcontainer/Dockerfile
@@ -27,9 +28,9 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: dbname
+      POSTGRES_USER: mylessons
+      POSTGRES_PASSWORD: hUWmTMZwKX6v8r
+      POSTGRES_DB: mylessons
     volumes:
       - db_data:/var/lib/postgresql/data
 

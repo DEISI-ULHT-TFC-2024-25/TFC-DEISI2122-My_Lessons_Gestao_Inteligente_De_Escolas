@@ -115,14 +115,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'mylessons.wsgi.application'
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'mylessons$default',  # Replace with your actual database name
-        'USER': 'mylessons',  # Your PythonAnywhere username
-        'PASSWORD': 'hUWmTMZwK@X6v8r',  # Your MySQL password (set in PythonAnywhere)
-        'HOST': 'mylessons.mysql.pythonanywhere-services.com',  # PythonAnywhere MySQL host
-        'PORT': '3306',
-    }
+    'default': env.db(),  # parses DATABASE_URL
 }
 
 AUTH_USER_MODEL = 'users.UserAccount'

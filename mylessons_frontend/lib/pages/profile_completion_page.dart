@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/profile_provider.dart';
 import '../services/api_service.dart';
 
 class ProfileCompletionPage extends StatefulWidget {
@@ -288,12 +290,19 @@ class _ProfileCompletionPageState extends State<ProfileCompletionPage> {
   @override
   Widget build(BuildContext context) {
     // Disable system back navigation so the user must complete the fields.
+    final provider = context.read<ProfileProvider>();
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Complete Your Profile"),
           automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () => provider.logout(context),
+            ),
+          ],
         ),
         body: _pages.isEmpty
             ? const Center(child: CircularProgressIndicator())
