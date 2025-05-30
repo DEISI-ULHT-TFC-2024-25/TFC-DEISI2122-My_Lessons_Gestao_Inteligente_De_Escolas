@@ -43,22 +43,22 @@ Future<void> main() async {
     if (Firebase.apps.isEmpty) {
       WidgetsFlutterBinding.ensureInitialized();
 
-  FirebaseOptions options;
-  if (kIsWeb) {
-    options = FirebaseOptions(
-      apiKey: "AIzaSyAAR9cU07q-tShEAN8HHGcmp5L2l9tMIFQ",                   // from console
-      authDomain: "my-lessons-460316.firebaseapp.com",
-      projectId: "my-lessons-460316",
-      storageBucket: "my-lessons-460316.appspot.com",
-      messagingSenderId: "1234567890",
-      appId: "1:1234567890:web:abcdef123456",
-      measurementId: "G-XYZ1234",
-    );
-  } else {
-    options = DefaultFirebaseOptions.currentPlatform;
-  }
+      FirebaseOptions options;
+      if (kIsWeb) {
+        options = FirebaseOptions(
+          apiKey: "AIzaSyAAR9cU07q-tShEAN8HHGcmp5L2l9tMIFQ", // from console
+          authDomain: "my-lessons-460316.firebaseapp.com",
+          projectId: "my-lessons-460316",
+          storageBucket: "my-lessons-460316.appspot.com",
+          messagingSenderId: "1234567890",
+          appId: "1:1234567890:web:abcdef123456",
+          measurementId: "G-XYZ1234",
+        );
+      } else {
+        options = DefaultFirebaseOptions.currentPlatform;
+      }
 
-  await Firebase.initializeApp(options: options);
+      await Firebase.initializeApp(options: options);
     }
     print('  • after Firebase.initializeApp');
   } catch (e, st) {
@@ -91,14 +91,15 @@ Future<void> main() async {
       child: const MyApp(),
     ),
   );
-
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  // Request permission on iOS
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+  if (!kIsWeb) {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    // Request permission on iOS
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+  }
 }
 
 class MyApp extends StatefulWidget {
