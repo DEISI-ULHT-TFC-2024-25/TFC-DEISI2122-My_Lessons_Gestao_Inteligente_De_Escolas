@@ -6,3 +6,6 @@ __pycache__/
 mylessons_backend/google_client_secret.json
 mylessons_backend/my-lessons-460316-firebase-adminsdk-fbsvc-3a1cf73ff7.json
 mylessons_backend/.env
+mylessons_backend/.env_staging
+mylessons_backend/.env_production
+mylessons_backend/.env_development

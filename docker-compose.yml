@@ -26,11 +26,11 @@ services:
       - db
 
   db:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: mylessons
-      POSTGRES_PASSWORD: hUWmTMZwKX6v8r
-      POSTGRES_DB: mylessons
+      POSTGRES_PASSWORD: devpass   # will only matter for dev/staging
+      POSTGRES_DB: mylessons_dev   # can be overridden below
     volumes:
       - db_data:/var/lib/postgresql/data
 
