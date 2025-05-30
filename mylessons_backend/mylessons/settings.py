@@ -35,6 +35,12 @@ CORS_ALLOWED_ORIGINS = [
   'https://www.mylessons.pt'
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://mylessons.pt",
+    "https://www.mylessons.pt",
+]
+
+
 # Installed Apps
 INSTALLED_APPS = [
     # Django default apps
