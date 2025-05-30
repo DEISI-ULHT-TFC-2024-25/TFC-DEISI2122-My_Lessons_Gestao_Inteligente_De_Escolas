@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mylessons_frontend/pages/register_landing_page.dart';
 import 'package:mylessons_frontend/providers/home_page_provider.dart';
@@ -40,9 +41,24 @@ Future<void> main() async {
     print('  • before Firebase.initializeApp');
     // Só inicializa se ainda não tiver sido inicializado
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      WidgetsFlutterBinding.ensureInitialized();
+
+  FirebaseOptions options;
+  if (kIsWeb) {
+    options = FirebaseOptions(
+      apiKey: "AIzaSyAAR9cU07q-tShEAN8HHGcmp5L2l9tMIFQ",                   // from console
+      authDomain: "my-lessons-460316.firebaseapp.com",
+      projectId: "my-lessons-460316",
+      storageBucket: "my-lessons-460316.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456",
+      measurementId: "G-XYZ1234",
+    );
+  } else {
+    options = DefaultFirebaseOptions.currentPlatform;
+  }
+
+  await Firebase.initializeApp(options: options);
     }
     print('  • after Firebase.initializeApp');
   } catch (e, st) {
