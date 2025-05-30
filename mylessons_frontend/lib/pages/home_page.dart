@@ -1,7 +1,9 @@
 // home_page.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -115,6 +117,9 @@ class _HomePageState extends State<HomePage>
   bool _fcmTokenSent = false;
 
   Future<void> registerFcmTokenIfNeeded() async {
+    // ONLY on Android or iOS native:
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    
     if (_fcmTokenSent) return; // ensure it's done only once
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) {
@@ -123,6 +128,7 @@ class _HomePageState extends State<HomePage>
     } else {
       print('⚠️ Not logged in or no FCM token');
     }
+  }
   }
 
   /// Modal methods (using provider values as needed).

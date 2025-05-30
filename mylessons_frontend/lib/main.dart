@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io'                show Platform; 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mylessons_frontend/pages/register_landing_page.dart';
@@ -91,14 +92,15 @@ Future<void> main() async {
       child: const MyApp(),
     ),
   );
-  if (!kIsWeb) {
+  // ONLY on Android or iOS native:
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
-    // Request permission on iOS
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+    print('FCM permission status: ${settings.authorizationStatus}');
   }
 }
 
