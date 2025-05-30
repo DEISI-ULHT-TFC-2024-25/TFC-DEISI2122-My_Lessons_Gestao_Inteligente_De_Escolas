@@ -74,16 +74,7 @@ Future<void> main() async {
     print('❌ Stripe setup failed: $e\n$st');
   }
 
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-
   debugPaintSizeEnabled = false;
-
-  // Request permission on iOS
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
 
   print('✅ reached runApp()');
 
@@ -99,6 +90,14 @@ Future<void> main() async {
       ],
       child: const MyApp(),
     ),
+  );
+
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  // Request permission on iOS
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
   );
 }
 
