@@ -31,6 +31,8 @@ CORS_ALLOWED_ORIGINS = [
   'https://mylessons.pythonanywhere.com',
   'http://localhost:8000',
   'http://172.20.10.3:8000',
+  'https://mylessons.pt',
+  'https://www.mylessons.pt'
 ]
 
 # Installed Apps
