@@ -22,8 +22,8 @@ services:
       sh -c "cd /workspace/mylessons_backend &&
              python manage.py migrate --no-input &&
              python manage.py runserver 0.0.0.0:8000"
-    depends_on:
-      - db
+    # depends_on:
+    #   - db
 
   # db:
 #   image: postgres:17-alpine
