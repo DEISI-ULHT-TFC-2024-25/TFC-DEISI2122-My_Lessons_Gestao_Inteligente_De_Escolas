@@ -1157,19 +1157,19 @@ class _HomePageState extends State<HomePage>
       create: (_) => HomePageProvider(),
       child: Consumer<HomePageProvider>(
         builder: (context, homeProvider, child) {
-          // ——————————————————————————————————————
-          // Once loading is done and we haven’t yet navigated,
-          // if any required field is empty, push the completion flow.
-          if (!homeProvider.isLoading &&
+          if (!homeProvider.isLoading && homeProvider.currentRole.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await storage.delete(key: 'auth_token');
+              Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
+            });
+          } else if (!homeProvider.isLoading &&
               !_didNavigateToProfile &&
               (homeProvider.firstName.isEmpty ||
                   homeProvider.lastName.isEmpty ||
                   homeProvider.phone.isEmpty)) {
             _didNavigateToProfile = true;
-            // Use pushReplacement if you want to replace HomePage
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              Navigator.of(context)
-                  .push(
+              Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => ProfileCompletionPage(
                     initialFirstName: homeProvider.firstName,
@@ -1178,9 +1178,10 @@ class _HomePageState extends State<HomePage>
                     initialCountryCode: homeProvider.countryCode,
                   ),
                 ),
-              );         
+              );
             });
           }
+
           // ——————————————————————————————————————
           // Build Lessons Tab.
           Widget lessonsTab = _lessonsActiveTabIndex == 0
