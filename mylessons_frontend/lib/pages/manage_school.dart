@@ -38,7 +38,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   late TabController _tabController;
   final TextEditingController _schoolNameController = TextEditingController();
   bool _isCreated = false;
-  File? _schoolImage; // optional image file
+  File? _schoolImage;
   final ImagePicker _picker = ImagePicker();
 
   final List<String> _tabLabels = [
@@ -54,7 +54,9 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this)
-      ..addListener(() => setState(() {}));
+      ..addListener(() {
+        setState(() {});
+      });
     if (!widget.isCreatingSchool) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<SchoolDataProvider>().loadSchoolDetails();
@@ -87,7 +89,6 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return;
     }
     try {
-      // Pass optional image to provider (you may need to update createSchool signature)
       await context.read<SchoolDataProvider>().createSchool(
         name,
         imageFile: _schoolImage,
@@ -139,84 +140,86 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
           builder: (_) => LocationModal(schoolId: schoolId),
         );
         break;
+      default:
+        break;
     }
 
     await provider.loadSchoolDetails();
   }
 
-  String _getBottomButtonLabel() => 'Add ${_tabLabels[_tabController.index]}';
+  String _getBottomButtonLabel() {
+    return 'Add ${_tabLabels[_tabController.index]}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isCreatingSchool && !_isCreated) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('School Setup')),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Create School',
+                style: GoogleFonts.lato(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _schoolNameController,
+                decoration: const InputDecoration(
+                  labelText: 'School Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_schoolImage != null)
+                Center(
+                  child: Image.file(
+                    _schoolImage!,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ElevatedButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.image),
+                label: const Text('Upload Image (optional)'),
+              ),
+              const SizedBox(height: 24),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _onCreateSchool,
+                  child: const Text('Create School'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Consumer<SchoolDataProvider>(
       builder: (context, provider, child) {
-        // Always show a spinner in a scaffold until we have real details
         final details = provider.schoolDetails;
+
         if (provider.isLoading || details == null) {
           return Scaffold(
             appBar: AppBar(
-              title: Text(
-                  widget.isCreatingSchool ? 'School Setup' : 'School Settings'),
+              title: Text(widget.isCreatingSchool
+                  ? 'School Setup'
+                  : 'School Settings'),
             ),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
 
-        // We now know `details` is non-null and `isLoading` is false
         final String? critical = details['critical_message'] as String?;
 
-        if (widget.isCreatingSchool && !_isCreated) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('School Setup')),
-            body: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Create School',
-                    style: GoogleFonts.lato(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _schoolNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'School Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Optional Image Input
-                  if (_schoolImage != null)
-                    Center(
-                      child: Image.file(
-                        _schoolImage!,
-                        height: 100,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ElevatedButton.icon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.image),
-                    label: const Text('Upload Image (optional)'),
-                  ),
-                  const SizedBox(height: 24),
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: _onCreateSchool,
-                      child: const Text('Create School'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        // Main tabbed UI
         final appBarTitle = details['school_name'] != null
             ? '${details['school_name']} Settings'
             : 'School Settings';
@@ -335,10 +338,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   }
 
   Widget _buildStaffTab(Map<String, dynamic> schoolDetails) {
-    if (schoolDetails == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final List staff = (schoolDetails!['staff'] as List?) ?? [];
+    final List staff = (schoolDetails['staff'] as List?) ?? [];
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -346,7 +346,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
             ? buildStaffSection(
                 List<dynamic>.from(staff),
                 context: context,
-                schoolDetails: schoolDetails!,
+                schoolDetails: schoolDetails,
                 schoolNameController: _schoolNameController,
               )
             : const Text("No staff data available."),
@@ -361,7 +361,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       return const Center(child: CircularProgressIndicator());
     }
     final Map<String, dynamic> paymentTypes =
-        (schoolDetails!['payment_types'] as Map<String, dynamic>?) ?? {};
+        (schoolDetails['payment_types'] as Map<String, dynamic>?) ?? {};
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -369,7 +369,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
             ? buildPaymentTypesWidget(
                 paymentTypes,
                 context: context,
-                schoolDetails: schoolDetails!,
+                schoolDetails: schoolDetails,
                 schoolNameController: _schoolNameController,
               )
             : const Text("No payment types available."),
