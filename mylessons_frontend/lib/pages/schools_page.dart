@@ -115,7 +115,6 @@ class _SchoolsPageState extends State<SchoolsPage> {
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
                         school['image'],
-                        height: 80,
                         width: 80,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {

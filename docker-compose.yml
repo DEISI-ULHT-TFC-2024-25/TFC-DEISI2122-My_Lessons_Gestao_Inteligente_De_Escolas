@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: .devcontainer/Dockerfile
+    working_dir: /workspace/mylessons_backend
     # load your backend .env so django-environ works:
     env_file:
       - ./mylessons_backend/.env
@@ -19,21 +20,19 @@ services:
     ports:
       - "8000:8000"
     command: >
-      sh -c "cd /workspace/mylessons_backend &&
-             python manage.py migrate --no-input &&
+      sh -c "python manage.py migrate --no-input &&
              python manage.py runserver 0.0.0.0:8000"
     depends_on:
       - db
 
   db:
-   image: postgres:17-alpine
-   environment:
-     POSTGRES_USER: mylessons
-     POSTGRES_PASSWORD: devpass   # will only matter for dev/staging
-     POSTGRES_DB: mylessons_dev   # can be overridden below
-   volumes:
-     - db_data:/var/lib/postgresql/data
-
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: mylessons
+      POSTGRES_PASSWORD: devpass   # will only matter for dev/staging
+      POSTGRES_DB: mylessons_dev   # can be overridden below
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
 volumes:
   db_data:
