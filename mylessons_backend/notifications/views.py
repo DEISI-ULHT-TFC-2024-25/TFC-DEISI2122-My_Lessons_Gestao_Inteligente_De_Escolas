@@ -12,17 +12,30 @@ class RegisterDeviceToken(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        token = request.data.get('token')
+        token = request.data.get("token")
         if not token:
             return Response({"error": "Token required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create or update the device entry for this user
-        device, created = FCMDevice.objects.update_or_create(
-            user=request.user,
-            registration_id=token,
-            defaults={"type": "ios"},
-        )
+        # 1) See if some user already has this token
+        try:
+            existing = FCMDevice.objects.get(registration_id=token)
+            # If it exists, reassign it to the current user and update its type
+            existing.user = request.user
+            existing.type = "ios"
+            existing.save(update_fields=["user", "type"])
+            created = False
+            device = existing
+        except FCMDevice.DoesNotExist:
+            # 2) If nobody has this token yet, create a fresh one
+            device = FCMDevice.objects.create(
+                user=request.user,
+                registration_id=token,
+                type="ios",
+            )
+            created = True
+
         return Response({"status": "registered"})
+
     
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

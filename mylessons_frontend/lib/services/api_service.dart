@@ -10,7 +10,7 @@ import 'package:intl/intl.dart';
 //const String baseUrl = 'http://172.19.72.130:8000'; // freeulusofona
 const String baseUrl = 'http://172.20.10.3:8000'; // hotspot
 //const String baseUrl = 'https://mylessons.pt'; // production hosting
-//const String baseUrl = 'http://169.254.73.235:8000'; // hotspot
+//const String baseUrl = 'http://169.254.189.6:8000'; // hotspot
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
 

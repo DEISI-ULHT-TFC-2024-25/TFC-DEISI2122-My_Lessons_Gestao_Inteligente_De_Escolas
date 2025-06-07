@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mylessons_frontend/providers/lessons_modal_provider.dart';
 import 'package:provider/provider.dart';
-import '../modals/pack_details_modal.dart';
+import 'pack_details_modal.dart';
 import '../providers/pack_details_provider.dart'; // NEW: Import the PackDetailsProvider
 
 class PacksModal extends StatefulWidget {
@@ -141,7 +141,7 @@ class _PacksModalState extends State<PacksModal> {
                             );
                             return provider;
                           },
-                          child: const PackDetailsModal(),
+                          child: PackDetailsPage(pack: pack,),
                         ),
                       );
                     },
@@ -163,8 +163,6 @@ class _PacksModalState extends State<PacksModal> {
     Provider.of<LessonModalProvider>(context, listen: false).showLessonCardOptions(
       context,
       pack,
-      widget.currentRole,
-      widget.fetchData,
     );
   }
 
@@ -178,8 +176,6 @@ class _PacksModalState extends State<PacksModal> {
         'expiration_date': expirationDate,
         'type': 'pack',
       },
-      widget.currentRole,
-      widget.fetchData,
     );
   }
 
