@@ -48,16 +48,27 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH & Docker Compose
-        uses: appleboy/ssh-action@v0.1.10
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start SSH agent and load key
+        uses: webfactory/ssh-agent@v0.8.1
         with:
-          host: ${{ secrets.VM_IP }}
-          port: ${{ secrets.VM_PORT }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          passphrase: ${{ secrets.VM_PASSWORD }}
-          script: |
+          ssh-private-key: ${{ secrets.VM_SSH_KEY }}
+          ssh-passphrase: ${{ secrets.VM_PASSWORD }}
+
+      - name: Deploy via SSH
+        env:
+          VM_IP: ${{ secrets.VM_IP }}
+          VM_PORT: ${{ secrets.VM_PORT }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -p "$VM_PORT" \
+              "$VM_USER"@"$VM_IP" << 'EOF'
             cd /opt/mylessons
             docker-compose pull
             docker-compose up -d
             docker-compose logs --tail=50
+          EOF
+  
