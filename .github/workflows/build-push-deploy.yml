@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 env:
+  # initial value (may contain uppercase)
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
@@ -14,6 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Lowercase IMAGE_NAME for Docker tags
+        run: |
+          echo "IMAGE_NAME=$(echo \"$IMAGE_NAME\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Log in to Registry
         uses: docker/login-action@v3
@@ -28,7 +33,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}   
+            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
             ${{ env.IMAGE_NAME }}:latest
 
   deploy:
@@ -38,9 +43,11 @@ jobs:
       - name: Deploy via SSH & Docker-Compose
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.DROPLET_IP }}
+          host:     ${{ secrets.DROPLET_IP }}
           username: ${{ secrets.DROPLET_USER }}
           key:      ${{ secrets.DROPLET_SSH_KEY }}
+          # password-based auth example, if you prefer:
+          #     password: ${{ secrets.VM_PASSWORD }}
           script: |
             cd /path/para/seu/app
             # Puxa a imagem correspondente ao branch
