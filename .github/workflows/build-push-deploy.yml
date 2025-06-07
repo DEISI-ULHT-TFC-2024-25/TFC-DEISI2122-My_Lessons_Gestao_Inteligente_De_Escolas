@@ -54,7 +54,7 @@ jobs:
           host: ${{ secrets.VM_IP }}
           port: ${{ secrets.VM_PORT }}
           username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_PASSWORD }}
+          password: ${{ secrets.VM_PASSWORD }}
           script: |
             cd /opt/mylessons
             docker-compose pull
