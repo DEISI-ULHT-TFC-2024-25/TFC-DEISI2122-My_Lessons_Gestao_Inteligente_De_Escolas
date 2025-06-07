@@ -7,20 +7,20 @@ on:
   workflow_dispatch:
 
 env:
-  # initial value (may contain uppercase)
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Lowercase IMAGE_NAME for Docker tags
+      - name: Lowercase IMAGE_NAME
         run: |
-          echo "IMAGE_NAME=$(echo \"$IMAGE_NAME\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "IMAGE_NAME=$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Log in to Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -40,18 +40,14 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH & Docker-Compose
+      - name: Deploy via SSH & Docker Compose
         uses: appleboy/ssh-action@v0.1.10
         with:
           host:     ${{ secrets.DROPLET_IP }}
           username: ${{ secrets.DROPLET_USER }}
           key:      ${{ secrets.DROPLET_SSH_KEY }}
-          # password-based auth example, if you prefer:
-          #     password: ${{ secrets.VM_PASSWORD }}
           script: |
-            cd /path/para/seu/app
-            # Puxa a imagem correspondente ao branch
+            cd /opt/mylessons
             docker-compose pull
-            # Recria containers (serviços Django + Flutter)
             docker-compose up -d
             docker-compose logs --tail=50
