@@ -51,9 +51,10 @@ jobs:
       - name: Deploy via SSH & Docker Compose
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host:     ${{ secrets.DROPLET_IP }}
-          username: ${{ secrets.DROPLET_USER }}
-          key:      ${{ secrets.DROPLET_SSH_KEY }}
+          host: ${{ secrets.VM_IP }}
+          port: ${{ secrets.VM_PORT }}      # default is 22 if you don’t harden it
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}   # or password: ${{ secrets.VM_PASSWORD }}
           script: |
             cd /opt/mylessons
             docker-compose pull
