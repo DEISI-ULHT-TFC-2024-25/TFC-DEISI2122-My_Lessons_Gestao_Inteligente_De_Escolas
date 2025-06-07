@@ -1,5 +1,12 @@
 name: CI/CD Django + Flutter
 
+
+# ─── Grant the token permission to push to GHCR ───────────────────────────────
+permissions:
+  contents: read     # (you usually only need to read the repo)
+  packages: write    # ← this unlocks docker push to ghcr.io
+
+
 on:
   push:
     branches:
