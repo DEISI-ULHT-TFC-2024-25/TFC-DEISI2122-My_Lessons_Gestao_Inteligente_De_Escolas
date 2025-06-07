@@ -25,7 +25,7 @@ if not FERNET_KEY:
 # Security Settings
 SECRET_KEY = 'your-secret-key'
 DEBUG = True  # Change to False in production
-ALLOWED_HOSTS = ['mylessons.pt', 'www.mylessons.pt', 'www.google.com', '127.0.0.1', '161.35.32.87']  # Adjust for production
+ALLOWED_HOSTS = ['mylessons.pt', 'www.mylessons.pt', 'www.google.com', '127.0.0.1', '161.35.32.87', '172.20.10.3']  # Adjust for production
 
 CORS_ALLOWED_ORIGINS = [
   'https://mylessons.pythonanywhere.com',

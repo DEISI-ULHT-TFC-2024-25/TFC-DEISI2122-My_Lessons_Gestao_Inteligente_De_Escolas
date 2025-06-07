@@ -103,7 +103,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       debugPrint("PaymentSheet error: $e");
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const PaymentFailPage()),
+        MaterialPageRoute(builder: (_) => const PaymentFailPage(isFromCheckout: false,)),
       );
     }
   }
