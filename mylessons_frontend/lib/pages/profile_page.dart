@@ -143,8 +143,7 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
                       itemBuilder: (ctx, i) {
                         final st = provider.associatedStudents[i];
                         return ListTile(
-                          title: Text(
-                              "${st['first_name']} ${st['last_name']}"),
+                          title: Text("${st['first_name']} ${st['last_name']}"),
                           subtitle: Text(st['birthday']),
                           trailing: IconButton(
                             icon: const Icon(Icons.info),
@@ -174,8 +173,7 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
                                 builder: (_) => SchoolSetupPage(
                                   isCreatingSchool:
                                       provider.availableSchools.isEmpty,
-                                  fetchProfileData:
-                                      provider.fetchProfileData,
+                                  fetchProfileData: provider.fetchProfileData,
                                 ),
                               ),
                             ),
@@ -183,16 +181,18 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
                                 ? 'Create School'
                                 : 'Manage School'),
                           ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BulkImportPage(),
+                          if (!provider.availableSchools.isEmpty) ...[
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BulkImportPage(),
+                                ),
                               ),
+                              child: const Text('Import Data'),
                             ),
-                            child: const Text('Import Data'),
-                          ),
+                          ]
                         ],
                       ),
                     ),
@@ -211,8 +211,7 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
                               ),
                             ),
                           ),
-                          child:
-                              const Text('Termos e Condições de Utilização'),
+                          child: const Text('Termos e Condições de Utilização'),
                         ),
                         TextButton(
                           onPressed: () => Navigator.of(context).push(
@@ -234,8 +233,7 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
     );
   }
 
-  Widget _buildInput(
-      String label, TextEditingController controller,
+  Widget _buildInput(String label, TextEditingController controller,
       {bool readOnly = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -244,8 +242,7 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
         readOnly: readOnly,
         decoration: InputDecoration(
           labelText: label,
-          border:
-              OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
     );
@@ -260,8 +257,8 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
             readOnly: true,
             decoration: InputDecoration(
               labelText: 'Birthday',
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ),
@@ -271,9 +268,9 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
               ? () async {
                   DateTime initial = DateTime.now();
                   if (provider.birthdayController.text.isNotEmpty) {
-                    initial = DateTime.tryParse(
-                            provider.birthdayController.text) ??
-                        DateTime.now();
+                    initial =
+                        DateTime.tryParse(provider.birthdayController.text) ??
+                            DateTime.now();
                   }
                   final picked = await showDatePicker(
                     context: context,
@@ -338,8 +335,9 @@ class ToggleRoleButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<ProfileProvider>();
     return ToggleButtons(
-      isSelected:
-          provider.availableRoles.map((r) => r == provider.currentRole).toList(),
+      isSelected: provider.availableRoles
+          .map((r) => r == provider.currentRole)
+          .toList(),
       onPressed: (index) =>
           provider.changeRole(context, provider.availableRoles[index]),
       borderRadius: BorderRadius.circular(8),
@@ -347,8 +345,7 @@ class ToggleRoleButtons extends StatelessWidget {
       selectedBorderColor: Theme.of(context).primaryColor,
       children: provider.availableRoles
           .map((r) => Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(r),
               ))
           .toList(),
