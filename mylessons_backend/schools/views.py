@@ -2,7 +2,7 @@ import json
 from django.shortcuts import render, get_object_or_404
 from locations.models import Location
 from equipment.serializers import EquipmentSerializer
-from schools.serializers import CSVUploadSerializer
+from schools.serializers import CSVUploadSerializer, UpdateContactsSerializer, ContactsSerializer
 from sports.models import Sport
 from payments.models import Payment
 from users.models import Instructor, Monitor, Student, UserAccount
@@ -12,7 +12,8 @@ from django.contrib.auth import authenticate, get_user_model
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
-from rest_framework import status, views, serializers
+from rest_framework.views import APIView
+from rest_framework import status, views, serializers, permissions
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from google.oauth2 import id_token
@@ -35,6 +36,26 @@ from openpyxl.comments import Comment
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 logger = logging.getLogger(__name__)
+
+
+class UpdateContactsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, school_id):
+        school = get_object_or_404(School, id=school_id)
+
+        serializer = UpdateContactsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # serializer.validated_data['contacts'] is a dict {'teams': [...]}
+        school.contacts = serializer.validated_data['contacts']
+        school.save(update_fields=['contacts'])
+
+        # Optionally return the updated contacts
+        return Response(
+            ContactsSerializer(school.contacts).data,
+            status=status.HTTP_200_OK
+        )
 
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])

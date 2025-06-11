@@ -14,8 +14,12 @@ import '../modals/payment_type_modal.dart';
 import '../modals/service_modal.dart';
 import '../modals/subject_modal.dart';
 import '../modals/location_modal.dart';
+import '../models/phone_input.dart';
+import '../models/team_input.dart';
+import '../providers/profile_provider.dart';
 import '../providers/school_data_provider.dart';
 import '../services/school_service.dart';
+import '../widgets/contact_section.dart';
 import '../widgets/payment_widgets.dart';
 import '../widgets/staff_widgets.dart';
 
@@ -40,11 +44,16 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   bool _isCreated = false;
   File? _schoolImage;
   final ImagePicker _picker = ImagePicker();
+  bool _contactsInitialized = false;
+
+  List<TeamInput> _contactTeams = [];
+  List<TeamInput>? _editContactTeams;
 
   final List<String> _tabLabels = [
     'Service',
     'Staff',
     'Staff Payment',
+    'Contacts',
     'Subject',
     'Equipment',
     'Location',
@@ -53,7 +62,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this)
+    _tabController = TabController(length: _tabLabels.length, vsync: this)
       ..addListener(() {
         setState(() {});
       });
@@ -63,6 +72,19 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
       });
     }
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.watch<SchoolDataProvider>();
+
+    // hydrate exactly once when details arrive
+    if (!_contactsInitialized && !provider.isLoading && provider.schoolDetails != null) {
+      _contactTeams = provider.contactTeams;
+      _contactsInitialized = true;
+    }
+  }
+
 
   @override
   void dispose() {
@@ -90,9 +112,9 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     }
     try {
       await context.read<SchoolDataProvider>().createSchool(
-        name,
-        imageFile: _schoolImage,
-      );
+            name,
+            imageFile: _schoolImage,
+          );
       _isCreated = true;
       await widget.fetchProfileData();
       await context.read<SchoolDataProvider>().loadSchoolDetails();
@@ -124,16 +146,30 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         );
         break;
       case 3:
-        await showSubjectModal(context, schoolId: schoolId);
+        final schoolId = provider.schoolDetails!['school_id'] as int;
+        final payload = {
+          'contacts': {
+            'teams': _contactTeams.map((t) => t.toJson()).toList(),
+          },
+        };
+        await provider.updateContacts(schoolId, payload);
+        // refresh & allow re-hydration:
+        _contactsInitialized = false;
+        await provider.loadSchoolDetails();
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Contacts saved')));
         break;
       case 4:
+        await showSubjectModal(context, schoolId: schoolId);
+        break;
+      case 5:
         await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           builder: (_) => AddEquipmentModal(schoolId: schoolId),
         );
         break;
-      case 5:
+      case 6:
         await showModalBottomSheet(
           context: context,
           isScrollControlled: true,
@@ -148,6 +184,9 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
   }
 
   String _getBottomButtonLabel() {
+    if (_tabLabels[_tabController.index] == 'Contacts') {
+      return 'Save Contacts';
+    }
     return 'Add ${_tabLabels[_tabController.index]}';
   }
 
@@ -156,7 +195,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
     if (widget.isCreatingSchool && !_isCreated) {
       return Scaffold(
         appBar: AppBar(title: const Text('School Setup')),
-        body: Padding(
+        body: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,6 +230,13 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                 label: const Text('Upload Image (optional)'),
               ),
               const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              ContactsSection(
+                initialTeams: _contactTeams,
+                onTeamsChanged: (teams) =>
+                    setState(() => _contactTeams = teams),
+              ),
+              const SizedBox(height: 24),
               Center(
                 child: ElevatedButton(
                   onPressed: _onCreateSchool,
@@ -210,12 +256,38 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
         if (provider.isLoading || details == null) {
           return Scaffold(
             appBar: AppBar(
-              title: Text(widget.isCreatingSchool
-                  ? 'School Setup'
-                  : 'School Settings'),
+              title: Text(
+                  widget.isCreatingSchool ? 'School Setup' : 'School Settings'),
             ),
             body: const Center(child: CircularProgressIndicator()),
           );
+        }
+
+        // ─── Hydrate one time from the server payload ──────────
+        if (!provider.isLoading &&
+            details['contacts'] != null &&
+            !_contactsInitialized) {
+          final rawTeams = (details['contacts']['teams'] as List<dynamic>);
+          _contactTeams = rawTeams.map((raw) {
+            // turn the JSON into your TeamInput/PhoneInput model:
+            final phonesRaw = (raw['phones'] as List<dynamic>);
+            final phones = phonesRaw.map((p) {
+              return PhoneInput(
+                countryCode: (p['country_code'] as String) ?? '',
+                number:      (p['number']       as String) ?? '',
+                canCall:     (p['capabilities']['call'] as bool?) ?? false,
+                canText:     (p['capabilities']['text'] as bool?) ?? false,
+              );
+            }).toList();
+
+            return TeamInput(
+              label:  (raw['label']  as String) ?? '',
+              emails: List<String>.from(raw['emails'] as List<dynamic>),
+              phones: phones,
+            );
+          }).toList();
+
+          _contactsInitialized = true;
         }
 
         final String? critical = details['critical_message'] as String?;
@@ -225,20 +297,15 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
             : 'School Settings';
 
         return DefaultTabController(
-          length: 6,
+          length: _tabLabels.length,
           child: Scaffold(
             appBar: AppBar(
               title: Text(appBarTitle),
               bottom: TabBar(
                 controller: _tabController,
                 isScrollable: true,
-                tabs: const [
-                  Tab(text: 'Services'),
-                  Tab(text: 'Staff'),
-                  Tab(text: 'Staff Payments'),
-                  Tab(text: 'Subjects'),
-                  Tab(text: 'Equipments'),
-                  Tab(text: 'Locations'),
+                tabs: [
+                  ..._tabLabels.map((l) => Tab(text: l)),
                 ],
               ),
             ),
@@ -271,6 +338,7 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                           _buildServicesTab(details),
                           _buildStaffTab(details),
                           buildStaffPaymentsTab(),
+                          _buildContactsTab(),
                           _buildSubjectsTab(details),
                           _buildEquipmentsTab(details),
                           _buildLocationsTab(details),
@@ -447,6 +515,18 @@ class _SchoolSetupPageState extends State<SchoolSetupPage>
                 );
               }).toList(),
             ),
+    );
+  }
+
+  Widget _buildContactsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ContactsSection(
+        initialTeams: _contactTeams,
+        onTeamsChanged: (teams) => setState(() {
+          _contactTeams = teams;
+        }),
+      ),
     );
   }
 }
