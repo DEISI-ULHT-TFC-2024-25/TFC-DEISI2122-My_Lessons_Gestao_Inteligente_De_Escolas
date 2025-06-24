@@ -5,6 +5,7 @@ from django.core.mail import send_mail
 from django.conf import settings
     
 class Payment(models.Model):
+    old_id_str = models.CharField(max_length=255, unique=True, blank=True, null=True)
     value = models.DecimalField(max_digits=10, decimal_places=2)
     time = models.TimeField(auto_now_add=True)
     date = models.DateField(auto_now_add=True)

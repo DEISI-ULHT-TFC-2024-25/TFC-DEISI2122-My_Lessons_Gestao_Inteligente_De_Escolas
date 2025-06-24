@@ -1,10 +1,11 @@
+import uuid
 from datetime import datetime, timedelta, date, time
 from decimal import Decimal
 import json
 import logging
 from django.contrib.auth.models import AbstractUser,  Group, Permission
 from django.db import models
-
+import secrets
 from payments.models import Payment
 from .utils import get_phone
 from django.utils import timezone
@@ -147,10 +148,11 @@ class UserAccount(AbstractUser):
 
 class Student(models.Model):
     id = models.AutoField(primary_key=True)
+    old_id_str = models.CharField(max_length=255, unique=True, blank=True, null=True)
     user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name='student_profile', null=True, blank=True)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    birthday = models.DateField()
+    birthday = models.DateField(null=True, blank=True)
     level = models.PositiveIntegerField(null=True, blank=True)
     parents = models.ManyToManyField(UserAccount, related_name='students')
 
@@ -163,6 +165,7 @@ class Student(models.Model):
     
 class Instructor(models.Model):
     id = models.AutoField(primary_key=True)
+    old_id_str = models.CharField(max_length=255, unique=True, blank=True, null=True)
     user = models.OneToOneField(UserAccount, on_delete=models.CASCADE, related_name='instructor_profile')
     subjects = models.ManyToManyField('sports.Sport', related_name="instructors", blank=True)
     locations = models.ManyToManyField('locations.Location', related_name="instructors", blank=True)
@@ -511,3 +514,33 @@ class UserCredentials(models.Model):
         except Exception as e:
             print(f"Error retrieving credentials: {e}")
             return None
+
+
+class AssociationKey(models.Model):
+    """
+    One‐time key to pair a user with a Student.
+    """
+    key = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        help_text="One-time pairing key"
+    )
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='association_keys'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [models.Index(fields=['key'])]
+
+    def is_expired(self) -> bool:
+        # expire after 24h
+        return self.created_at < timezone.now() - timedelta(hours=24)
+
+    def mark_used(self):
+        self.used = True
+        self.save(update_fields=['used'])

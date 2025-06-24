@@ -10,6 +10,8 @@ class ProfileProvider extends ChangeNotifier {
   bool isLoading = true;
   bool isEditingProfile = false;
 
+  String? lastGeneratedKey;
+
   // Profile controllers
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
@@ -103,5 +105,16 @@ class ProfileProvider extends ChangeNotifier {
   Future<void> logout(BuildContext context) async {
     await storage.delete(key: 'auth_token');
     Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
+  }
+
+  Future<void> generateAssociationKey(BuildContext context, int studentId) async {
+    try {
+      lastGeneratedKey = await ProfileService.generateAssociationKey(studentId);
+      notifyListeners();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error generating key: $e')),
+      );
+    }
   }
 }

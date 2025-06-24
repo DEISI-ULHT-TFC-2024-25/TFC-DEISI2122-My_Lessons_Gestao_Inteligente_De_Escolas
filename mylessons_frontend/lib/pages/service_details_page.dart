@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/school_provider.dart';
 import '../modals/student_selection_modal.dart';
+import '../widgets/showMapOptionsBottomModal.dart';
 
 /// Returns the currency symbol for a given currency code.
 String getCurrencySymbol(String currencyCode) {
@@ -639,43 +640,74 @@ class _ServiceDetailsContentState extends State<ServiceDetailsContent> {
   }
 
   Widget _buildLocationsTab() {
-    final List<String> locations = (_service['locations'] as List<dynamic>?)
-            ?.map((e) => e.toString())
+    // 1) Cast your raw list of locations from the service:
+    final List<Map<String, dynamic>> locations =
+        (_service['locations'] as List<dynamic>?)
+            ?.cast<Map<String, dynamic>>()
             .toList() ??
-        [];
-    return SingleChildScrollView(
+            [];
+
+    if (locations.isEmpty) {
+      return Center(
+        child: Text(
+          'No locations provided.',
+          style: GoogleFonts.lato(fontSize: 14),
+        ),
+      );
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      child: locations.isEmpty
-          ? Center(
-              child: Text('No locations provided.',
-                  style: GoogleFonts.lato(fontSize: 14)))
-          : Column(
-              children: locations.map((loc) {
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.location_on,
-                            size: 20, color: Colors.orange),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(loc,
-                              style: GoogleFonts.lato(
-                                  fontSize: 14, fontWeight: FontWeight.w500)),
-                        ),
-                      ],
-                    ),
+      itemCount: locations.length,
+      itemBuilder: (context, index) {
+        final loc = locations[index];
+        final name = loc['name'] as String? ?? '';
+        final address = loc['address'] as String? ?? '';
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            leading: const Icon(
+              Icons.location_on,
+              color: Colors.orange,
+              size: 24,
+            ),
+            title: Text(
+              name,
+              style: GoogleFonts.lato(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text(
+              address,
+              style: GoogleFonts.lato(fontSize: 14),
+            ),
+            trailing: const Icon(Icons.directions, color: Colors.orange),
+            onTap: () async {
+              if (address.isNotEmpty) {
+                await showMapOptionsBottomModal(context, address);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Location address not available."),
                   ),
                 );
-              }).toList(),
-            ),
+              }
+            },
+          ),
+        );
+      },
     );
   }
+
+
 
   Widget _buildBenefitsTab() {
     final List<String> benefits = (_service['benefits'] as List<dynamic>?)

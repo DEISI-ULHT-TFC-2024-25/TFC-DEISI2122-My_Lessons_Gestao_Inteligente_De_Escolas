@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import add_pack_payment, edit_instructors, edit_location, edit_students, edit_subject, get_group_packs_from_a_lesson, unschedulable_lessons, last_packs, pay_pack_debt, toggle_lesson_completion, upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, available_lesson_times, can_still_reschedule, schedule_multiple_lessons, update_lesson_extras
+from .views import update_pack_expiration_date, add_pack_payment, edit_instructors, edit_location, edit_students, edit_subject, get_group_packs_from_a_lesson, unschedulable_lessons, last_packs, pay_pack_debt, toggle_lesson_completion, upcoming_lessons, last_lessons, schedule_private_lesson, active_packs, pack_details, lesson_details, todays_lessons, available_lesson_times, can_still_reschedule, schedule_multiple_lessons, update_lesson_extras
 
 urlpatterns = [
     path('upcoming_lessons/', upcoming_lessons, name='upcoming_lessons'),
@@ -22,9 +22,11 @@ urlpatterns = [
     path('add_pack_payment/', add_pack_payment, name='add_pack_payment'),
     path('pay_pack_debt/', pay_pack_debt, name='pay_pack_debt'),
     path('unschedulable_lessons/', unschedulable_lessons, name='unschedulable_lessons'),
+    path('update_pack_expiration_date/', update_pack_expiration_date, name='update_pack_expiration_date'),
     path('get_group_packs_from_a_lesson/', get_group_packs_from_a_lesson, name='get_group_packs_from_a_lesson'),
     path('extras/',
         update_lesson_extras,
         name='update-lesson-extras'
     ),
 ]
+

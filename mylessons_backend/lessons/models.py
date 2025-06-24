@@ -12,6 +12,7 @@ from payments.models import Payment
 # TODO not here but everywhere make_aware problem (convert to datetime and then make the operation with now())
 
 class Pack(models.Model):
+    old_id_str = models.CharField(max_length=255, unique=True, blank=True, null=True)
     date = models.DateField()
     date_time = models.DateTimeField(auto_now_add=True)
     type = models.CharField(max_length=255, default='private')
@@ -36,6 +37,7 @@ class Pack(models.Model):
     
     def handle_expiration_date(self):
         today = now().date()
+        """
         print("ENTERED HANDLE EXPIRATION")
         print(self.expiration_date)
         if self.expiration_date < today:
@@ -45,6 +47,7 @@ class Pack(models.Model):
                     lesson.mark_as_given()
                 self.update_pack_status()
         days_until_expiration = None
+        """
         if self.expiration_date:
             days_until_expiration = (self.expiration_date - today).days
         return days_until_expiration
@@ -254,6 +257,7 @@ class Pack(models.Model):
             raise ValueError("Cannot add classes to a completed pack.")
 
 class Lesson(models.Model):
+    old_id_str = models.CharField(max_length=255, unique=True, blank=True, null=True)
     date = models.DateField(null=True, blank = True)
     start_time = models.TimeField(null=True, blank = True)
     end_time = models.TimeField(null=True, blank = True)

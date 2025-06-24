@@ -9,6 +9,12 @@ Future<T?> showSubjectModal<T>(
   int? lessonId,
   int? packId,
   int? schoolId,
+  /// if true, operate purely locally: no HTTP POST for update/create
+  bool localOnly = false,
+  /// initial selection for multi-select mode
+  List<int>? initialSelectedIds,
+  /// supply list of available items in local mode
+  List<Map<String, dynamic>>? items,
 }) {
   // sanity-check: exactly one non-null
   final provided = [lessonId, packId, schoolId].where((x) => x != null);
@@ -28,10 +34,12 @@ Future<T?> showSubjectModal<T>(
       return SizedBox(
         height: maxHeight,
         child: SubjectModal(
-          // only one of these will be non-null
           lessonId: lessonId,
           packId: packId,
           schoolId: schoolId,
+          localOnly: localOnly,
+          initialSelectedIds: initialSelectedIds,
+          items: items,
         ),
       );
     },

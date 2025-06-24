@@ -165,7 +165,7 @@ STRIPE_WEBHOOK_SECRET = 'whsec_5EcGjLPpcfMjRNDpGVbahPjQWAyZgGmZ'
 SUCCESS_URL = "https://mylessons.pythonanywhere.com/deeplink/payment-success?session_id={CHECKOUT_SESSION_ID}"
 CANCEL_URL = "https://mylessons.pythonanywhere.com/deeplink/payment-fail?session_id={CHECKOUT_SESSION_ID}"
 
-
+FRONTEND_URL = "https://mylessons.pt"
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'

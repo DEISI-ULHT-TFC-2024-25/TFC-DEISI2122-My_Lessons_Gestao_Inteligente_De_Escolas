@@ -1,6 +1,7 @@
 from django.db import models
 
 class Equipment(models.Model):
+    old_id_str = models.CharField(max_length=255, unique=True, blank=True, null=True)
     name = models.CharField(max_length=255)
     location = models.ForeignKey('locations.Location', on_delete=models.CASCADE, related_name='equipments', null=True, blank=True)
     school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='equipments', blank=True, null=True)

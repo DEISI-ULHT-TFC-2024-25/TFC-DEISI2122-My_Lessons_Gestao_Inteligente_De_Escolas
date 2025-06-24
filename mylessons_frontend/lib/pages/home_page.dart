@@ -47,6 +47,11 @@ class _HomePageState extends State<HomePage>
   String lastPacksSearchQuery = "";
   List<Map<String, String>> lastPacksFilters = [];
 
+  bool _isLoadingMore = false;
+  bool _isLoadingHistory = false;
+  bool _isLoadingActivePacks = false;
+  bool _isLoadingLastPacks = false;
+
   bool _didNavigateToProfile = false;
 
   int _lessonsActiveTabIndex = 0; // 0: Active lessons, 1: History
@@ -118,17 +123,16 @@ class _HomePageState extends State<HomePage>
 
   Future<void> registerFcmTokenIfNeeded() async {
     // ONLY on Android or iOS native:
-  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-    
-    if (_fcmTokenSent) return; // ensure it's done only once
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      await sendTokenToBackend(token);
-      _fcmTokenSent = true;
-    } else {
-      print('⚠️ Not logged in or no FCM token');
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      if (_fcmTokenSent) return; // ensure it's done only once
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await sendTokenToBackend(token);
+        _fcmTokenSent = true;
+      } else {
+        print('⚠️ Not logged in or no FCM token');
+      }
     }
-  }
   }
 
   /// Modal methods (using provider values as needed).
@@ -1157,6 +1161,92 @@ class _HomePageState extends State<HomePage>
     return const Center(child: Text("No stats available"));
   }
 
+  Widget _buildGroupWithLoadMore({
+    required String label,
+    required List<dynamic> items,
+    required Color color,
+    required bool hasMore,
+    required Future<void> Function() onLoadMore,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildGroupedLessonCard(
+          label,
+          color,
+          items.map((lesson) {
+            return Provider.of<LessonModalProvider>(context, listen: false)
+                .buildLessonCard(
+              context,
+              lesson,
+              Provider.of<PackDetailsProvider>(context, listen: false)
+                  .unschedulableLessons,
+              isLastLesson: false,
+            );
+          }).toList(),
+        ),
+        if (hasMore)
+          Center(
+            child: TextButton(
+              onPressed: _isLoadingMore
+                  ? null
+                  : () async {
+                      setState(() => _isLoadingMore = true);
+                      await onLoadMore();
+                      setState(() => _isLoadingMore = false);
+                    },
+              child: _isLoadingMore
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.orange,
+                      ),
+                    )
+                  : Text('Load more $label'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildListWithLoadMore({
+    required List<Widget> children,
+    required bool hasMore,
+    required bool isLoading,
+    required Future<void> Function() onLoadMore,
+    required String buttonLabel,
+  }) {
+    return Column(
+      children: [
+        ...children,
+        if (hasMore)
+          Center(
+            child: TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setState(() => isLoading = true);
+                      await onLoadMore();
+                      setState(() => isLoading = false);
+                    },
+              child: isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.orange,
+                      ),
+                    )
+                  : Text(buttonLabel),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<HomePageProvider>(
@@ -1219,116 +1309,136 @@ class _HomePageState extends State<HomePage>
                                     upcomingFilters,
                                   );
 
-                                  // Map group titles to their background colors.
-                                  final Map<String, Color> groupColors = {
-                                    'Need Reschedule': Colors.red,
-                                    'Today': Colors.orange,
-                                    'Upcoming': Colors.grey,
-                                  };
-
-                                  // Create groups (assumes each lesson has a "status" field).
-                                  final Map<String, List<dynamic>>
-                                      groupedLessons = {
-                                    'Today': [],
-                                    'Need Reschedule': [],
-                                    'Upcoming': [],
-                                  };
-
-                                  // Group the lessons based on the 'status' field.
-                                  for (var lesson in activeLessons) {
-                                    String status =
-                                        lesson['status'] ?? 'Upcoming';
-                                    if (!groupedLessons.containsKey(status)) {
-                                      status = 'Upcoming';
-                                    }
-                                    groupedLessons[status]!.add(lesson);
-                                  }
-
-                                  // Build a list of grouped cards.
-                                  List<Widget> groupedCards = [];
-                                  groupedLessons.forEach((group, lessons) {
-                                    if (lessons.isNotEmpty) {
-                                      // Build individual lesson card widgets using your existing method.
-                                      final lessonWidgets =
-                                          lessons.map((lesson) {
-                                        return Provider.of<LessonModalProvider>(
-                                                context,
-                                                listen: false)
-                                            .buildLessonCard(
-                                          context,
-                                          lesson,
-                                          Provider.of<PackDetailsProvider>(
-                                                  context)
-                                              .unschedulableLessons,
-                                          isLastLesson: false,
-                                        );
-                                      }).toList();
-
-                                      groupedCards.add(
-                                        buildGroupedLessonCard(group,
-                                            groupColors[group]!, lessonWidgets),
-                                      );
-                                    }
-                                  });
-
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: groupedCards,
+                                  // 1. filter each bucket separately
+                                  final todayList = _filterLessons(
+                                    homeProvider.todayLessons,
+                                    upcomingSearchQuery,
+                                    upcomingFilters,
                                   );
+                                  final needRescheduleList = _filterLessons(
+                                    homeProvider.needRescheduleLessons,
+                                    upcomingSearchQuery,
+                                    upcomingFilters,
+                                  );
+                                  final upcomingList = _filterLessons(
+                                    homeProvider.upcomingLessons,
+                                    upcomingSearchQuery,
+                                    upcomingFilters,
+                                  );
+
+                                  List<Widget> sections = [];
+
+// Today:
+                                  // Today:
+                                  sections.add(_buildGroupWithLoadMore(
+                                    label: 'Today',
+                                    items: todayList,
+                                    color: Colors.orange,
+                                    hasMore: homeProvider.hasMoreToday,
+                                    onLoadMore: () => homeProvider
+                                        .fetchUpcomingLessons(bucket: 'today'),
+                                  ));
+
+                                  // Need Reschedule:
+                                  sections.add(_buildGroupWithLoadMore(
+                                    label: 'Need Reschedule',
+                                    items: needRescheduleList,
+                                    color: Colors.red,
+                                    hasMore: homeProvider.hasMoreReschedule,
+                                    onLoadMore: () =>
+                                        homeProvider.fetchUpcomingLessons(
+                                            bucket: 'reschedule'),
+                                  ));
+
+                                  // Upcoming:
+                                  sections.add(_buildGroupWithLoadMore(
+                                    label: 'Upcoming',
+                                    items: upcomingList,
+                                    color: Colors.grey,
+                                    hasMore: homeProvider.hasMoreUpcoming,
+                                    onLoadMore: () =>
+                                        homeProvider.fetchUpcomingLessons(
+                                            bucket: 'upcoming'),
+                                  ));
+
+                                  return Column(children: sections);
                                 }),
                         ),
                       ],
                     ),
                   ),
                 )
+              // inside the “History” branch of your lessonsTab:
               : RefreshIndicator(
                   color: Colors.orange,
                   backgroundColor: Colors.white,
-                  onRefresh: () async {
-                    await homeProvider.fetchData();
-                  },
+                  onRefresh: () async => await homeProvider.fetchData(),
                   child: SingleChildScrollView(
                     controller: _lessonsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       children: [
-                        // Moved toggle row inside the scrollable content.
                         _buildToggleRowForLessons(),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: homeProvider.isLoading
                               ? Column(
                                   children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
+                                      3, (_) => _buildLoadingCard()),
                                 )
-                              : _filterLessons(
-                                          homeProvider.lastLessons,
-                                          lastLessonsSearchQuery,
-                                          lastLessonsFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterLessons(
-                                              homeProvider.lastLessons,
-                                              lastLessonsSearchQuery,
-                                              lastLessonsFilters)
-                                          .map((lesson) => Provider.of<
-                                                      LessonModalProvider>(
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // your list of history lesson cards
+                                    ..._filterLessons(
+                                      homeProvider.lastLessons,
+                                      lastLessonsSearchQuery,
+                                      lastLessonsFilters,
+                                    ).map((lesson) =>
+                                        Provider.of<LessonModalProvider>(
+                                          context,
+                                          listen: false,
+                                        ).buildLessonCard(
+                                          context,
+                                          lesson,
+                                          Provider.of<PackDetailsProvider>(
                                                   context,
                                                   listen: false)
-                                              .buildLessonCard(
-                                                  context,
-                                                  lesson,
-                                                  Provider.of<PackDetailsProvider>(
-                                                          context)
-                                                      .unschedulableLessons,
-                                                  isLastLesson: true))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No historical lessons")),
+                                              .unschedulableLessons,
+                                          isLastLesson: true,
+                                        )),
+                                    // load more button + spinner
+                                    if (homeProvider.hasMoreLastLessons)
+                                      Center(
+                                        child: TextButton(
+                                          onPressed: _isLoadingHistory
+                                              ? null
+                                              : () async {
+                                                  setState(() =>
+                                                      _isLoadingHistory = true);
+                                                  await homeProvider
+                                                      .fetchLastLessons(
+                                                          loadMore: true);
+                                                  setState(() =>
+                                                      _isLoadingHistory =
+                                                          false);
+                                                },
+                                          child: _isLoadingHistory
+                                              ? SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.orange,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Load more history lessons'),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
@@ -1337,85 +1447,131 @@ class _HomePageState extends State<HomePage>
 
           // Build Packs Tab.
           Widget packsTab = _packsActiveTabIndex == 0
+              // Active Packs
               ? RefreshIndicator(
                   color: Colors.orange,
                   backgroundColor: Colors.white,
-                  onRefresh: () async {
-                    await homeProvider.fetchData();
-                  },
+                  onRefresh: () async => await homeProvider.fetchData(),
                   child: SingleChildScrollView(
                     controller: _packsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       children: [
-                        // Moved toggle row inside the scrollable content.
                         _buildToggleRowForPacks(),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: homeProvider.isLoading
                               ? Column(
                                   children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
+                                      3, (_) => _buildLoadingCard()),
                                 )
-                              : _filterPacks(
-                                          homeProvider.activePacks,
-                                          activePacksSearchQuery,
-                                          activePacksFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterPacks(
-                                              homeProvider.activePacks,
-                                              activePacksSearchQuery,
-                                              activePacksFilters)
-                                          .map((pack) => _buildPackCard(pack))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No active packs")),
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // your list of active pack cards
+                                    ..._filterPacks(
+                                      homeProvider.activePacks,
+                                      activePacksSearchQuery,
+                                      activePacksFilters,
+                                    ).map((pack) => _buildPackCard(pack)),
+                                    // load more button + spinner
+                                    if (homeProvider.hasMoreActivePacks)
+                                      Center(
+                                        child: TextButton(
+                                          onPressed: _isLoadingActivePacks
+                                              ? null
+                                              : () async {
+                                                  setState(() =>
+                                                      _isLoadingActivePacks =
+                                                          true);
+                                                  await homeProvider
+                                                      .fetchActivePacks(
+                                                          loadMore: true);
+                                                  setState(() =>
+                                                      _isLoadingActivePacks =
+                                                          false);
+                                                },
+                                          child: _isLoadingActivePacks
+                                              ? SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.orange,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Load more active packs'),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
                   ),
                 )
+              // Last (Historical) Packs
               : RefreshIndicator(
                   color: Colors.orange,
                   backgroundColor: Colors.white,
-                  onRefresh: () async {
-                    await homeProvider.fetchData();
-                  },
+                  onRefresh: () async => await homeProvider.fetchData(),
                   child: SingleChildScrollView(
                     controller: _packsScrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       children: [
-                        // Moved toggle row inside the scrollable content.
                         _buildToggleRowForPacks(),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: homeProvider.isLoading
                               ? Column(
                                   children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
+                                      3, (_) => _buildLoadingCard()),
                                 )
-                              : _filterPacks(
-                                          homeProvider.lastPacks,
-                                          lastPacksSearchQuery,
-                                          lastPacksFilters)
-                                      .isNotEmpty
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: _filterPacks(
-                                              homeProvider.lastPacks,
-                                              lastPacksSearchQuery,
-                                              lastPacksFilters)
-                                          .map((pack) => _buildPackCard(pack))
-                                          .toList(),
-                                    )
-                                  : const Center(
-                                      child: Text("No historical packs")),
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // your list of completed pack cards
+                                    ..._filterPacks(
+                                      homeProvider.lastPacks,
+                                      lastPacksSearchQuery,
+                                      lastPacksFilters,
+                                    ).map((pack) => _buildPackCard(pack)),
+                                    // load more button + spinner
+                                    if (homeProvider.hasMoreLastPacks)
+                                      Center(
+                                        child: TextButton(
+                                          onPressed: _isLoadingLastPacks
+                                              ? null
+                                              : () async {
+                                                  setState(() =>
+                                                      _isLoadingLastPacks =
+                                                          true);
+                                                  await homeProvider
+                                                      .fetchLastPacks(
+                                                          loadMore: true);
+                                                  setState(() =>
+                                                      _isLoadingLastPacks =
+                                                          false);
+                                                },
+                                          child: _isLoadingLastPacks
+                                              ? SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.orange,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Load more completed packs'),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
