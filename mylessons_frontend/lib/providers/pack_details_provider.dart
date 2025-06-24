@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/api_service.dart';
+import '../services/api_service.dart' as ApiService;
 
 class PackDetailsProvider extends ChangeNotifier {
   /// Data passed in from outside.
@@ -38,7 +38,7 @@ class PackDetailsProvider extends ChangeNotifier {
   /// Refresh the modal's pack details.
   void _refreshPackDetails() {
     final int packId = _getPackId();
-    _packDetailsFuture = fetchPackDetails(packId);
+    _packDetailsFuture = ApiService.fetchPackDetails(packId);
     notifyListeners();
   }
 
@@ -65,5 +65,25 @@ class PackDetailsProvider extends ChangeNotifier {
   /// Public method to force a refresh of data from outside.
   Future<void> refreshPackDetails() async {
     _refreshPackDetails();
+  }
+
+  /// Sends the new expiration date to the API and refreshes.
+  Future<bool> updateExpirationDate(DateTime newDate) async {
+    final label = 'Expiration Date';
+    setActionLoading(label, true);
+    try {
+      final int packId = _getPackId();
+      final String formatted = DateFormat('yyyy-MM-dd').format(newDate);
+      final success = await ApiService.updatePackExpirationDate(
+        packId: packId,
+        expirationDate: formatted,
+      );
+      if (success) {
+        await refreshPackDetails();
+      }
+      return success;
+    } finally {
+      setActionLoading(label, false);
+    }
   }
 }

@@ -27,6 +27,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'pages/reset_password_page.dart';
 import 'providers/profile_provider.dart';
 import 'services/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // Create a global RouteObserver instance.
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -77,6 +78,15 @@ Future<void> main() async {
 
   debugPaintSizeEnabled = false;
 
+  // If running integration tests, wipe any stored token first:
+  const bool clearTokenForIntegration =
+  bool.fromEnvironment('INTEGRATION_TEST', defaultValue: false);
+  if (clearTokenForIntegration) {
+    await const FlutterSecureStorage().delete(key: 'auth_token');
+    print('⚠️ Cleared auth_token for integration test');
+  }
+
+
   print('✅ reached runApp()');
 
   runApp(
@@ -93,7 +103,9 @@ Future<void> main() async {
     ),
   );
   // ONLY on Android or iOS native:
-  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+  if (!kIsWeb &&
+      (Platform.isAndroid || Platform.isIOS) &&
+      !clearTokenForIntegration) {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,

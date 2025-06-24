@@ -2,14 +2,15 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
 import 'package:intl/intl.dart';
 
 //const String baseUrl = 'https://mylessons.pythonanywhere.com'; // hosting
 //const String baseUrl = 'http://127.0.0.1:8000'; // localhost
 //const String baseUrl = 'http://192.168.1.66:8000'; // net da sala
 //const String baseUrl = 'http://172.19.72.130:8000'; // freeulusofona
-//const String baseUrl = 'http://172.20.10.3:8000'; // hotspot
-const String baseUrl = 'https://mylessons.pt'; // production hosting
+const String baseUrl = 'http://192.168.1.71:8000';
+//const String baseUrl = 'https://mylessons.pt'; // production hosting
 //const String baseUrl = 'http://172.18.128.1:8000'; // hotspot
 
 final FlutterSecureStorage storage = const FlutterSecureStorage();
@@ -42,34 +43,34 @@ Future<void> sendTokenToBackend(String token) async {
 }
 
 Future<void> requestPasswordReset(String email) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/users/password-reset/'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email}),
-    );
-    if (response.statusCode != 200) {
-      throw Exception('Failed to request password reset');
-    }
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/users/password-reset/'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'email': email}),
+  );
+  if (response.statusCode != 200) {
+    throw Exception('Failed to request password reset');
   }
+}
 
-  Future<void> confirmPasswordReset({
-    required String uid,
-    required String token,
-    required String newPassword,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/users/password-reset-confirm/'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'uid': uid,
-        'token': token,
-        'new_password': newPassword,
-      }),
-    );
-    if (response.statusCode != 200) {
-      throw Exception('Failed to reset password');
-    }
+Future<void> confirmPasswordReset({
+  required String uid,
+  required String token,
+  required String newPassword,
+}) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/users/password-reset-confirm/'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'uid': uid,
+      'token': token,
+      'new_password': newPassword,
+    }),
+  );
+  if (response.statusCode != 200) {
+    throw Exception('Failed to reset password');
   }
+}
 
 Future<String> fetchCurrentRole() async {
   final headers = await getAuthHeaders();
@@ -168,7 +169,6 @@ Future<List<Map<String, dynamic>>> fetchSchools() async {
     throw Exception('Failed to load schools');
   }
 }
-
 
 Future<Map<String, dynamic>?> fetchLessonDetails(int lessonId) async {
   final headers = await getAuthHeaders();
@@ -280,18 +280,14 @@ Future<int> fetchSchoolScheduleTimeLimit(schoolName) async {
     body: jsonEncode({"school_name": schoolName}),
   );
   if (response.statusCode == 200) {
-    final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+    final Map<String, dynamic> data =
+        json.decode(utf8.decode(response.bodyBytes));
     return data['time_limit'] as int;
   } else {
     // If an error occurs, default to 0 hours.
     return 0;
   }
 }
-
-
-
-
-
 
 // ==================== New API Functions for Flutter Frontend ====================
 
@@ -350,8 +346,6 @@ Future<Map<String, dynamic>> createSkill(Map<String, dynamic> payload) async {
   }
 }
 
-
-
 /// Creates a new goal.
 Future<void> createGoal(Map<String, dynamic> payload) async {
   final headers = await getAuthHeaders();
@@ -381,7 +375,8 @@ Future<void> createProgressRecord(Map<String, dynamic> payload) async {
 }
 
 /// Updates an existing progress record.
-Future<void> updateProgressRecord(int recordId, Map<String, dynamic> payload) async {
+Future<void> updateProgressRecord(
+    int recordId, Map<String, dynamic> payload) async {
   final headers = await getAuthHeaders();
   final url = '$baseUrl/api/progress/progress-records/$recordId/';
   final response = await http.put(
@@ -396,9 +391,10 @@ Future<void> updateProgressRecord(int recordId, Map<String, dynamic> payload) as
 
 Future<dynamic> getProgressRecord(int studentId, int lessonId) async {
   final headers = await getAuthHeaders();
-  final url = '$baseUrl/api/progress/progress-record/?student_id=$studentId&lesson_id=$lessonId';
+  final url =
+      '$baseUrl/api/progress/progress-record/?student_id=$studentId&lesson_id=$lessonId';
   final response = await http.get(Uri.parse(url), headers: headers);
-  
+
   if (response.statusCode == 200) {
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data;
@@ -408,4 +404,19 @@ Future<dynamic> getProgressRecord(int studentId, int lessonId) async {
   } else {
     throw Exception("Failed to get progress record: ${response.statusCode}");
   }
+}
+
+Future<bool> updatePackExpirationDate({
+  required int packId,
+  required String expirationDate, // “yyyy-MM-dd”
+}) async {
+  final response = await post(
+      Uri.parse('$baseUrl/api/lessons/update_pack_expiration_date/'),
+      headers: await getAuthHeaders(),
+      body: jsonEncode({
+      'pack_id': packId,
+      'expiration_date': expirationDate,
+    }),
+  );
+  return response.statusCode == 200;
 }

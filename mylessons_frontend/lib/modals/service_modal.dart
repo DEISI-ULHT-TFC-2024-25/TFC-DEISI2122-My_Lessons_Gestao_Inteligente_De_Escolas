@@ -671,7 +671,34 @@ Future<void> showAddEditServiceModal(
                                 avatar: const Icon(Icons.add),
                                 label: const Text("Add Subject"),
                                 onPressed: () async {
-                                  // … your existing SubjectModal logic …
+                                  // 1) grab the school_id from the details you were already given
+                                  final schoolId = schoolDetails['school_id'] as int;
+
+                                  // 2) build your initial subject-IDs list:
+                                  final initialIds = selectedSports.map((s) => s['id'] as int).toList();
+
+                                  // 3) normalize raw provider subjects
+                                  final rawSubjects = context
+                                      .read<SchoolDataProvider>()
+                                      .subjects
+                                      .cast<Map<String, dynamic>>();
+                                  final allSubjects = rawSubjects.map((s) => <String, dynamic>{
+                                    'id':   s['subject_id']   as int,
+                                    'name': s['subject_name'] as String,
+                                  }).toList();
+
+                                  // 4) pass the schoolId in to satisfy the assert
+                                  final picked = await showSubjectModal<List<Map<String, dynamic>>>(
+                                    context,
+                                    schoolId: schoolId,        // ← now you have “exactly one” non-null ID
+                                    localOnly: true,
+                                    initialSelectedIds: initialIds,
+                                    items: allSubjects,
+                                  );
+
+                                  if (picked != null) {
+                                    setModalState(() => selectedSports = picked);
+                                  }
                                 },
                               ),
                             ],
@@ -696,7 +723,40 @@ Future<void> showAddEditServiceModal(
                                 avatar: const Icon(Icons.add),
                                 label: const Text("Add Location"),
                                 onPressed: () async {
-                                  // … your existing LocationModal logic …
+                                  // 1) grab the exact school ID you were already handed
+                                  final schoolId = schoolDetails['school_id'] as int;
+
+                                  // 2) build your initial list of selected location IDs
+                                  final initialIds = selectedLocations
+                                      .map((l) => l['id'] as int)
+                                      .toList();
+
+                                  // 3) normalize raw provider locations
+                                  final rawLocations = context
+                                      .read<SchoolDataProvider>()
+                                      .locations
+                                      .cast<Map<String, dynamic>>();
+                                  final allLocations = rawLocations.map((l) => <String, dynamic>{
+                                    'id': l['location_id'] as int,
+                                    'name': l['location_name'] as String,
+                                    'address': (l['address'] as String?) ?? '',
+                                  }).toList();
+
+                                  // 4) invoke the modal, passing schoolId so the assert passes
+                                  final picked = await showLocationModal<List<Map<String, dynamic>>>(
+                                    context,
+                                    schoolId: schoolId,
+                                    localOnly: true,
+                                    initialSelectedIds: initialIds,
+                                    items: allLocations,
+                                  );
+
+                                  // 5) if the user made a choice, update your chip list
+                                  if (picked != null) {
+                                    setModalState(() {
+                                      selectedLocations = picked;
+                                    });
+                                  }
                                 },
                               ),
                             ],

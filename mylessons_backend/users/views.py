@@ -12,14 +12,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, redirect
 from rest_framework.authtoken.models import Token
-from rest_framework import status
+from rest_framework import status, generics, permissions
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 import logging
 from django.contrib.auth.hashers import make_password
-from .models import GoogleCredentials, Student, Unavailability, UserAccount, Instructor, UserCredentials
-from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, UserAccountSerializer, StudentSerializer
+from .models import GoogleCredentials, Student, Unavailability, UserAccount, Instructor, \
+    UserCredentials, AssociationKey
+from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, UserAccountSerializer, StudentSerializer, GenerateKeyOutputSerializer, PairByKeyInputSerializer
 from notifications.models import Notification
 from lessons.models import Lesson, Pack
 from schools.models import School
@@ -29,6 +30,7 @@ from django.utils.dateparse import parse_date, parse_time
 import firebase_admin
 from firebase_admin import auth as firebase_auth, initialize_app, credentials
 import os
+from django.db import transaction
 import secrets
 import string
 from google.oauth2 import id_token
@@ -43,11 +45,72 @@ from django.urls import reverse
 from django.http import JsonResponse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
+from django.core.exceptions import ObjectDoesNotExist
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def generate_key(request, id):
+    """
+    POST /student/<id>/generate-key/
+    Returns: { "key": "<uuid4>" }
+    """
+    student = get_object_or_404(Student, pk=id)
+
+    # TODO: enforce that request.user may generate keys for this student
+    # e.g. if request.user is the owner/admin of the student record
+
+    assoc = AssociationKey.objects.create(student=student)
+    out = GenerateKeyOutputSerializer({'key': assoc.key})
+    return Response(out.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def pair_by_key(request):
+    """
+    POST /student/pair-by-key/  { "key": "<uuid>" }
+    Validates and consumes the key, then associates request.user with student.
+    """
+    serializer = PairByKeyInputSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    key_val = serializer.validated_data['key']
+
+    try:
+        assoc = AssociationKey.objects.get(key=key_val, used=False)
+    except AssociationKey.DoesNotExist:
+        return Response(
+            {'detail': 'Invalid or already used key.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if assoc.is_expired():
+        return Response(
+            {'detail': 'Key has expired.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Perform the association. Adjust this to your actual relation:
+    # e.g. if Student has a ManyToManyField to a Parent model:
+    student = assoc.student
+    parent_user = request.user  # or request.user.parent_profile
+    student.parents.add(parent_user)
+    # 4a) Link parent ↔ student
+    student.parents.add(parent_user)
+
+    # 4b) Link parent ↔ each school the student belongs to
+    for school in student.schools.all():            # adjust field name if needed
+        school.parents.add(parent_user)
+
+    # 4c) Link parent ↔ each pack the student belongs to
+    for pack in student.packs.all():                # adjust field name if needed
+        pack.parents.add(parent_user)
+
+    assoc.mark_used()
+    return Response({'detail': 'Paired successfully.'}, status=status.HTTP_200_OK)
 
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])

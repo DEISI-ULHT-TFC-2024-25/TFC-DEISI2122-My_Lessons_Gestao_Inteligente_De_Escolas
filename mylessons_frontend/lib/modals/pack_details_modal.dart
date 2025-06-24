@@ -159,7 +159,8 @@ class PackDetailsContent extends StatelessWidget {
             details["date"] = provider.formatDate(details["date"].toString());
           }
           if (details.containsKey("expiration_date")) {
-            details["expiration_date"] = provider.formatDate(details["expiration_date"].toString());
+            details["expiration_date"] =
+                provider.formatDate(details["expiration_date"].toString());
           }
 
           // Instead of relying solely on provider.currentRole,
@@ -179,7 +180,10 @@ class PackDetailsContent extends StatelessWidget {
           if (currentRole == "Parent") {
             gridItems.addAll([
               {'label': 'Date', 'value': details['date'] ?? ''},
-              {'label': 'Expiration Date', 'value': details['expiration_date'] ?? ''},
+              {
+                'label': 'Expiration Date',
+                'value': details['expiration_date'] ?? ''
+              },
               {
                 'label': 'Lessons Remaining',
                 'value':
@@ -194,7 +198,6 @@ class PackDetailsContent extends StatelessWidget {
                 'value': details['instructors_name'] ?? ''
               },
               {'label': 'Subject', 'value': details['subject'] ?? ''},
-  
             ]);
 
             leftIconMapping.addAll({
@@ -229,7 +232,10 @@ class PackDetailsContent extends StatelessWidget {
           } else if (currentRole == "Instructor" || currentRole == "Admin") {
             gridItems.addAll([
               {'label': 'Date', 'value': details['date'] ?? ''},
-              {'label': 'Expiration Date', 'value': details['expiration_date'] ?? ''},
+              {
+                'label': 'Expiration Date',
+                'value': details['expiration_date'] ?? ''
+              },
               {
                 'label': 'Lessons Remaining',
                 'value':
@@ -258,8 +264,14 @@ class PackDetailsContent extends StatelessWidget {
               'Instructors': Icons.edit,
             });
 
-            labelsWithAction.addAll(
-                ['Debt', 'Expiration Date', 'School', 'Instructors', 'Students', 'Subject']);
+            labelsWithAction.addAll([
+              'Debt',
+              'Expiration Date',
+              'School',
+              'Instructors',
+              'Students',
+              'Subject'
+            ]);
             actionIconMapping.addAll({
               'Debt': Icons.payment,
               'Expiration Date': Icons.edit,
@@ -531,29 +543,46 @@ class PackDetailsContent extends StatelessWidget {
                                                     );
                                                   },
                                                 );
-                                              } /*else if (label == "Expiration Date" &&
+                                              } else if (label == "Expiration Date" &&
                                                   currentRole == "Admin") {
-                                                await 
-
-                                                
-                                   
-                                  
-                                              }*/ else if (label == "Debt") {
-                                                if(currentRole == "Parent") {
-                                                Navigator.pop(context);
-
-                                                Navigator.of(context)
-                                                    .pushNamedAndRemoveUntil(
-                                                  '/main',
-                                                  (route) => false,
-                                                  arguments: {
-                                                    'initialIndex': 2
-                                                  },
+                                                // 1. Pick a date
+                                                final DateTime? picked = await showDatePicker(
+                                                  context: context,
+                                                  initialDate: DateTime.tryParse(details['expiration_date_raw'] ?? '') ?? DateTime.now(),
+                                                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                                  lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
                                                 );
-                                                return;
-                                              } else if (currentRole == "Admin" || currentRole == "Instructor") {
-                                                updated = await showAddPaymentModal(context, pack: details);
+                                                if (picked != null) {
+                                                  final updated = await provider.updateExpirationDate(picked);
+                                                  if (!updated) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(content: Text('Failed to update expiration date')),
+                                                    );
+                                                  }
+                                                }
                                               }
+                                              else if (label == "Debt") {
+                                                if (currentRole == "Parent") {
+                                                  Navigator.pop(context);
+
+                                                  Navigator.of(context)
+                                                      .pushNamedAndRemoveUntil(
+                                                    '/main',
+                                                    (route) => false,
+                                                    arguments: {
+                                                      'initialIndex': 2
+                                                    },
+                                                  );
+                                                  return;
+                                                } else if (currentRole ==
+                                                        "Admin" ||
+                                                    currentRole ==
+                                                        "Instructor") {
+                                                  updated =
+                                                      await showAddPaymentModal(
+                                                          context,
+                                                          pack: details);
+                                                }
                                               } else if (label == "Subject" &&
                                                   currentRole != "Parent") {
                                                 updated =

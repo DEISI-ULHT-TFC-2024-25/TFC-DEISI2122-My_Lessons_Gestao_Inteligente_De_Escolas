@@ -1,6 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 import json
+from time import strptime
+from django.utils.dateparse import parse_date
 from locations.models import Location
 from notifications.models import Notification
 from payments.models import Payment
@@ -13,6 +15,7 @@ from .models import Lesson, Pack
 from django.utils.timezone import now
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from .pagination import TenPerPagePagination
 
 
 # TODO change all views to work on specific roles (user.current_role)
@@ -166,48 +169,123 @@ def get_packs_data(user, is_done_flag):
 @permission_classes([IsAuthenticated])
 def upcoming_lessons(request):
     """
-    Return lessons that are upcoming (date >= today) and not completed.
+    Return paginated lessons for each status bucket.
+    Query params:
+      - today_page (int, default 1)
+      - upcoming_page (int, default 1)
+      - reschedule_page (int, default 1)
     """
-    # For upcoming lessons, filter for date >= today and is_done False.
-    lessons_data = get_lessons_data(
-        user=request.user,
-        is_done_flag=False
-    )
-    return Response(lessons_data)
+    today = now().date()
+    all_lessons = get_lessons_data(request.user, is_done_flag=False)
+
+    # read pages
+    tp = max(1, int(request.GET.get('today_page', 1)))
+    up = max(1, int(request.GET.get('upcoming_page', 1)))
+    rp = max(1, int(request.GET.get('reschedule_page', 1)))
+    page_size = 10
+
+    # bucket them
+    buckets = {"Today": [], "Upcoming": [], "Need Reschedule": []}
+    for lesson in all_lessons:
+        status = lesson.get("status", "Upcoming")
+        if status not in buckets:
+            status = "Upcoming"
+        buckets[status].append(lesson)
+
+    def slice_and_flag(lst, page):
+        start = (page - 1) * page_size
+        end = start + page_size
+        return lst[start:end], len(lst) > end
+
+    today_slice,  has_more_today  = slice_and_flag(buckets["Today"], tp)
+    up_slice,    has_more_upcoming = slice_and_flag(buckets["Upcoming"], up)
+    rs_slice,    has_more_rs       = slice_and_flag(buckets["Need Reschedule"], rp)
+
+    return Response({
+        "today_lessons":           today_slice,
+        "has_more_today":          has_more_today,
+        "upcoming_lessons":        up_slice,
+        "has_more_upcoming":       has_more_upcoming,
+        "need_reschedule_lessons": rs_slice,
+        "has_more_reschedule":     has_more_rs,
+    })
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def last_lessons(request):
     """
-    Return lessons that have already occurred (date <= today) and are completed.
+    Paginate completed lessons.
+    GET param: page (default=1)
     """
-    # For past lessons, filter for date <= today and is_done True.
-    lessons_data = get_lessons_data(
+    page = max(1, int(request.GET.get('page', 1)))
+    page_size = 10
+
+    all_lessons = get_lessons_data(
         user=request.user,
         is_done_flag=True
     )
-    return Response(lessons_data)
+
+    start = (page - 1) * page_size
+    end   = start + page_size
+    slice_ = all_lessons[start:end]
+    has_more = len(all_lessons) > end
+
+    return Response({
+        'results': slice_,
+        'has_more': has_more,
+    })
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def active_packs(request):
-    # For upcoming lessons, filter for date >= today and is_done False.
-    packs_data = get_packs_data(
+    """
+    Paginate incomplete packs.
+    """
+    page = max(1, int(request.GET.get('page', 1)))
+    page_size = 10
+
+    all_packs = get_packs_data(
         user=request.user,
         is_done_flag=False
     )
-    return Response(packs_data)
+
+    start = (page - 1) * page_size
+    end   = start + page_size
+    slice_ = all_packs[start:end]
+    has_more = len(all_packs) > end
+
+    return Response({
+        'results': slice_,
+        'has_more': has_more,
+    })
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def last_packs(request):
-    # For upcoming lessons, filter for date >= today and is_done False.
-    packs_data = get_packs_data(
+    """
+    Paginate completed packs.
+    """
+    page = max(1, int(request.GET.get('page', 1)))
+    page_size = 10
+
+    all_packs = get_packs_data(
         user=request.user,
         is_done_flag=True
     )
-    return Response(packs_data)
+
+    start = (page - 1) * page_size
+    end   = start + page_size
+    slice_ = all_packs[start:end]
+    has_more = len(all_packs) > end
+
+    return Response({
+        'results': slice_,
+        'has_more': has_more,
+    })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -1636,3 +1714,43 @@ def get_group_packs_from_a_lesson(request):
     
     return Response({"packs": packs_data}, status=status.HTTP_200_OK)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_pack_expiration_date(request):
+    pack_id = request.data.get("pack_id")
+    if not pack_id:
+        return Response(
+            {"error": "É necessário fornecer pack_id"},
+            status=400
+        )
+
+    pack = get_object_or_404(Pack, id=pack_id)
+
+    expiration_date_str = request.data.get("expiration_date")
+    if not expiration_date_str:
+        return Response(
+            {"error": "É necessário fornecer expiration_date"},
+            status=400
+        )
+
+    # Parse the incoming YYYY-MM-DD string into a date object
+    expiration_date = parse_date(expiration_date_str)
+    if expiration_date is None:
+        return Response(
+            {"error": "Formato de expiration_date inválido. Use YYYY-MM-DD."},
+            status=400
+        )
+
+    # Update and save
+    pack.expiration_date = expiration_date
+    pack.save()
+
+    # Return success, with the new date in ISO format
+    return Response(
+        {
+            "success": True,
+            "pack_id": pack.id,
+            "expiration_date": pack.expiration_date.isoformat()
+        }
+    )

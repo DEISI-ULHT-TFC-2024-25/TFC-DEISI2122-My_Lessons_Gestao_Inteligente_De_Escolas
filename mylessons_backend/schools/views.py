@@ -1,4 +1,10 @@
 import json
+import datetime as dt
+import math
+from decimal import Decimal, InvalidOperation
+
+from openpyxl.styles import Font, PatternFill
+from openpyxl.worksheet.datavalidation import DataValidation
 from django.shortcuts import render, get_object_or_404
 from locations.models import Location
 from equipment.serializers import EquipmentSerializer
@@ -32,8 +38,7 @@ import pandas as pd
 from django.http import HttpResponse
 import io
 from openpyxl import Workbook
-from openpyxl.comments import Comment
-from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.formatting.rule import FormulaRule
 
 logger = logging.getLogger(__name__)
 
@@ -1171,262 +1176,478 @@ def create_review(request):
     return JsonResponse({'error': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
+def parse_date(value):
+    # Handle None, NaN, and pandas NaT
+    if value is None or pd.isna(value):
+        return None
+    # pandas Timestamp or datetime
+    if isinstance(value, dt.datetime):
+        return value.date()
+    if isinstance(value, dt.date):
+        return value
+    try:
+        return dt.date.fromisoformat(str(value))
+    except Exception:
+        return None
+
+
+def parse_time(value):
+    # Handle None, NaN, and pandas NaT
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, dt.datetime):
+        return value.time()
+    if isinstance(value, dt.time):
+        return value
+    try:
+        return dt.time.fromisoformat(str(value))
+    except Exception:
+        return None
+
 class BulkImportView(views.APIView):
     """
-    Endpoint to handle bulk Excel import for Students, Packs, Lessons, and Payments.
+    Endpoint to handle bulk Excel import for Students, Lessons, Packs, and Payments.
     Only Admin users may import. Imported objects are linked to the user's current school.
     """
-    serializer_class = CSVUploadSerializer  # or ExcelUploadSerializer
+    serializer_class = CSVUploadSerializer
 
     def post(self, request, *args, **kwargs):
-        # 0) Admin check
         if getattr(request.user, 'current_role', None) != 'Admin':
-            return Response({'detail': 'Admin privileges required.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Admin privileges required.'},
+                            status=status.HTTP_403_FORBIDDEN)
 
-        # Determine current school
         try:
             school = School.objects.get(pk=request.user.current_school_id)
         except School.DoesNotExist:
-            return Response({'detail': 'Invalid school.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Invalid school.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # 1) Validate upload
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         excel_file = serializer.validated_data['file']
 
-        # 2) Load all sheets (header on row 2)
+        # load & clean sheets
         xl = pd.ExcelFile(excel_file)
-        raw_sheets = {sheet: xl.parse(sheet_name=sheet, header=1) for sheet in xl.sheet_names}
+        raw = {}
+        for name in xl.sheet_names:
+            df = xl.parse(name, header=1).astype(object)
+            df = df.where(pd.notna(df), None)
+            df.columns = [col.lower() for col in df.columns]
+            if 'id' in df.columns and 'old_id_str' not in df.columns:
+                df.rename(columns={'id': 'old_id_str'}, inplace=True)
+            raw[name.lower()] = df
 
-        # 3) Clean NaNs → None
-        cleaned = {}
-        for name, df in raw_sheets.items():
-            obj_df = df.astype(object)
-            obj_df = obj_df.where(pd.notna(df), None)
-            cleaned[name] = obj_df
-
-        # 4) Dispatch importers
         results = {}
-        for sheet_name, df in cleaned.items():
-            target = sheet_name.rstrip('s').lower()
-            import_func = getattr(self, f'_import_{target}', None)
-            if import_func:
-                results[target] = import_func(df, school)
-            else:
-                results[target] = {'error': 'No importer for this sheet.'}
+        for key in ('students','lessons','packs','payments'):
+            if key in raw:
+                fn = getattr(self, f'_import_{key}')
+                results[key] = fn(raw.pop(key), school)
+
+        for name, df in raw.items():
+            fn = getattr(self, f'_import_{name.rstrip("s")}', None)
+            results[name] = fn(df, school) if fn else {'error': 'No importer for this sheet.'}
 
         return Response(results, status=status.HTTP_200_OK)
 
-    def _import_student(self, df: pd.DataFrame, school: School) -> dict:
+    def _parse_decimal(self, value):
+        """Parse a value into a Decimal, defaulting to 0.00 on failure or empty, filtering out NaNs."""
+        if value is None:
+            return Decimal('0.00')
+        # handle float NaN
+        if isinstance(value, float) and math.isnan(value):
+            return Decimal('0.00')
+        # handle string representations
+        if isinstance(value, str):
+            if not value.strip() or value.strip().lower() == 'nan':
+                return Decimal('0.00')
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return Decimal('0.00')
+
+    def _parse_int(self, value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _parse_bool(self, value):
+        if isinstance(value, bool): return value
+        val = str(value).strip().lower()
+        return val in ('true', '1', 'yes', 'y')
+
+    def _import_student(self, df: pd.DataFrame, school: School):
         successes, errors = [], []
         for idx, row in df.iterrows():
+            old_id = str(row.get('old_id_str') or '')
             try:
                 student, created = Student.objects.update_or_create(
-                    first_name=row['first_name'],
-                    last_name=row['last_name'],
+                    old_id_str=old_id,
                     defaults={
-                        'birthday': row['birthday'],
-                        'level': row.get('level', None)
+                        'first_name': row.get('first_name') or '',
+                        'last_name':  row.get('last_name') or '',
+                        'birthday':   parse_date(row.get('birthday')),
+                        'level':      self._parse_int(row.get('level')),
                     }
                 )
                 school.students.add(student)
-                successes.append({'row': idx + 1, 'id': student.id, 'created': created})
+                successes.append({'row': idx+2, 'old_id': old_id, 'new_id': student.id, 'created': created})
             except Exception as e:
-                errors.append({'row': idx + 1, 'error': str(e)})
+                errors.append({'row': idx+2, 'old_id': old_id, 'error': str(e)})
         return {'imported': len(successes), 'errors': errors}
 
-    def _import_pack(self, df: pd.DataFrame, school: School) -> dict:
+    def _import_lesson(self, df: pd.DataFrame, school: School):
         successes, errors = [], []
         for idx, row in df.iterrows():
+            old_id = str(row.get('old_id_str') or '')
             try:
-                with transaction.atomic():
-                    pack = Pack.objects.create(
-                        date=row['date'],
-                        type=row.get('type', 'private'),
-                        number_of_classes=row['number_of_classes'],
-                        number_of_classes_left=row['number_of_classes'],
-                        duration_in_minutes=row['duration_in_minutes'],
-                        price=row['price'],
-                        expiration_date=row.get('expiration_date', None)
-                    )
-                    school.packs.add(pack)
-                    if row.get('student_ids'):
-                        ids = [int(i) for i in str(row['student_ids']).split(',')]
-                        pack.students.set(Student.objects.filter(id__in=ids))
-                    successes.append({'row': idx + 1, 'id': pack.id})
-            except Exception as e:
-                errors.append({'row': idx + 1, 'error': str(e)})
-        return {'imported': len(successes), 'errors': errors}
-
-    def _import_lesson(self, df: pd.DataFrame, school: School) -> dict:
-        successes, errors = [], []
-        for idx, row in df.iterrows():
-            try:
-                lesson = Lesson.objects.create(
-                    date=row.get('date', None),
-                    start_time=row.get('start_time', None),
-                    duration_in_minutes=row['duration_in_minutes'],
-                    class_number=row.get('class_number', None),
-                    price=row.get('price', None),
-                    type=row.get('type', 'private'),
-                )
+                lesson, created = self._create_or_update_lesson(row, old_id)
                 school.lessons.add(lesson)
-                if row.get('student_ids'):
-                    ids = [int(i) for i in str(row['student_ids']).split(',')]
-                    lesson.students.set(Student.objects.filter(id__in=ids))
-                successes.append({'row': idx + 1, 'id': lesson.id})
+                successes.append({'row': idx+2, 'lesson_id': lesson.id, 'created': created})
             except Exception as e:
-                errors.append({'row': idx + 1, 'error': str(e)})
+                errors.append({'row': idx+2, 'error': str(e)})
         return {'imported': len(successes), 'errors': errors}
 
-    def _import_payment(self, df: pd.DataFrame, school: School) -> dict:
+    def _create_or_update_lesson(self, row, old_id):
+        lesson_date = parse_date(row.get('date'))
+        lesson_time = parse_time(row.get('start_time'))
+        duration    = self._parse_int(row.get('duration_in_minutes'))
+        if duration is None and row.get('type') == 'group':
+            duration = 60
+        duration = duration or 60
+        class_no    = self._parse_int(row.get('class_number'))
+        price       = self._parse_decimal(row.get('price'))
+        lesson, created = Lesson.objects.update_or_create(
+            old_id_str=old_id,
+            defaults={
+                'date': lesson_date,
+                'start_time': lesson_time,
+                'duration_in_minutes': duration,
+                'class_number': class_no,
+                'price': price,
+            }
+        )
+        if row.get('student_ids'):
+            ids = [s.strip() for s in str(row['student_ids']).split(',') if s.strip()]
+            lesson.students.set(Student.objects.filter(old_id_str__in=ids))
+        return lesson, created
+
+    def _import_pack(self, df, school):
         successes, errors = [], []
         for idx, row in df.iterrows():
+            old_id = str(row.get('old_id_str') or '')
             try:
-                payment = Payment.objects.create(
-                    value=row['value'],
-                    user=UserAccount.objects.get(id=row['user_id'])
+                raw_date = row.get('date')
+                raw_finished = row.get('finished_date')
+                if raw_date and str(raw_date).strip().lower() != 'nan':
+                    pack_date = parse_date(raw_date)
+                elif raw_finished and str(raw_finished).strip().lower() != 'nan':
+                    pack_date = parse_date(raw_finished)
+                else:
+                    pack_date = dt.date.today()
+                defaults = {
+                    'date':                pack_date,
+                    'type':                row.get('type') or 'private',
+                    'number_of_classes':   self._parse_int(row.get('number_of_classes')) or 0,
+                    'number_of_classes_left': self._parse_int(row.get('number_of_classes_left'))
+                                              or self._parse_int(row.get('number_of_classes')) or 0,
+                    'duration_in_minutes': self._parse_int(row.get('duration_in_minutes')) or 0,
+                    'price':               self._parse_decimal(row.get('price')),
+                    'is_done':             self._parse_bool(row.get('is_done')),
+                    'is_paid':             self._parse_bool(row.get('is_paid')),
+                    'is_suspended':        self._parse_bool(row.get('is_suspended')),
+                    'debt':                self._parse_decimal(row.get('debt')),
+                    'finished_date':       parse_date(row.get('finished_date'))
+                    if row.get('finished_date') else None,
+                    'expiration_date':     parse_date(row.get('expiration_date'))
+                    if row.get('expiration_date') else None,
+                }
+                pack, created = Pack.objects.update_or_create(
+                    old_id_str=old_id,
+                    defaults=defaults
+                )
+                school.packs.add(pack)
+                # M2M relationships
+                if row.get('student_ids'):
+                    sids = [s.strip() for s in str(row['student_ids']).split(',') if s.strip()]
+                    pack.students.set(Student.objects.filter(old_id_str__in=sids))
+                if row.get('instructor_ids'):
+                    iids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
+                    pack.instructors.set(Instructor.objects.filter(id__in=iids))
+                if row.get('parent_ids'):
+                    pids = [s.strip() for s in str(row['parent_ids']).split(',') if s.strip()]
+                    pack.parents.set(UserAccount.objects.filter(id__in=pids))
+                if row.get('sport_id'):
+                    try:
+                        sport = Sport.objects.get(pk=self._parse_int(row.get('sport_id')))
+                        pack.sport = sport
+                        pack.save()
+                    except Sport.DoesNotExist:
+                        pass
+                successes.append({'row': idx+2, 'new_id': pack.id, 'created': created})
+            except Exception as e:
+                errors.append({'row': idx+2, 'old_id': old_id, 'error': str(e)})
+        return {'imported': len(successes), 'errors': errors}
+
+    def _import_payment(self, df, school):
+        successes, errors = [], []
+        for idx, row in df.iterrows():
+            old_id = str(row.get('old_id_str') or '')
+            try:
+                uid = self._parse_int(row.get('user_id'))
+                user = UserAccount.objects.filter(pk=uid).first() if uid else None
+                desc = row.get('description') if row.get('description') is not None else {}
+                payment, created = Payment.objects.update_or_create(
+                    old_id_str=old_id,
+                    defaults={
+                        'value': self._parse_decimal(row.get('value')),
+                        'user': user,
+                        'description': desc,
+                    }
                 )
                 school.payments.add(payment)
                 if row.get('pack_ids'):
-                    pack_ids = [int(i) for i in str(row['pack_ids']).split(',')]
-                    payment.packs.set(Pack.objects.filter(id__in=pack_ids))
+                    pids = [s.strip() for s in str(row['pack_ids']).split(',') if s.strip()]
+                    payment.packs.set(Pack.objects.filter(old_id_str__in=pids))
                 if row.get('lesson_ids'):
-                    lesson_ids = [int(i) for i in str(row['lesson_ids']).split(',')]
-                    payment.lessons.set(Lesson.objects.filter(id__in=lesson_ids))
-                successes.append({'row': idx + 1, 'id': payment.id})
+                    lids = [s.strip() for s in str(row['lesson_ids']).split(',') if s.strip()]
+                    payment.lessons.set(Lesson.objects.filter(old_id_str__in=lids))
+                successes.append({'row': idx+2, 'payment_id': payment.id, 'created': created})
             except Exception as e:
-                errors.append({'row': idx + 1, 'error': str(e)})
+                errors.append({'row': idx+2, 'error': str(e)})
         return {'imported': len(successes), 'errors': errors}
 
-"""
-class CSVTemplateView(views.APIView):
-    
-    Returns a CSV template for the requested target, with comments describing each column’s expected format.
-    
-    def get(self, request, *args, **kwargs):
-        # 1) Normalize & validate the 'target' query parameter
-        target = request.query_params.get('target', '').lower()
-        templates = {
-            'student': ['first_name', 'last_name', 'birthday', 'level'],
-            'pack':    ['date', 'type', 'number_of_classes', 'duration_in_minutes',
-                        'price', 'expiration_date', 'student_ids', 'instructor_ids'],
-            'lesson':  ['date', 'start_time', 'duration_in_minutes', 'class_number',
-                        'price', 'type', 'student_ids'],
-            'payment': ['value', 'user_id', 'pack_ids', 'lesson_ids'],
-        }
-        if target not in templates:
-            return Response(
-                {'detail': f'Invalid target: "{target}"'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
-        # 2) Metadata for comments (keys must match 'templates')
-        metadata = {
-            'student': {
-                'first_name': 'Text: student first name',
-                'last_name':  'Text: student last name',
-                'birthday':   'Date (YYYY-MM-DD)',
-                'level':      'Integer, optional',
-            },
-            'pack': {
-                'date':                 'Date (YYYY-MM-DD)',
-                'type':                 "'private' or 'group'",
-                'number_of_classes':    'Integer',
-                'duration_in_minutes':  'Integer (minutes)',
-                'price':                'Decimal (e.g., 50.00)',
-                'expiration_date':      'Date (YYYY-MM-DD) or blank',
-                'student_ids':          'Comma-separated integer IDs (e.g., 1,2,3)',
-                'instructor_ids':       'Comma-separated integer IDs',
-            },
-            'lesson': {
-                'date':                'Date (YYYY-MM-DD) or blank',
-                'start_time':          'Time (HH:MM:SS) or blank',
-                'duration_in_minutes': 'Integer (minutes)',
-                'class_number':        'Integer or blank',
-                'price':               'Decimal or blank',
-                'type':                "'private' or 'group'",
-                'student_ids':         'Comma-separated integer IDs',
-            },
-            'payment': {
-                'value':      'Decimal (e.g., 20.00)',
-                'user_id':    'Integer: ID of user making payment',
-                'pack_ids':   'Comma-separated integer IDs or blank',
-                'lesson_ids': 'Comma-separated integer IDs or blank',
-            },
-        }
-
-        # 3) Build the CSV in-memory
-        buffer = io.StringIO()
-
-        # Excel hint + UTF-8 BOM so Excel splits on commas correctly
-        buffer.write('\ufeffsep=,\r\n')
-
-        # Write comment lines (if any metadata exists for this target)
-        for col, desc in metadata.get(target, {}).items():
-            buffer.write(f"# {col}: {desc}\r\n")
-
-        # Write the header row
-        writer = csv.writer(buffer)
-        writer.writerow(templates[target])
-
-        # 4) Return as an HTTP attachment
-        buffer.seek(0)
-        response = HttpResponse(
-            buffer.getvalue(),
-            content_type='text/csv; charset=utf-8'
-        )
-        response['Content-Disposition'] = (
-            f'attachment; filename="{target}_template.csv"'
-        )
-        return response
-"""
 
 class ExcelTemplateView(views.APIView):
     """
     Returns a single .xlsx file with separate sheets for
     Students, Packs, Lessons, and Payments.
+    Includes placeholders, data validations, and live conditional formatting
+    to highlight invalid cells (red), incomplete rows (orange), and ready rows (green).
     """
     def get(self, request, *args, **kwargs):
-        # Define columns and metadata
+        # Column definitions
         templates = {
             'Student': ['first_name', 'last_name', 'birthday', 'level'],
-            'Pack':   ['date', 'type', 'number_of_classes', 'duration_in_minutes',
-                        'price', 'expiration_date', 'student_ids', 'instructor_ids'],
-            'Lesson': ['date', 'start_time', 'duration_in_minutes', 'class_number',
-                        'price', 'type', 'student_ids'],
-            'Payment':['value', 'user_id', 'pack_ids', 'lesson_ids'],
-        }
-        metadata = {
-            'first_name': 'Text: student first name',
-            'last_name':  'Text: student last name',
-            'birthday':   'Date (YYYY-MM-DD)',
-            # … same as before for all fields …
+            'Pack': [
+                'date', 'type', 'number_of_classes', 'number_of_classes_left',
+                'duration_in_minutes', 'price', 'debt', 'is_paid',
+                'is_done', 'is_suspended', 'expiration_date',
+                'student_ids', 'instructor_ids'
+            ],
+            'Lesson': ['date', 'start_time', 'duration_in_minutes',
+                       'class_number', 'price', 'type', 'student_ids'],
+            'Payment': ['value', 'user_id', 'pack_ids', 'lesson_ids'],
         }
 
+        # Fields required for a row to be complete
+        required = {
+            'Student': ['first_name', 'last_name', 'birthday'],
+            'Pack': ['date', 'type', 'number_of_classes', 'duration_in_minutes', 'price'],
+            'Lesson': ['date', 'start_time', 'duration_in_minutes'],
+            'Payment': ['value', 'user_id'],
+        }
+
+        # Placeholder hints
+        metadata = {
+            'first_name': 'Text (e.g. John)',
+            'last_name': 'Text (e.g. Doe)',
+            'birthday': 'Date YYYY-MM-DD',
+            'level': 'Integer (e.g. 1)',
+            'date': 'Date YYYY-MM-DD',
+            'type': 'Text (e.g. private)',
+            'number_of_classes': 'Integer',
+            'number_of_classes_left': 'Integer',
+            'duration_in_minutes': 'Integer',
+            'price': 'Decimal (e.g. 100.00)',
+            'debt': 'Decimal or 0',
+            'is_paid': 'TRUE or FALSE',
+            'is_done': 'TRUE or FALSE',
+            'is_suspended': 'TRUE or FALSE',
+            'expiration_date': 'Date YYYY-MM-DD or blank',
+            'student_ids': 'CSV of Student IDs',
+            'instructor_ids': 'CSV of Instructor IDs',
+            'start_time': 'Time HH:MM:SS',
+            'class_number': 'Integer or blank',
+            'value': 'Decimal (e.g. 50.00)',
+            'user_id': 'Integer User PK',
+            'pack_ids': 'CSV of Pack IDs',
+            'lesson_ids': 'CSV of Lesson IDs',
+        }
+
+        # Styles (ARGB)
+        placeholder_font = Font(italic=True, color="FF888888")
+        placeholder_fill = PatternFill(
+            fill_type="solid",
+            start_color="FFDDDDDD",
+            end_color="FFDDDDDD",
+        )
+        error_fill = PatternFill(
+            fill_type="solid",
+            start_color="FFFFC7CE",
+            end_color="FFFFC7CE",
+        )
+        warning_fill = PatternFill(
+            fill_type="solid",
+            start_color="FFFFEB9C",
+            end_color="FFFFEB9C",
+        )
+        success_fill = PatternFill(
+            fill_type="solid",
+            start_color="FFC6EFCE",
+            end_color="FFC6EFCE",
+        )
+
         wb = Workbook()
-        wb.remove(wb.active)
+
+        # Help sheet with color key
+        help_ws = wb.active
+        help_ws.title = 'Help'
+        help_ws.append(['Instructions:'])
+        help_ws.append(['• Don’t remove or rename sheets.'])
+        help_ws.append(['• Row 1 = field name; Row 2 = placeholder.'])
+        help_ws.append(['• Enter data from row 3 onward.'])
+        help_ws.append(['• Red = invalid cell; Orange = incomplete row; Green = row complete.'])
+        help_ws.column_dimensions['A'].width = 25
+        help_ws.column_dimensions['B'].width = 50
+
+        # Add a color key for debugging
+        # Row 7: red
+        cell = help_ws.cell(row=7, column=1, value='')
+        cell.fill = error_fill
+        help_ws.cell(row=7, column=2, value='Invalid cell (should appear red)')
+        # Row 8: orange
+        cell = help_ws.cell(row=8, column=1, value='')
+        cell.fill = warning_fill
+        help_ws.cell(row=8, column=2, value='Incomplete row cell (should appear orange)')
+        # Row 9: green
+        cell = help_ws.cell(row=9, column=1, value='')
+        cell.fill = success_fill
+        help_ws.cell(row=9, column=2, value='Complete row cell (should appear green)')
 
         for sheet_name, cols in templates.items():
             ws = wb.create_sheet(title=sheet_name)
-            # header row
-            for idx, col in enumerate(cols, start=1):
-                ws.cell(row=2, column=idx, value=col)
-                # add a comment in row 2, col idx
-                if col in metadata:
-                    ws.cell(row=2, column=idx).comment = Comment(
-                        text=metadata[col],
-                        author="System"
+            col_letters = {}
+
+            # Header + placeholder row
+            for idx, field in enumerate(cols, start=1):
+                hdr = ws.cell(row=1, column=idx, value=field)
+                letter = hdr.column_letter
+                col_letters[field] = letter
+
+                ph = ws.cell(row=2, column=idx, value=metadata.get(field, ''))
+                ph.font = placeholder_font
+                ph.fill = placeholder_fill
+
+                ws.column_dimensions[letter].width = 25
+
+            max_row = 5000
+
+            # Cell-level validation + red invalid formatting
+            for field, letter in col_letters.items():
+                if field.endswith('_date') or field == 'date':
+                    test = f"OR(ISBLANK({letter}3), ISNUMBER({letter}3))"
+                    dv = DataValidation(
+                        type='custom',
+                        formula1=test,
+                        allow_blank=True
+                    )
+                    dv.errorTitle = 'Invalid Date'
+                    dv.error = 'Must be a valid date'
+                    dv.prompt = 'YYYY-MM-DD'
+
+                elif 'time' in field:
+                    test = f"OR(ISBLANK({letter}3), ISNUMBER({letter}3))"
+                    dv = DataValidation(
+                        type='custom',
+                        formula1=test,
+                        allow_blank=True
+                    )
+                    dv.errorTitle = 'Invalid Time'
+                    dv.error = 'Must be a valid time'
+                    dv.prompt = 'HH:MM:SS'
+
+                elif field in ['level', 'number_of_classes', 'number_of_classes_left', 'duration_in_minutes', 'class_number']:
+                    test = f"OR(ISBLANK({letter}3), AND(ISNUMBER({letter}3), {letter}3>=0))"
+                    dv = DataValidation(
+                        type='whole',
+                        operator='greaterThanOrEqual',
+                        formula1='0',
+                        allow_blank=True
+                    )
+                    dv.errorTitle = 'Invalid Number'
+                    dv.error = 'Enter a non-negative integer'
+
+                elif field in ['price', 'debt', 'value']:
+                    test = f"OR(ISBLANK({letter}3), AND(ISNUMBER({letter}3), {letter}3>=0))"
+                    dv = DataValidation(
+                        type='decimal',
+                        operator='greaterThanOrEqual',
+                        formula1='0',
+                        allow_blank=True
+                    )
+                    dv.errorTitle = 'Invalid Amount'
+                    dv.error = 'Enter a non-negative number'
+
+                elif field in ['is_paid', 'is_done', 'is_suspended']:
+                    test = f"OR(ISBLANK({letter}3), {letter}3=\"TRUE\", {letter}3=\"FALSE\")"
+                    dv = DataValidation(
+                        type='list',
+                        formula1='"TRUE,FALSE"',
+                        allow_blank=True
+                    )
+                    dv.errorTitle = 'Invalid Choice'
+                    dv.error = 'TRUE or FALSE only'
+
+                else:
+                    continue
+
+                dv.add(f"{letter}3:{letter}{max_row}")
+                ws.add_data_validation(dv)
+
+                ws.conditional_formatting.add(
+                    f"{letter}3:{letter}{max_row}",
+                    FormulaRule(formula=[f"NOT({test})"], fill=error_fill)
+                )
+
+            # Row-level orange (partial) and green (complete)
+            first = next(iter(col_letters.values()))
+            last  = next(reversed(col_letters.values()))
+
+            # Build required-field tests
+            req_tests = []
+            for rf in required[sheet_name]:
+                lt = col_letters[rf]
+                if rf.endswith('_date') or rf == 'date' or 'time' in rf:
+                    req_tests.append(f"AND(NOT(ISBLANK({lt}3)), ISNUMBER({lt}3))")
+                elif rf in ['level','number_of_classes','duration_in_minutes','class_number']:
+                    req_tests.append(f"AND(NOT(ISBLANK({lt}3)), ISNUMBER({lt}3), {lt}3>=0)")
+                elif rf in ['price','debt','value']:
+                    req_tests.append(f"AND(NOT(ISBLANK({lt}3)), ISNUMBER({lt}3), {lt}3>=0)")
+                elif rf in ['is_paid','is_done','is_suspended']:
+                    req_tests.append(f"OR({lt}3=\"TRUE\",{lt}3=\"FALSE\")")
+                else:
+                    req_tests.append(f"NOT(ISBLANK({lt}3))")
+
+            green_formula  = f"AND({','.join(req_tests)})"
+            orange_formula = f"AND(COUNTA({first}3:{last}3)>0, NOT({green_formula}))"
+
+            ws.conditional_formatting.add(
+                f"{first}3:{last}{max_row}",
+                FormulaRule(formula=[orange_formula], fill=warning_fill)
+            )
+            ws.conditional_formatting.add(
+                f"{first}3:{last}{max_row}",
+                FormulaRule(formula=[green_formula], fill=success_fill)
             )
 
-        # save to in‐memory buffer
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-
-        resp = HttpResponse(
-            buffer.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        # Write out and return
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': 'attachment; filename="bulk_import_template.xlsx"'}
         )
-        resp['Content-Disposition'] = 'attachment; filename="bulk_import_template.xlsx"'
-        return resp

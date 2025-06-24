@@ -12,6 +12,8 @@ import 'bulk_import_page.dart';
 import 'manage_school.dart';
 import '../main.dart';
 import 'markdown_page.dart';
+import 'student_pairing_screen.dart';
+
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -138,25 +140,81 @@ class __ProfileViewState extends State<_ProfileView> with RouteAware {
                   // Students Tab
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: ListView.builder(
-                      itemCount: provider.associatedStudents.length,
-                      itemBuilder: (ctx, i) {
-                        final st = provider.associatedStudents[i];
-                        return ListTile(
-                          title: Text("${st['first_name']} ${st['last_name']}"),
-                          subtitle: Text(st['birthday']),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.info),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Show “Pair” button for regular parents...
+                        if (provider.currentRole != 'Admin')
+                          ElevatedButton(
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    StudentPage(studentId: st["id"]),
-                              ),
+                                  builder: (_) => StudentPairingScreen()),
                             ),
+                            child: const Text('Pair with a Student'),
                           ),
-                        );
-                      },
+
+
+                        const SizedBox(height: 16),
+
+                        // Then the existing students list
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: provider.associatedStudents.length,
+                            itemBuilder: (ctx, i) {
+                              final st = provider.associatedStudents[i];
+                              return ListTile(
+                                title: Text(
+                                    "${st['first_name']} ${st['last_name']}"),
+                                subtitle: Text(st['birthday']),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Keep the “info” button if you like:
+                                    IconButton(
+                                      icon: const Icon(Icons.info_outline),
+                                      onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              StudentPage(studentId: st["id"]),
+                                        ),
+                                      ),
+                                    ),
+                                    // NEW: generate key
+                                    IconButton(
+                                      icon: const Icon(Icons.vpn_key),
+                                      tooltip: 'Generate pairing key',
+                                      onPressed: () async {
+                                        await provider.generateAssociationKey(
+                                            context, st['id'] as int);
+                                        if (provider.lastGeneratedKey != null) {
+                                          showDialog(
+                                            context: context,
+                                            builder: (_) => AlertDialog(
+                                              title: const Text('Pairing Key'),
+                                              content: SelectableText(
+                                                  provider.lastGeneratedKey!),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(context)
+                                                          .pop(),
+                                                  child: const Text('Close'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 

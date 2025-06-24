@@ -225,4 +225,53 @@ class ProfileService {
       throw Exception(data['error']);
     }
   }
+
+  static Future<String> generateAssociationKey(int studentId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/users/student/$studentId/generate-key/'),
+      headers: await getAuthHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      // decode the JSON body
+      final Map<String, dynamic> body = json.decode(utf8.decode(response.bodyBytes));
+      return body['key'] as String;
+    } else {
+      // try to extract server error message, or just throw a generic one
+      String message;
+      try {
+        final Map<String, dynamic> err = json.decode(response.body);
+        message = err['detail'] ?? err['error'] ?? response.reasonPhrase!;
+      } catch (_) {
+        message = response.reasonPhrase ?? 'Unknown error';
+      }
+      throw Exception('Could not generate key: $message');
+    }
+  }
+
+  /// Attempts to pair the current user with a student using a one-time key.
+  static Future<void> pairWithStudentByKey(String key) async {
+    final uri = Uri.parse('$baseUrl/api/users/student/pair-by-key/');
+    final response = await http.post(
+      uri,
+      headers: await getAuthHeaders(),
+      body: json.encode({'key': key}),
+    );
+
+    if (response.statusCode == 200) {
+      // paired successfully
+      return;
+    } else {
+      // try to pull server error message
+      String msg;
+      try {
+        final Map<String, dynamic> err =
+        json.decode(utf8.decode(response.bodyBytes));
+        msg = err['detail'] ?? err['error'] ?? response.reasonPhrase!;
+      } catch (_) {
+        msg = response.reasonPhrase ?? 'Unknown error';
+      }
+      throw Exception('Pairing failed: $msg');
+    }
+  }
 }

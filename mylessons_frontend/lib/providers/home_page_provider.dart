@@ -21,11 +21,28 @@ class HomePageProvider extends ChangeNotifier {
   String currentRole = '';
 
   // Lessons and Packs.
+  List<dynamic> todayLessons = [];
   List<dynamic> upcomingLessons = [];
+  List<dynamic> needRescheduleLessons = [];
   List<dynamic> lastLessons = [];
   List<dynamic> activePacks = [];
   List<dynamic> lastPacks = [];
   List<String> unschedulableLessons = [];
+
+  // pages
+  int todayPage = 1, upcomingPage = 1, reschedulePage = 1;
+  // flags
+  bool hasMoreToday = false, hasMoreUpcoming = false, hasMoreReschedule = false;
+  // History lessons
+  int lastLessonsPage = 1;
+  bool hasMoreLastLessons = false;
+
+  // Packs
+  int activePacksPage = 1;
+  bool hasMoreActivePacks = false;
+
+  int lastPacksPage = 1;
+  bool hasMoreLastPacks = false;
 
   // Instructor metrics.
   int numberOfActiveStudents = 0;
@@ -119,38 +136,13 @@ class HomePageProvider extends ChangeNotifier {
         }
       }
 
-      // Depending on role, fetch lessons and packs.
       if (currentRole == "Parent" ||
           currentRole == "Instructor" ||
           currentRole == "Admin") {
-        final lessonsResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/upcoming_lessons/'),
-          headers: headers,
-        );
-        final activePacksResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/active_packs/'),
-          headers: headers,
-        );
-        final lastPacksResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/last_packs/'),
-          headers: headers,
-        );
-        if (lessonsResponse.statusCode == 200) {
-          upcomingLessons = json.decode(utf8.decode(lessonsResponse.bodyBytes));
-        }
-        if (activePacksResponse.statusCode == 200) {
-          activePacks = json.decode(utf8.decode(activePacksResponse.bodyBytes));
-        }
-        if (lastPacksResponse.statusCode == 200) {
-          lastPacks = json.decode(utf8.decode(lastPacksResponse.bodyBytes));
-        }
-        final lastLessonsResponse = await http.get(
-          Uri.parse('$baseUrl/api/lessons/last_lessons/'),
-          headers: headers,
-        );
-        if (lastLessonsResponse.statusCode == 200) {
-          lastLessons = json.decode(utf8.decode(lastLessonsResponse.bodyBytes));
-        }
+        await fetchUpcomingLessons();
+        await fetchLastLessons();
+        await fetchActivePacks();
+        await fetchLastPacks();
       }
 
       if (currentRole == "Instructor") {
@@ -241,6 +233,123 @@ class HomePageProvider extends ChangeNotifier {
                 .toString()) ??
             0.0
         : 0.0;
+    notifyListeners();
+  }
+
+  Future<void> fetchUpcomingLessons({ String? bucket }) async {
+    final headers = await getAuthHeaders();
+
+    // On initial load (no bucket), reset everything
+    if (bucket == null) {
+      todayPage = 1;
+      upcomingPage = 1;
+      reschedulePage = 1;
+      todayLessons = [];
+      upcomingLessons = [];
+      needRescheduleLessons = [];
+    }
+
+    Uri uri = Uri.parse('$baseUrl/api/lessons/upcoming_lessons/');
+    // build query params
+    final params = <String, String>{};
+    if (bucket == 'today') {
+      params['today_page'] = todayPage.toString();
+    } else if (bucket == 'upcoming') {
+      params['upcoming_page'] = upcomingPage.toString();
+    } else if (bucket == 'reschedule') {
+      params['reschedule_page'] = reschedulePage.toString();
+    }
+    uri = uri.replace(queryParameters: params);
+
+    final resp = await http.get(uri, headers: headers);
+    if (resp.statusCode != 200) return;
+
+    final data = json.decode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+
+    // For each list, either assign (initial) or append (load more)
+    // and bump page counters & flags.
+        {
+      final list = List<dynamic>.from(data['today_lessons'] ?? []);
+      if (bucket == 'today') todayLessons.addAll(list);
+      else todayLessons = list;
+      hasMoreToday = data['has_more_today'] as bool? ?? false;
+      todayPage++;
+    }
+    {
+      final list = List<dynamic>.from(data['upcoming_lessons'] ?? []);
+      if (bucket == 'upcoming') upcomingLessons.addAll(list);
+      else upcomingLessons = list;
+      hasMoreUpcoming = data['has_more_upcoming'] as bool? ?? false;
+      upcomingPage++;
+    }
+    {
+      final list = List<dynamic>.from(data['need_reschedule_lessons'] ?? []);
+      if (bucket == 'reschedule') needRescheduleLessons.addAll(list);
+      else needRescheduleLessons = list;
+      hasMoreReschedule = data['has_more_reschedule'] as bool? ?? false;
+      reschedulePage++;
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> fetchLastLessons({ bool loadMore = false }) async {
+    if (!loadMore) {
+      lastLessonsPage = 1;
+      lastLessons = [];
+    }
+    final uri = Uri.parse(
+        '$baseUrl/api/lessons/last_lessons/?page=$lastLessonsPage'
+    );
+    final resp = await http.get(uri, headers: await getAuthHeaders());
+    if (resp.statusCode != 200) return;
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final pageItems = List<dynamic>.from(data['results'] ?? []);
+    lastLessons.addAll(pageItems);
+
+    hasMoreLastLessons = data['has_more'] as bool? ?? false;
+    lastLessonsPage++;
+    notifyListeners();
+  }
+
+  Future<void> fetchActivePacks({ bool loadMore = false }) async {
+    if (!loadMore) {
+      activePacksPage = 1;
+      activePacks = [];
+    }
+    final uri = Uri.parse(
+        '$baseUrl/api/lessons/active_packs/?page=$activePacksPage'
+    );
+    final resp = await http.get(uri, headers: await getAuthHeaders());
+    if (resp.statusCode != 200) return;
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final items = List<dynamic>.from(data['results'] ?? []);
+    activePacks.addAll(items);
+
+    hasMoreActivePacks = data['has_more'] as bool? ?? false;
+    activePacksPage++;
+    notifyListeners();
+  }
+
+  Future<void> fetchLastPacks({ bool loadMore = false }) async {
+    if (!loadMore) {
+      lastPacksPage = 1;
+      lastPacks = [];
+    }
+    final uri = Uri.parse(
+        '$baseUrl/api/lessons/last_packs/?page=$lastPacksPage'
+    );
+    final resp = await http.get(uri, headers: await getAuthHeaders());
+    if (resp.statusCode != 200) return;
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final items = List<dynamic>.from(data['results'] ?? []);
+    lastPacks.addAll(items);
+
+    hasMoreLastPacks = data['has_more'] as bool? ?? false;
+    lastPacksPage++;
     notifyListeners();
   }
 }

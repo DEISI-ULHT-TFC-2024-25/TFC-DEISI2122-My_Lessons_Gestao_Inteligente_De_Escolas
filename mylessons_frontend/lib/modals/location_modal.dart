@@ -3,6 +3,45 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart'; // Exports getAuthHeaders() and baseUrl
 
+Future<T?> showLocationModal<T>(
+    BuildContext context, {
+      int? lessonId,
+      int? packId,
+      int? schoolId,
+      bool localOnly = false,
+      List<int>? initialSelectedIds,
+      List<Map<String, dynamic>>? items,
+    }) {
+  // same sanity‐check as in SubjectModal:
+  assert(
+  localOnly || [lessonId, packId, schoolId].where((x) => x != null).length == 1,
+  'You must provide exactly one of lessonId, packId or schoolId',
+  );
+
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      final maxHeight = MediaQuery.of(ctx).size.height * 0.9;
+      return SizedBox(
+        height: maxHeight,
+        child: LocationModal(
+          lessonId: lessonId,
+          packId: packId,
+          schoolId: schoolId,
+          localOnly: localOnly,
+          initialSelectedIds: initialSelectedIds,
+          items: items,
+        ),
+      );
+    },
+  );
+}
+
+
 class LocationModal extends StatefulWidget {
   final int? lessonId;
   final int? packId;
@@ -76,7 +115,7 @@ class _LocationModalState extends State<LocationModal>
       if (widget.schoolId != null) {
         queryParams['school_id'] = widget.schoolId.toString();
       }
-      Uri uri = Uri.parse("\$baseUrl/api/schools/locations/")
+      Uri uri = Uri.parse("$baseUrl/api/schools/locations/")
           .replace(queryParameters: queryParams);
 
       final response = await http.get(uri, headers: await getAuthHeaders());
@@ -114,7 +153,7 @@ class _LocationModalState extends State<LocationModal>
         });
       }
     } catch (e) {
-      print("Error fetching locations: \$e");
+      print("Error fetching locations: $e");
     }
     setState(() {
       isLoading = false;
@@ -150,7 +189,7 @@ class _LocationModalState extends State<LocationModal>
       ),
     );
     if (confirmed == true) {
-      final url = "\$baseUrl/api/lessons/edit_location/";
+      final url = "$baseUrl/api/lessons/edit_location/";
       Map<String, dynamic> payload = {
         "location_id": location["id"],
         "action": "change",
@@ -166,12 +205,12 @@ class _LocationModalState extends State<LocationModal>
           Navigator.pop(context, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error updating location: \${utf8.decode(resp.bodyBytes)}")),
+            SnackBar(content: Text("Error updating location: ${utf8.decode(resp.bodyBytes)}")),
           );
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: \$e")),
+          SnackBar(content: Text("Error: $e")),
         );
       }
     }
@@ -183,7 +222,7 @@ class _LocationModalState extends State<LocationModal>
       Navigator.pop(context, picked);
       return;
     }
-    final url = "\$baseUrl/api/schools/update_locations/";
+    final url = "$baseUrl/api/schools/update_locations/";
     Map<String, dynamic> payload = {"location_ids": _selectedIds};
     if (widget.lessonId != null) payload['lesson_id'] = widget.lessonId;
     if (widget.packId != null) payload['pack_id'] = widget.packId;
@@ -196,12 +235,12 @@ class _LocationModalState extends State<LocationModal>
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error updating locations: \${utf8.decode(resp.bodyBytes)}")),
+          SnackBar(content: Text("Error updating locations: ${utf8.decode(resp.bodyBytes)}")),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: \$e")),
+        SnackBar(content: Text("Error: $e")),
       );
     }
   }
@@ -221,7 +260,7 @@ class _LocationModalState extends State<LocationModal>
       context: context,
       builder: (c) => AlertDialog(
         title: const Text("Confirm Creation"),
-        content: Text("Create location: \$name?"),
+        content: Text("Create location: $name?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancel")),
           TextButton(onPressed: () => Navigator.pop(c, true), child: const Text("Confirm")),
@@ -230,7 +269,7 @@ class _LocationModalState extends State<LocationModal>
     );
     if (confirmed != true) return;
 
-    final url = "\$baseUrl/api/schools/create_location/";
+    final url = "$baseUrl/api/schools/create_location/";
     Map<String, dynamic> payload = {
       "location_name": name,
       "location_address": address,
@@ -240,18 +279,19 @@ class _LocationModalState extends State<LocationModal>
     if (widget.schoolId != null) payload['school_id'] = widget.schoolId;
 
     try {
+      print(payload);
       final resp = await http.post(Uri.parse(url),
           headers: await getAuthHeaders(), body: jsonEncode(payload));
       if (resp.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error creating location: \${utf8.decode(resp.bodyBytes)}")),
+          SnackBar(content: Text("Error creating location: ${utf8.decode(resp.bodyBytes)}")),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: \$e")),
+        SnackBar(content: Text("Error: $e")),
       );
     }
   }
