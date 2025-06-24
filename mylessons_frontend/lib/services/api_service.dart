@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 //const String baseUrl = 'http://127.0.0.1:8000'; // localhost
 //const String baseUrl = 'http://192.168.1.66:8000'; // net da sala
 //const String baseUrl = 'http://172.19.72.130:8000'; // freeulusofona
-const String baseUrl = 'http://192.168.1.75:8000';
+const String baseUrl = 'http://192.168.1.71:8000';
 //const String baseUrl = 'https://mylessons.pt'; // production hosting
 //const String baseUrl = 'http://172.18.128.1:8000'; // hotspot
 
