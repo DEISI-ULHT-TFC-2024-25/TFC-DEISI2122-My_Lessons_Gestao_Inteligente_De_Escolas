@@ -1296,6 +1296,25 @@ class BulkImportView(views.APIView):
                 errors.append({'row': idx+2, 'old_id': old_id, 'error': str(e)})
         return {'imported': len(successes), 'errors': errors}
 
+    def _import_instructor(self, df: pd.DataFrame, school: School):
+        successes, errors = [], []
+        for idx, row in df.iterrows():
+            old_id = str(row.get('old_id_str') or '')
+            try:
+                instructor, created = Instructor.objects.update_or_create(
+                    old_id_str=old_id,
+                    defaults={
+                        'first_name': row.get('first_name') or '',
+                        'last_name':  row.get('last_name') or '',
+
+                    }
+                )
+                school.instructors.add(instructor)
+                successes.append({'row': idx+2, 'old_id': old_id, 'new_id': instructor.id, 'created': created})
+            except Exception as e:
+                errors.append({'row': idx+2, 'old_id': old_id, 'error': str(e)})
+        return {'imported': len(successes), 'errors': errors}
+
     def _import_lesson(self, df: pd.DataFrame, school: School):
         successes, errors = [], []
         for idx, row in df.iterrows():
@@ -1330,6 +1349,9 @@ class BulkImportView(views.APIView):
         if row.get('student_ids'):
             ids = [s.strip() for s in str(row['student_ids']).split(',') if s.strip()]
             lesson.students.set(Student.objects.filter(old_id_str__in=ids))
+        if row.get('instructor_ids'):
+            ids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
+            lesson.instructors.set(Instructor.objects.filter(old_id_str__in=ids))
         return lesson, created
 
     def _import_pack(self, df, school):
@@ -1373,7 +1395,7 @@ class BulkImportView(views.APIView):
                     pack.students.set(Student.objects.filter(old_id_str__in=sids))
                 if row.get('instructor_ids'):
                     iids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
-                    pack.instructors.set(Instructor.objects.filter(id__in=iids))
+                    pack.instructors.set(Instructor.objects.filter(old_id_str__in=iids))
                 if row.get('parent_ids'):
                     pids = [s.strip() for s in str(row['parent_ids']).split(',') if s.strip()]
                     pack.parents.set(UserAccount.objects.filter(id__in=pids))
