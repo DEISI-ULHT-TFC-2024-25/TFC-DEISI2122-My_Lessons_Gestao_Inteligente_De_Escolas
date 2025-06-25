@@ -1,6 +1,6 @@
 name: CI/CD Django + Flutter
 
-# Top‐level image name (will be lowercased in each job)
+# ─── your GHCR image name (will be lowercased in each job) ────────────────
 env:
   IMAGE_NAME: ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}
 
@@ -51,8 +51,6 @@ jobs:
       VM_USER:   ${{ secrets.VM_USER }}
       GHCR_USER: ${{ github.actor }}
       GHCR_PAT:  ${{ secrets.GITHUB_TOKEN }}
-      IMAGE_NAME: ${{ env.IMAGE_NAME }}
-
     steps:
       - name: Lowercase IMAGE_NAME
         run: |
@@ -68,24 +66,24 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no \
               -p "$VM_PORT" \
-              "$VM_USER@$VM_IP" << EOF
+              "$VM_USER@$VM_IP" << 'EOF'
             set -e
             cd /opt/mylessons
 
-            # 1) Sync your on-disk repo
+            # 1) keep your on-disk repo in sync
             git remote set-url origin https://${GHCR_USER}:${GHCR_PAT}@github.com/${GHCR_USER}/MyLessons-Project.git
             git fetch --depth=1 origin main
             git reset --hard FETCH_HEAD
 
-            # 2) Docker login & cleanup
+            # 2) login & prune old images/containers
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker container prune -f
             docker image prune -af
 
-            # 3) Pull & deploy new image (no server-side build)
+            # 3) pull & deploy new image (no server build)
             docker pull $IMAGE_NAME:latest
             docker compose up -d --remove-orphans --no-build
 
-            # 4) Sanity-check logs
+            # 4) sanity-check
             docker compose logs --tail=50
           EOF
