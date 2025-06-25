@@ -211,33 +211,33 @@ def upcoming_lessons(request):
     })
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def last_lessons(request):
-    """
-    Paginate completed lessons.
-    GET param: page (default=1)
-    """
-    page = max(1, int(request.GET.get('page', 1)))
+    page      = max(1, int(request.GET.get('page', 1)))
     page_size = 10
 
-    all_lessons = sorted(
-        get_lessons_data(user=request.user, is_done_flag=True),
-        key=lambda lesson: lesson['date'],   # or lesson.date if it’s an object
-        reverse=True                         # newest→oldest
-    )
+    # get_lessons_data returns dicts, each with `lesson['date']` as a **string**
+    raw = get_lessons_data(user=request.user, is_done_flag=True)
 
-    start = (page - 1) * page_size
-    end   = start + page_size
-    slice_ = all_lessons[start:end]
-    has_more = len(all_lessons) > end
+    # parse each string into a real datetime
+    for lesson in raw:
+        lesson['_parsed_date'] = parser.parse(lesson['date'])
+
+    # sort by the real datetime, descending
+    sorted_lessons = sorted(raw,
+                            key=lambda x: x['_parsed_date'],
+                            reverse=True)
+
+    # paginate
+    start  = (page - 1) * page_size
+    end    = start + page_size
+    slice_ = sorted_lessons[start:end]
 
     return Response({
         'results': slice_,
-        'has_more': has_more,
+        'has_more': len(sorted_lessons) > end,
     })
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
