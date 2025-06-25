@@ -1,6 +1,6 @@
 name: CI/CD Django + Flutter
 
-# 1) Top-level IMAGE_NAME is fine — GH will interpolate this once, early
+# Top‐level image name (will be lowercased in each job)
 env:
   IMAGE_NAME: ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}
 
@@ -17,14 +17,16 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Lowercase IMAGE_NAME
         run: |
           IMAGE_NAME=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
 
-      - uses: docker/login-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -43,15 +45,20 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    # only define real secrets & contexts here — do NOT try to re-use env.IMAGE_NAME
     env:
-      VM_IP:    ${{ secrets.VM_IP }}
-      VM_PORT:  ${{ secrets.VM_PORT }}
-      VM_USER:  ${{ secrets.VM_USER }}
+      VM_IP:     ${{ secrets.VM_IP }}
+      VM_PORT:   ${{ secrets.VM_PORT }}
+      VM_USER:   ${{ secrets.VM_USER }}
       GHCR_USER: ${{ github.actor }}
       GHCR_PAT:  ${{ secrets.GITHUB_TOKEN }}
+      IMAGE_NAME: ${{ env.IMAGE_NAME }}
 
     steps:
+      - name: Lowercase IMAGE_NAME
+        run: |
+          IMAGE_NAME=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.1
         with:
@@ -65,18 +72,20 @@ jobs:
             set -e
             cd /opt/mylessons
 
-            # (optional) keep your host repo in sync
+            # 1) Sync your on-disk repo
             git remote set-url origin https://${GHCR_USER}:${GHCR_PAT}@github.com/${GHCR_USER}/MyLessons-Project.git
             git fetch --depth=1 origin main
             git reset --hard FETCH_HEAD
 
-            # login & clean up old cruft
+            # 2) Docker login & cleanup
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker container prune -f
             docker image prune -af
 
-            # pull & deploy the new build (no local build, no dangling layers)
-            docker pull ${{ env.IMAGE_NAME }}:latest
+            # 3) Pull & deploy new image (no server-side build)
+            docker pull $IMAGE_NAME:latest
             docker compose up -d --remove-orphans --no-build
+
+            # 4) Sanity-check logs
             docker compose logs --tail=50
           EOF
