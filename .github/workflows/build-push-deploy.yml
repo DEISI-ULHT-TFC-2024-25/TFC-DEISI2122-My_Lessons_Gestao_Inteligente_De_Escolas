@@ -70,6 +70,7 @@ jobs:
           GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
               -p "$VM_PORT" \
               "$VM_USER"@"$VM_IP" << EOF
             set -e
