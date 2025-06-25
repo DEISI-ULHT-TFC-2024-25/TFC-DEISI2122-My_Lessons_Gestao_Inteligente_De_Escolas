@@ -1363,11 +1363,23 @@ class BulkImportView(views.APIView):
             ids = [s.strip() for s in str(row['student_ids']).split(',') if s.strip()]
             lesson.students.set(Student.objects.filter(old_id_str__in=ids))
 
-        if row.get('instructor_ids'):
-            ids = [str(int(float(s)))
-                   for s in str(row['instructor_ids']).split(',')
-                   if s.strip()]
-            lesson.instructors.set(Instructor.objects.filter(old_id_str__in=ids))
+        raw = row.get('instructor_ids') or ''
+        ids = []
+        for part in str(raw).split(','):
+            part = part.strip()
+            # skip blank or literal "nan"
+            if not part or part.lower() == 'nan':
+                continue
+            try:
+                # convert to float→int→str; skip anything that fails
+                ids.append(str(int(float(part))))
+            except:
+                continue
+
+        if ids:
+            lesson.instructors.set(
+                Instructor.objects.filter(old_id_str__in=ids)
+            )
 
         if row.get('pack_ids'):
             ids = [s.strip() for s in str(row['pack_ids']).split(',') if s.strip()]
