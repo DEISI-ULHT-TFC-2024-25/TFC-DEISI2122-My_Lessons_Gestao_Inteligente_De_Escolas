@@ -85,7 +85,7 @@ jobs:
 
             # 3) Docker-login and redeploy
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker-compose pull
-            docker-compose up -d --remove-orphans
-            docker-compose logs --tail=50
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker compose logs --tail=50
           EOF
