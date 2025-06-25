@@ -70,12 +70,13 @@ jobs:
           ssh -o StrictHostKeyChecking=no \
               -p "$VM_PORT" \
               "$VM_USER"@"$VM_IP" << 'EOF'
-            # 1) Authenticate Docker on the droplet against GHCR
-            echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            
           
-            # 2) Pull the fresh image, recreate your services, and show the latest logs
+            # Pull the fresh image, recreate your services, and show the latest logs
             cd /opt/mylessons
-            docker-compose pull
+            git pull origin main               # ← bring host files up-to-date
+            echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker-compose pull                # still pulls new images if you keep them
             docker-compose up -d
             docker-compose logs --tail=50
           EOF
