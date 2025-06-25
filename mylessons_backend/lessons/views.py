@@ -222,9 +222,10 @@ def last_lessons(request):
     page = max(1, int(request.GET.get('page', 1)))
     page_size = 10
 
-    all_lessons = get_lessons_data(
-        user=request.user,
-        is_done_flag=True
+    all_lessons = sorted(
+        get_lessons_data(user=request.user, is_done_flag=True),
+        key=lambda lesson: lesson['date'],   # or lesson.date if it’s an object
+        reverse=True                         # newest→oldest
     )
 
     start = (page - 1) * page_size
