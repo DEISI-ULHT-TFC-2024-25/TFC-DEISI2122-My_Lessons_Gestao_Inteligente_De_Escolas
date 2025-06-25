@@ -66,18 +66,26 @@ jobs:
           VM_IP: ${{ secrets.VM_IP }}
           VM_PORT: ${{ secrets.VM_PORT }}
           VM_USER: ${{ secrets.VM_USER }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ssh -o StrictHostKeyChecking=no \
               -p "$VM_PORT" \
-              "$VM_USER"@"$VM_IP" << 'EOF'
-            
+              "$VM_USER"@"$VM_IP" << EOF
+            set -e
           
-            # Pull the fresh image, recreate your services, and show the latest logs
+            # 1) Update host checkout from GitHub (now using SSH remote):
             cd /opt/mylessons
-            git pull origin main               # ← bring host files up-to-date
+            git pull origin main
+          
+            # 2) Login so docker-compose pull works:
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker-compose pull                # still pulls new images if you keep them
-            docker-compose up -d
-            docker-compose logs --tail=50
+          
+            # 3) Pull the fresh image & restart
+            docker-compose -f docker-compose.prod.yml pull
+            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+          
+            # 4) Show last 50 lines of logs for sanity
+            docker-compose -f docker-compose.prod.yml logs --tail=50
           EOF
   
