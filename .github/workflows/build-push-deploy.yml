@@ -74,19 +74,18 @@ jobs:
               -p "$VM_PORT" \
               "$VM_USER"@"$VM_IP" << EOF
             set -e
-          
-            # 1) Update host checkout from GitHub (now using SSH remote):
+
+            # ensure ~/.ssh exists & trust GitHub's host key
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+
             cd /opt/mylessons
             git pull origin main
-          
-            # 2) Login so docker-compose pull works:
+
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-          
-            # 3) Pull the fresh image & restart
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-          
-            # 4) Show last 50 lines of logs for sanity
             docker-compose -f docker-compose.prod.yml logs --tail=50
           EOF
+      
   
