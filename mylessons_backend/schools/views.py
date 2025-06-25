@@ -1352,6 +1352,9 @@ class BulkImportView(views.APIView):
         if row.get('instructor_ids'):
             ids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
             lesson.instructors.set(Instructor.objects.filter(old_id_str__in=ids))
+        if row.get('pack_ids'):
+            ids = [s.strip() for s in str(row['pack_ids']).split(',') if s.strip()]
+            lesson.packs.set(Pack.objects.filter(old_id_str__in=ids))
         return lesson, created
 
     def _import_pack(self, df, school):
@@ -1393,6 +1396,9 @@ class BulkImportView(views.APIView):
                 if row.get('student_ids'):
                     sids = [s.strip() for s in str(row['student_ids']).split(',') if s.strip()]
                     pack.students.set(Student.objects.filter(old_id_str__in=sids))
+                if row.get('lesson_ids'):
+                    sids = [s.strip() for s in str(row['lesson_ids']).split(',') if s.strip()]
+                    pack.lessons.set(Lesson.objects.filter(old_id_str__in=sids))
                 if row.get('instructor_ids'):
                     iids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
                     pack.instructors.set(Instructor.objects.filter(old_id_str__in=iids))
