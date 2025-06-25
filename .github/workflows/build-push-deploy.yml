@@ -1,5 +1,9 @@
 name: CI/CD Django + Flutter
 
+# 1) Top-level IMAGE_NAME is fine — GH will interpolate this once, early
+env:
+  IMAGE_NAME: ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}
+
 permissions:
   contents: read
   packages: write
@@ -9,22 +13,18 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Lowercase IMAGE_NAME
         run: |
-          echo "IMAGE_NAME=$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          IMAGE_NAME=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -43,13 +43,13 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    # only define real secrets & contexts here — do NOT try to re-use env.IMAGE_NAME
     env:
-      VM_IP:      ${{ secrets.VM_IP }}
-      VM_PORT:    ${{ secrets.VM_PORT }}
-      VM_USER:    ${{ secrets.VM_USER }}
-      GHCR_USER:  ${{ github.actor }}
-      GHCR_PAT:   ${{ secrets.GITHUB_TOKEN }}
-      IMAGE_NAME: ${{ env.IMAGE_NAME }}
+      VM_IP:    ${{ secrets.VM_IP }}
+      VM_PORT:  ${{ secrets.VM_PORT }}
+      VM_USER:  ${{ secrets.VM_USER }}
+      GHCR_USER: ${{ github.actor }}
+      GHCR_PAT:  ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Start SSH agent
@@ -57,29 +57,26 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.VM_SSH_KEY }}
 
-      - name: Deploy via SSH
+      - name: Deploy to Production
         run: |
           ssh -o StrictHostKeyChecking=no \
               -p "$VM_PORT" \
-              "$VM_USER@$VM_IP" << 'EOF'
+              "$VM_USER@$VM_IP" << EOF
             set -e
-
             cd /opt/mylessons
 
-            # — keep your on-disk repo in sync —
+            # (optional) keep your host repo in sync
             git remote set-url origin https://${GHCR_USER}:${GHCR_PAT}@github.com/${GHCR_USER}/MyLessons-Project.git
             git fetch --depth=1 origin main
             git reset --hard FETCH_HEAD
 
-            # — Docker login & cleanup —
+            # login & clean up old cruft
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker container prune -f       # drop stopped containers
-            docker image prune -af          # drop unused images & build cache
+            docker container prune -f
+            docker image prune -af
 
-            # — fetch fresh image & deploy —
-            docker pull ${IMAGE_NAME}:latest
+            # pull & deploy the new build (no local build, no dangling layers)
+            docker pull ${{ env.IMAGE_NAME }}:latest
             docker compose up -d --remove-orphans --no-build
-
-            # — sanity-check logs —
             docker compose logs --tail=50
           EOF
