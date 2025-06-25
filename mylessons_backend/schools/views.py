@@ -1328,33 +1328,49 @@ class BulkImportView(views.APIView):
         return {'imported': len(successes), 'errors': errors}
 
     def _create_or_update_lesson(self, row, old_id):
+        # Parse basic fields
         lesson_date = parse_date(row.get('date'))
         lesson_time = parse_time(row.get('start_time'))
-        duration    = self._parse_int(row.get('duration_in_minutes'))
+        lesson_end_time = parse_time(row.get('end_time'))
+        duration = self._parse_int(row.get('duration_in_minutes'))
         if duration is None and row.get('type') == 'group':
             duration = 60
         duration = duration or 60
-        class_no    = self._parse_int(row.get('class_number'))
-        price       = self._parse_decimal(row.get('price'))
+        class_no = self._parse_int(row.get('class_number'))
+        price = self._parse_decimal(row.get('price'))
+
+        # Imported but previously missing fields
+        lesson_type = row.get('type') or 'private'
+        lesson_is_done = self._parse_bool(row.get('is_done'))
+
+        # Create or update
         lesson, created = Lesson.objects.update_or_create(
             old_id_str=old_id,
             defaults={
-                'date': lesson_date,
-                'start_time': lesson_time,
+                'date':                lesson_date,
+                'start_time':          lesson_time,
+                'end_time':            lesson_end_time,
                 'duration_in_minutes': duration,
-                'class_number': class_no,
-                'price': price,
+                'class_number':        class_no,
+                'price':               price,
+                'type':                lesson_type,
+                'is_done':             lesson_is_done,
             }
         )
+
+        # M2M relationships
         if row.get('student_ids'):
             ids = [s.strip() for s in str(row['student_ids']).split(',') if s.strip()]
             lesson.students.set(Student.objects.filter(old_id_str__in=ids))
+
         if row.get('instructor_ids'):
             ids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
             lesson.instructors.set(Instructor.objects.filter(old_id_str__in=ids))
+
         if row.get('pack_ids'):
             ids = [s.strip() for s in str(row['pack_ids']).split(',') if s.strip()]
             lesson.packs.set(Pack.objects.filter(old_id_str__in=ids))
+
         return lesson, created
 
     def _import_pack(self, df, school):
@@ -1412,6 +1428,11 @@ class BulkImportView(views.APIView):
                         pack.save()
                     except Sport.DoesNotExist:
                         pass
+
+                done_count = pack.lessons.filter(is_done=True).count()
+                pack.number_of_classes_left = pack.number_of_classes - done_count
+                pack.save(update_fields=['number_of_classes_left'])
+
                 successes.append({'row': idx+2, 'new_id': pack.id, 'created': created})
             except Exception as e:
                 errors.append({'row': idx+2, 'old_id': old_id, 'error': str(e)})
