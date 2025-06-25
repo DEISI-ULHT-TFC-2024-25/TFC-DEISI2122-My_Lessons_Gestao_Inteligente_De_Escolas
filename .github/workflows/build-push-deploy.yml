@@ -70,22 +70,22 @@ jobs:
           GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ssh -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
               -p "$VM_PORT" \
               "$VM_USER"@"$VM_IP" << EOF
             set -e
 
-            # ensure ~/.ssh exists & trust GitHub's host key
-            mkdir -p ~/.ssh
-            ssh-keyscan github.com >> ~/.ssh/known_hosts
-
             cd /opt/mylessons
-            git pull origin main
 
+            # 1) Switch origin from SSH to HTTPS including your token:
+            git remote set-url origin https://${GHCR_USER}:${GHCR_PAT}@github.com/${GHCR_USER}/MyLessons-Project.git
+
+            # 2) Fetch & reset to main (hard reset avoids merge hassles)
+            git fetch --depth=1 origin main
+            git reset --hard FETCH_HEAD
+
+            # 3) Docker-login and redeploy
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
             docker-compose -f docker-compose.prod.yml logs --tail=50
           EOF
-      
-  
