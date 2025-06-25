@@ -1364,7 +1364,9 @@ class BulkImportView(views.APIView):
             lesson.students.set(Student.objects.filter(old_id_str__in=ids))
 
         if row.get('instructor_ids'):
-            ids = [s.strip() for s in str(row['instructor_ids']).split(',') if s.strip()]
+            ids = [str(int(float(s)))
+                   for s in str(row['instructor_ids']).split(',')
+                   if s.strip()]
             lesson.instructors.set(Instructor.objects.filter(old_id_str__in=ids))
 
         if row.get('pack_ids'):
