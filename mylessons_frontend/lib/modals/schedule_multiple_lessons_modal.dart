@@ -8,7 +8,10 @@ import 'package:mylessons_frontend/services/api_service.dart';
 import 'package:provider/provider.dart';
 import 'package:mylessons_frontend/providers/home_page_provider.dart';
 
+import '../providers/lessons_modal_provider.dart';
+
 class ScheduleMultipleLessonsModal extends StatefulWidget {
+  final BuildContext parentContext;
   final List<dynamic> lessons;
   final List<String> unschedulableLessons;
   final VoidCallback onScheduleConfirmed;
@@ -18,6 +21,7 @@ class ScheduleMultipleLessonsModal extends StatefulWidget {
 
   const ScheduleMultipleLessonsModal({
     super.key,
+    required this.parentContext,
     required this.lessons,
     required this.onScheduleConfirmed,
     required this.currentRole,
@@ -164,211 +168,6 @@ class _ScheduleMultipleLessonsModalState
     } else {
       Navigator.of(context).pop();
     }
-  }
-
-  Widget buildTimeSelection() {
-    if (singleSelectedDate == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _openDatePicker();
-      });
-    }
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
-      child: Container(
-        key: const ValueKey<int>(1),
-        width: double.infinity,
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header row with orange back icon and heading.
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.orange),
-                  onPressed: () {
-                    setState(() {
-                      _currentStep = 0;
-                    });
-                  },
-                ),
-                Text(
-                  singleSelectedDate != null
-                      ? DateFormat('d MMM yyyy').format(singleSelectedDate!)
-                      : "",
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-            // Increment selection using ToggleButtons.
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ToggleButtons(
-                    borderRadius: BorderRadius.circular(8),
-                    isSelected: [
-                      singleIncrement == 15,
-                      singleIncrement == 30,
-                      singleIncrement == 60
-                    ],
-                    onPressed: (int index) {
-                      int newValue;
-                      if (index == 0) {
-                        newValue = 15;
-                      } else if (index == 1) {
-                        newValue = 30;
-                      } else {
-                        newValue = 60;
-                      }
-                      setState(() {
-                        singleIncrement = newValue;
-                        if (singleSelectedDate != null) {
-                          singleIsLoading = true;
-                          singleAvailableTimes = [];
-                        }
-                      });
-                      if (singleSelectedDate != null) {
-                        final selectedIndex =
-                            selectedLessons.indexWhere((e) => e);
-                        if (selectedIndex == -1) return;
-                        final lessonId = int.parse(
-                            widget.lessons[selectedIndex]['lesson_id']);
-                        fetchAvailableTimes(
-                                lessonId, singleSelectedDate!, singleIncrement)
-                            .then((times) {
-                          setState(() {
-                            singleAvailableTimes = times;
-                            singleIsLoading = false;
-                          });
-                        });
-                      }
-                    },
-                    children: const [
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text("15 min"),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text("30 min"),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text("60 min"),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (singleIsLoading) const CircularProgressIndicator(),
-            if (!singleIsLoading && singleAvailableTimes.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 2,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: singleAvailableTimes.length,
-                  itemBuilder: (context, index) {
-                    String timeStr = singleAvailableTimes[index];
-                    return InkWell(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext dialogContext) {
-                            return StatefulBuilder(
-                              builder: (BuildContext dialogContext,
-                                  StateSetter setDialogState) {
-                                return AlertDialog(
-                                  title: const Text("Confirm Reschedule"),
-                                  content: SizedBox(
-                                    height: 80,
-                                    child: Center(
-                                      child: singleIsScheduling
-                                          ? const CircularProgressIndicator()
-                                          : Text(
-                                              "Reschedule lesson to ${DateFormat('d MMM yyyy').format(singleSelectedDate!).toLowerCase()} at $timeStr?",
-                                            ),
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: singleIsScheduling
-                                          ? null
-                                          : () =>
-                                              Navigator.of(dialogContext).pop(),
-                                      child: const Text("Cancel"),
-                                    ),
-                                    TextButton(
-                                      onPressed: singleIsScheduling
-                                          ? null
-                                          : () {
-                                              setDialogState(() {
-                                                singleIsScheduling = true;
-                                              });
-                                              _submitSingleSchedule().then((_) {
-                                                setDialogState(() {
-                                                  singleIsScheduling = false;
-                                                });
-                                              });
-                                            },
-                                      child: singleIsScheduling
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                  strokeWidth: 2),
-                                            )
-                                          : const Text("Confirm"),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          timeStr,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            if (!singleIsLoading && singleAvailableTimes.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Text("No available times for the selected date."),
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
   }
 
   // ------------------ MULTIPLE LESSONS SCHEDULING ------------------ //
@@ -771,9 +570,7 @@ class _ScheduleMultipleLessonsModalState
   /// Decide which scheduling UI to show based on the number of selected lessons.
   Widget buildSchedulingStep() {
     final selectedCount = selectedLessons.where((e) => e).length;
-    if (selectedCount == 1) {
-      return buildTimeSelection();
-    } else if (selectedCount > 1) {
+    if (selectedCount > 1) {
       return buildMultipleLessonsUI();
     }
     return const SizedBox.shrink();
@@ -901,63 +698,6 @@ class _ScheduleMultipleLessonsModalState
     }
   }
 
-  Future<void> _submitSingleSchedule() async {
-    try {
-      final lessonIds = <String>[];
-      for (int i = 0; i < widget.lessons.length; i++) {
-        if (selectedLessons[i]) {
-          lessonIds.add(widget.lessons[i]['lesson_id']);
-        }
-      }
-      if (lessonIds.length != 1) {
-        throw Exception('Exactly one lesson must be selected.');
-      }
-      if (singleSelectedDate == null) {
-        throw Exception('No date selected.');
-      }
-      final payload = {
-        'lesson_id': lessonIds.first,
-        'new_date': DateFormat('yyyy-MM-dd').format(singleSelectedDate!),
-        'new_time': singleAvailableTimes.isNotEmpty
-            ? singleAvailableTimes.first
-            : '00:00',
-      };
-      final headers = await getAuthHeaders();
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/lessons/schedule_private_lesson/'),
-        headers: {
-          "Content-Type": "application/json",
-          ...headers,
-        },
-        body: jsonEncode(payload),
-      );
-      if (response.statusCode == 200) {
-        Navigator.of(context).pop();
-        widget.onScheduleConfirmed();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Lesson scheduled successfully!"),
-          ),
-        );
-      } else {
-        throw Exception("Error scheduling lesson: ${response.statusCode}");
-      }
-    } catch (e) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Warning"),
-          content: Text(e.toString()),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("OK"),
-            )
-          ],
-        ),
-      );
-    }
-  }
 
   // ------------------ BUILD METHOD: MODAL WITH HEIGHT ANIMATION ------------------ //
 
@@ -983,7 +723,7 @@ class _ScheduleMultipleLessonsModalState
                 ),
               ),
             ),
-            if (showNextButton)
+            if (showNextButton || (_currentStep == 1 && selectedLessons.where((e) => e).length > 1))
               Positioned(
                 left: 0,
                 right: 0,
@@ -993,18 +733,26 @@ class _ScheduleMultipleLessonsModalState
                     padding: const EdgeInsets.all(16),
                     child: ElevatedButton(
                       onPressed: () {
+                        final selectedCount = selectedLessons.where((e) => e).length;
+
                         if (_currentStep == 0) {
-                          setState(() {
-                            _currentStep = 1;
-                          });
-                        } else if (_currentStep == 1) {
-                          final selectedCount =
-                              selectedLessons.where((e) => e).length;
                           if (selectedCount == 1) {
-                            _submitSingleSchedule();
+                            // 1) close the multi‐lesson modal
+                            Navigator.of(context).pop();
+                            // 2) show your single‐lesson modal
+                            final selectedIndex = selectedLessons.indexWhere((e) => e);
+                            final lesson = widget.lessons[selectedIndex];
+                            print(lesson);
+                            Provider.of<LessonModalProvider>(context, listen: false)
+                                .showScheduleLessonModal(widget.parentContext, lesson);
                           } else if (selectedCount > 1) {
-                            _submitMultipleSchedule();
+                            // go to the "schedule multiple" UI
+                            setState(() => _currentStep = 1);
                           }
+                        } else if (_currentStep == 1) {
+                          // You're already in the "schedule multiple" step,
+                          // so just submit the batch schedule
+                          _submitMultipleSchedule();
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -1016,7 +764,7 @@ class _ScheduleMultipleLessonsModalState
                         ),
                         textStyle: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      child: Text(_currentStep == 0 ? "Next" : "Submit"),
+                      child: Text(_currentStep == 1 ? "Submit" : "Next"),
                     ),
                   ),
                 ),
