@@ -49,10 +49,11 @@ class LessonModalProvider with ChangeNotifier {
           int lessonId, DateTime newDate, String newTime) =>
       schedulePrivateLesson(lessonId, newDate, newTime);
 
-  Future<void> showScheduleLessonModal(
+  Future<bool> showScheduleLessonModal(
       BuildContext context,
       dynamic lesson,
       ) async {
+
     // … your ID logic stays the same …
     final rawId = lesson['id'] ?? lesson['lesson_id'];
     final int lessonId = rawId is int
@@ -65,37 +66,45 @@ class LessonModalProvider with ChangeNotifier {
         ? 'None'
         : rawExp as String;
 
-    final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
+    final homeProvider = context.read<HomePageProvider>();
     final currentRole = homeProvider.currentRole;
-    final fetchData = homeProvider.fetchData;
     final schoolScheduleTimeLimit =
     await fetchSchoolScheduleTimeLimit(lesson["school"]);
 
-    showModalBottomSheet(
+    // Await the bottom sheet and get a bool result
+    final didSchedule = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (modalContext) {
         return ScheduleLessonModal(
           lessonId: lessonId,
+          parentContext: context,
           expirationDate: expirationDate,
           schoolScheduleTimeLimit: schoolScheduleTimeLimit,
           currentRole: currentRole,
           fetchAvailableTimes: _fetchAvailableTimes,
           schedulePrivateLesson: _schedulePrivateLesson,
-          onScheduleConfirmed: fetchData,
         );
       },
     );
+
+
+    // normalize null to false
+    return didSchedule == true;
   }
 
   /// Shows available options for a lesson in a modal sheet.
   void showLessonCardOptions(BuildContext context, dynamic lesson) {
+    // 1) save the “real” context (which has HomePageProvider above it)
+    final homeCtx = context;
+    final homeProv = context.read<HomePageProvider>();
+
     showModalBottomSheet(
-      context: context,
+      context: homeCtx,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       isScrollControlled: true,
-      builder: (context) {
+      builder: (sheetCtx) {
         return Padding(
           padding: const EdgeInsets.all(16.0),
           child: Wrap(
@@ -103,11 +112,11 @@ class LessonModalProvider with ChangeNotifier {
               ListTile(
                 leading: const Icon(Icons.calendar_today, color: Colors.orange),
                 title: const Text("Schedule Lesson"),
-                onTap: () {
-                  Navigator.pop(context);
+                onTap: () async {
+                  Navigator.of(sheetCtx).pop();
                   if (lesson['type']?.toString().toLowerCase() == 'group') {
                     showDialog(
-                      context: context,
+                      context: sheetCtx,
                       builder: (context) => AlertDialog(
                         title: const Text("Scheduling Unavailable"),
                         content: const Text(
@@ -121,7 +130,21 @@ class LessonModalProvider with ChangeNotifier {
                       ),
                     );
                   } else {
-                    showScheduleLessonModal(context, lesson);
+
+                    // 2) open your scheduling modal (returns bool)
+                    final didSchedule = await showScheduleLessonModal(
+                      homeCtx,    // ← still use the outer context here
+                      lesson,
+                    );
+
+                    if (didSchedule) {
+                      // 1) start the data refresh, but don't wait for it
+                      homeProv.fetchData();
+                      // 2) immediately give the user feedback
+                      ScaffoldMessenger.of(homeCtx).showSnackBar(
+                        const SnackBar(content: Text("Lesson scheduled!")),
+                      );
+                    }
                   }
                 },
               ),
@@ -129,8 +152,8 @@ class LessonModalProvider with ChangeNotifier {
                 leading: const Icon(Icons.more_vert, color: Colors.orange),
                 title: const Text("View Details"),
                 onTap: () {
-                  Navigator.pop(context);
-                  showLessonDetailsModal(context, lesson);
+                  Navigator.of(sheetCtx).pop();
+                  showLessonDetailsModal(homeCtx, lesson);
                 },
               ),
             ],
@@ -212,7 +235,7 @@ Widget buildLessonCard(
 
             // Calendar or report icon.
             InkWell(
-              onTap: () {
+              onTap: () async {
                 if (isLastLesson) {
                   handleLessonReport(context, lesson);
                 } else if ((unschedulableLessons ?? [])
@@ -246,7 +269,20 @@ Widget buildLessonCard(
                     ),
                   );
                 } else {
-                  showScheduleLessonModal(context, lesson);
+                  // 2) open your scheduling modal (returns bool)
+                  final didSchedule = await showScheduleLessonModal(
+                    context,    // ← still use the outer context here
+                    lesson,
+                  );
+
+                  if (didSchedule) {
+                    final homeProv = context.read<HomePageProvider>();
+                    homeProv.fetchData();
+                    // 2) immediately give the user feedback
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Lesson scheduled!")),
+                    );
+                  }
                 }
               },
               child: SizedBox(
