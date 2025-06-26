@@ -89,6 +89,12 @@ Future<void> main() async {
 
   print('✅ reached runApp()');
 
+  // Show the “rainbow” overlay whenever Flutter repaints:
+  //debugRepaintRainbowEnabled = true;
+
+  // Show the built-in performance overlay (FPS, GPU, etc):
+  //WidgetsApp.showPerformanceOverlayOverride = true;
+
   runApp(
     MultiProvider(
       providers: [

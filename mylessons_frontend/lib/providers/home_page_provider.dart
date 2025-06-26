@@ -73,6 +73,7 @@ class HomePageProvider extends ChangeNotifier {
   }
 
   Future<void> fetchData() async {
+    print("🔄 HomePageProvider.fetchData() running!");
     isLoading = true;
     notifyListeners();
     try {

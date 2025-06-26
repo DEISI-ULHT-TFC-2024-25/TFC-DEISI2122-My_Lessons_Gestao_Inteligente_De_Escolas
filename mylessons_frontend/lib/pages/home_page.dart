@@ -67,6 +67,8 @@ class _HomePageState extends State<HomePage>
   bool _showToggleRow = true;
   bool _showHeader = true;
 
+  late final HomePageProvider homeProvider;
+
   @override
   void initState() {
     super.initState();
@@ -135,60 +137,6 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  /// Modal methods (using provider values as needed).
-  void showLessonCardOptions(dynamic lesson) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      isScrollControlled: true,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.calendar_today, color: Colors.orange),
-                title: const Text("Schedule Lesson"),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (lesson['type']?.toString().toLowerCase() == 'group') {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Scheduling Unavailable"),
-                        content: const Text(
-                            "To change the schedule of a group lesson, please contact the school."),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text("OK"),
-                          )
-                        ],
-                      ),
-                    );
-                  } else {
-                    Provider.of<LessonModalProvider>(context, listen: false)
-                        .showScheduleLessonModal(context, lesson);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.more_vert, color: Colors.orange),
-                title: const Text("View Details"),
-                onTap: () {
-                  Navigator.pop(context);
-                  Provider.of<LessonModalProvider>(context, listen: false)
-                      .showLessonDetailsModal(context, lesson);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showPackCardOptions(dynamic pack) {
     showModalBottomSheet(
       context: context,
@@ -250,6 +198,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  /// Now returns Future<void> but awaits a bool from the sheet
   Future<void> _showScheduleMultipleLessonsModal(
     List<dynamic> lessons,
     String expirationDate,
@@ -257,7 +206,7 @@ class _HomePageState extends State<HomePage>
     final timeLimit =
         await fetchSchoolScheduleTimeLimit(lessons.first["school"]);
 
-    // Await the sheet, declaring it returns a bool
+    // Await the sheet and capture its bool result:
     final didSchedule = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -265,19 +214,18 @@ class _HomePageState extends State<HomePage>
         parentContext: context,
         lessons: lessons,
         unschedulableLessons:
-            Provider.of<HomePageProvider>(context, listen: false)
+            context.read<HomePageProvider>()
                 .unschedulableLessons,
         expirationDate: expirationDate,
-        currentRole:
-            Provider.of<HomePageProvider>(context, listen: false).currentRole,
+        currentRole: context.read<HomePageProvider>().currentRole,
         schoolScheduleTimeLimit: timeLimit,
-        onScheduleConfirmed: () async {
-          // you can still refresh here if you like
-          await Provider.of<HomePageProvider>(context, listen: false)
-              .fetchData();
-        },
       ),
     );
+
+    // Only refresh if the user actually confirmed scheduling:
+    if (didSchedule == true) {
+      await homeProvider.fetchData();
+    }
   }
 
   Future<void> _showNotificationsModal() async {
@@ -286,7 +234,7 @@ class _HomePageState extends State<HomePage>
     await Future.delayed(const Duration(milliseconds: 500));
 
     // Mark as read…
-    final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
+    final homeProvider = context.read<HomePageProvider>();
     homeProvider.notificationsCount = 0;
     homeProvider.notifyListeners();
 
@@ -710,12 +658,12 @@ class _HomePageState extends State<HomePage>
                   if (_lessonsActiveTabIndex == 0) {
                     _showLessonFilterModal(
                         true,
-                        Provider.of<HomePageProvider>(context, listen: false)
+                        context.read<HomePageProvider>()
                             .upcomingLessons);
                   } else {
                     _showLessonFilterModal(
                         false,
-                        Provider.of<HomePageProvider>(context, listen: false)
+                        context.read<HomePageProvider>()
                             .lastLessons);
                   }
                 },
@@ -811,12 +759,12 @@ class _HomePageState extends State<HomePage>
                   if (_packsActiveTabIndex == 0) {
                     _showPackFilterModal(
                         true,
-                        Provider.of<HomePageProvider>(context, listen: false)
+                        context.read<HomePageProvider>()
                             .activePacks);
                   } else {
                     _showPackFilterModal(
                         false,
-                        Provider.of<HomePageProvider>(context, listen: false)
+                        context.read<HomePageProvider>()
                             .lastPacks);
                   }
                 },
@@ -1176,11 +1124,11 @@ class _HomePageState extends State<HomePage>
           label,
           color,
           items.map((lesson) {
-            return Provider.of<LessonModalProvider>(context, listen: false)
+            return context.read<LessonModalProvider>()
                 .buildLessonCard(
               context,
               lesson,
-              Provider.of<PackDetailsProvider>(context, listen: false)
+              context.read<PackDetailsProvider>()
                   .unschedulableLessons,
               isLastLesson: false,
             );
@@ -1250,10 +1198,8 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<HomePageProvider>(
-      create: (_) => HomePageProvider(),
-      child: Consumer<HomePageProvider>(
-        builder: (context, homeProvider, child) {
+    return Consumer<HomePageProvider>(
+      builder: (context, homeProvider, child) {
           if (!homeProvider.isLoading && homeProvider.currentRole.isEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) async {
               await storage.delete(key: 'auth_token');
@@ -1396,15 +1342,12 @@ class _HomePageState extends State<HomePage>
                                       lastLessonsSearchQuery,
                                       lastLessonsFilters,
                                     ).map((lesson) =>
-                                        Provider.of<LessonModalProvider>(
-                                          context,
-                                          listen: false,
+                                        context.read<LessonModalProvider>(
                                         ).buildLessonCard(
                                           context,
                                           lesson,
-                                          Provider.of<PackDetailsProvider>(
-                                                  context,
-                                                  listen: false)
+                                          context.read<PackDetailsProvider>(
+                                                  )
                                               .unschedulableLessons,
                                           isLastLesson: true,
                                         )),
@@ -1613,12 +1556,16 @@ class _HomePageState extends State<HomePage>
                             ),
                             const SizedBox(height: 8),
                             Expanded(
-                              child: TabBarView(
-                                children: [
-                                  lessonsTab,
-                                  packsTab,
-                                  statsTab,
-                                ],
+                              child: Builder(
+                                builder: (scaffoldCtx) {
+                                  return TabBarView(
+                                    children: [
+                                      lessonsTab,
+                                      packsTab,
+                                      statsTab,
+                                    ],
+                                  );
+                                }
                               ),
                             ),
                           ],
@@ -1631,7 +1578,6 @@ class _HomePageState extends State<HomePage>
             ),
           );
         },
-      ),
-    );
-  }
+
+    );}
 }

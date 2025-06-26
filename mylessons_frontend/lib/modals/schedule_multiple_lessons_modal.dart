@@ -14,7 +14,6 @@ class ScheduleMultipleLessonsModal extends StatefulWidget {
   final BuildContext parentContext;
   final List<dynamic> lessons;
   final List<String> unschedulableLessons;
-  final VoidCallback onScheduleConfirmed;
   final String currentRole;
   final int schoolScheduleTimeLimit;
   final String expirationDate;
@@ -23,7 +22,6 @@ class ScheduleMultipleLessonsModal extends StatefulWidget {
     super.key,
     required this.parentContext,
     required this.lessons,
-    required this.onScheduleConfirmed,
     required this.currentRole,
     required this.schoolScheduleTimeLimit,
     required this.expirationDate,
@@ -668,9 +666,9 @@ class _ScheduleMultipleLessonsModalState
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                    widget.onScheduleConfirmed();
+                    Navigator.of(context).pop(); // close the AlertDialog
+                    Navigator.of(widget.parentContext)
+                        .pop(true); // close the sheet, returning `true`
                   },
                   child: const Text("Confirm"),
                 ),
@@ -698,7 +696,6 @@ class _ScheduleMultipleLessonsModalState
     }
   }
 
-
   // ------------------ BUILD METHOD: MODAL WITH HEIGHT ANIMATION ------------------ //
 
   @override
@@ -723,7 +720,9 @@ class _ScheduleMultipleLessonsModalState
                 ),
               ),
             ),
-            if (showNextButton || (_currentStep == 1 && selectedLessons.where((e) => e).length > 1))
+            if (showNextButton ||
+                (_currentStep == 1 &&
+                    selectedLessons.where((e) => e).length > 1))
               Positioned(
                 left: 0,
                 right: 0,
@@ -732,19 +731,34 @@ class _ScheduleMultipleLessonsModalState
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: ElevatedButton(
-                      onPressed: () {
-                        final selectedCount = selectedLessons.where((e) => e).length;
+                      onPressed: () async {
+                        final selectedCount =
+                            selectedLessons.where((e) => e).length;
 
                         if (_currentStep == 0) {
                           if (selectedCount == 1) {
                             // 1) close the multi‐lesson modal
                             Navigator.of(context).pop();
                             // 2) show your single‐lesson modal
-                            final selectedIndex = selectedLessons.indexWhere((e) => e);
+                            final selectedIndex =
+                                selectedLessons.indexWhere((e) => e);
                             final lesson = widget.lessons[selectedIndex];
-                            print(lesson);
-                            Provider.of<LessonModalProvider>(context, listen: false)
-                                .showScheduleLessonModal(widget.parentContext, lesson);
+
+
+
+                            // 2) open your scheduling modal (returns bool)
+                            final didSchedule = await context.read<LessonModalProvider>()
+                                .showScheduleLessonModal(
+                                widget.parentContext, lesson);
+
+                            if (didSchedule) {
+                              final homeProv = widget.parentContext.read<HomePageProvider>();
+                              homeProv.fetchData();
+                              // 2) immediately give the user feedback
+                              ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+                                const SnackBar(content: Text("Lesson scheduled!")),
+                              );
+                            }
                           } else if (selectedCount > 1) {
                             // go to the "schedule multiple" UI
                             setState(() => _currentStep = 1);

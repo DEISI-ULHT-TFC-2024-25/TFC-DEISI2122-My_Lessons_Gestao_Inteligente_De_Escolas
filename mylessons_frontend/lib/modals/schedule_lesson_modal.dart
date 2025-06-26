@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 class ScheduleLessonModal extends StatefulWidget {
   final int lessonId;
+  final BuildContext parentContext;
   final String expirationDate;
   final int schoolScheduleTimeLimit;
   final String currentRole;
@@ -11,17 +12,16 @@ class ScheduleLessonModal extends StatefulWidget {
       int lessonId, DateTime date, int increment) fetchAvailableTimes;
   final Future<String?> Function(int lessonId, DateTime newDate, String newTime)
       schedulePrivateLesson;
-  final VoidCallback onScheduleConfirmed;
 
   const ScheduleLessonModal({
     Key? key,
+    required this.parentContext,
     required this.lessonId,
     required this.expirationDate,
     required this.schoolScheduleTimeLimit,
     required this.currentRole,
     required this.fetchAvailableTimes,
     required this.schedulePrivateLesson,
-    required this.onScheduleConfirmed,
   }) : super(key: key);
 
   @override
@@ -287,17 +287,10 @@ class _ScheduleLessonModalState extends State<ScheduleLessonModal> {
                                                 isScheduling = false;
                                               });
                                               if (errorMessage == null) {
+
                                                 Navigator.of(dialogContext)
                                                     .pop();
-                                                Navigator.of(context).pop();
-                                                widget.onScheduleConfirmed();
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                        "Lesson successfully scheduled"),
-                                                  ),
-                                                );
+                                                Navigator.of(context).pop(true);
                                               } else {
                                                 Navigator.of(dialogContext)
                                                     .pop();
