@@ -146,6 +146,7 @@ def get_packs_data(user, is_done_flag):
                                 "lesson_id" : str(lesson.id),
                                 "lesson_str": str(lesson),
                                 "school": str(lesson.school) if lesson.school else "",
+                                "expiration_date": lesson.packs.all()[0].expiration_date if lesson.packs.exists() and lesson.packs.all()[0].expiration_date else "None",
                             }
                             for lesson in pack.lessons_many.all()
                         ],

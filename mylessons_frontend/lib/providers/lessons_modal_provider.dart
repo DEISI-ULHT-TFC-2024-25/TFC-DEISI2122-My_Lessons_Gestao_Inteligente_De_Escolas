@@ -49,31 +49,40 @@ class LessonModalProvider with ChangeNotifier {
           int lessonId, DateTime newDate, String newTime) =>
       schedulePrivateLesson(lessonId, newDate, newTime);
 
-  /// Opens the schedule lesson modal.
   Future<void> showScheduleLessonModal(
-      BuildContext context, dynamic lesson) async {
-    final int lessonId = lesson['id'] ?? lesson['lesson_id'];
+      BuildContext context,
+      dynamic lesson,
+      ) async {
+    // … your ID logic stays the same …
+    final rawId = lesson['id'] ?? lesson['lesson_id'];
+    final int lessonId = rawId is int
+        ? rawId
+        : int.parse(rawId.toString());
+
+    // coalesce expiration date
+    final rawExp = lesson['expiration_date'];
+    final String expirationDate = (rawExp == null || rawExp == 'None')
+        ? 'None'
+        : rawExp as String;
+
     final homeProvider = Provider.of<HomePageProvider>(context, listen: false);
     final currentRole = homeProvider.currentRole;
-    // Ensure that fetchData is invoked as a function.
-    final Function fetchData = homeProvider.fetchData;
-    int schoolScheduleTimeLimit =
-        await fetchSchoolScheduleTimeLimit(lesson["school"]);
+    final fetchData = homeProvider.fetchData;
+    final schoolScheduleTimeLimit =
+    await fetchSchoolScheduleTimeLimit(lesson["school"]);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (BuildContext modalContext) {
+      builder: (modalContext) {
         return ScheduleLessonModal(
           lessonId: lessonId,
-          expirationDate: lesson['expiration_date'],
+          expirationDate: expirationDate,
           schoolScheduleTimeLimit: schoolScheduleTimeLimit,
           currentRole: currentRole,
           fetchAvailableTimes: _fetchAvailableTimes,
           schedulePrivateLesson: _schedulePrivateLesson,
-          onScheduleConfirmed: () {
-            fetchData();
-          },
+          onScheduleConfirmed: fetchData,
         );
       },
     );

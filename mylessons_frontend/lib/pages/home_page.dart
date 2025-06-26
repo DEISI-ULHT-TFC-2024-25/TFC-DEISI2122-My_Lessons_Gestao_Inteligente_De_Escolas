@@ -262,6 +262,7 @@ class _HomePageState extends State<HomePage>
       context: context,
       isScrollControlled: true,
       builder: (_) => ScheduleMultipleLessonsModal(
+        parentContext: context,
         lessons: lessons,
         unschedulableLessons:
             Provider.of<HomePageProvider>(context, listen: false)
