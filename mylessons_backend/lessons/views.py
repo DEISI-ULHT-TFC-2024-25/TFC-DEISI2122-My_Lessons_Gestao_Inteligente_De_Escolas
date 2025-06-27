@@ -1623,7 +1623,6 @@ def unschedulable_lessons(request):
         # Query lessons that are not done, that belong to any of the user's students,
         # and that are in one of the user's schools.
         lessons = Lesson.objects.filter(
-            is_done=False,
             students__in=user.students.all(),
             school__in=schools
         ).distinct()
