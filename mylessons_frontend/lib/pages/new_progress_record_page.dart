@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/home_page_provider.dart';
 import '../services/api_service.dart' as ApiService;
 import '../modals/progress_goal_modal.dart';
 
@@ -6,8 +8,9 @@ import '../modals/progress_goal_modal.dart';
 
 class NewProgressRecordPage extends StatefulWidget {
   final dynamic student; // The selected student.
-  final dynamic lesson;  // The current lesson.
-  const NewProgressRecordPage({Key? key, required this.student, required this.lesson})
+  final dynamic lesson; // The current lesson.
+  const NewProgressRecordPage(
+      {Key? key, required this.student, required this.lesson})
       : super(key: key);
 
   @override
@@ -135,9 +138,8 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
     }
   }
 
-  // Build a card widget for a given goal.
-  Widget buildGoalCard(dynamic goal) {
-    int progress = goalProgress[goal['id']] ?? 0;
+  Widget buildGoalCard(dynamic goal, bool isReadOnly) {
+    final progress = goalProgress[goal['id']] ?? 0;
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Padding(
@@ -152,25 +154,16 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
             ),
             IconButton(
               icon: const Icon(Icons.remove, color: Colors.orange),
-              onPressed: () {
-                updateGoalProgress(goal['id'], -1);
-              },
+              onPressed:
+                  isReadOnly ? null : () => updateGoalProgress(goal['id'], -1),
             ),
-            Text(
-              "$progress",
-              style: const TextStyle(fontSize: 16),
-            ),
-            const Text(
-              " / 5",
-              style: TextStyle(fontSize: 16),
-            ),
+            Text("$progress", style: const TextStyle(fontSize: 16)),
+            const Text(" / 5", style: TextStyle(fontSize: 16)),
             IconButton(
               icon: const Icon(Icons.add, color: Colors.orange),
-              onPressed: progress < 5
-                  ? () {
-                      updateGoalProgress(goal['id'], 1);
-                    }
-                  : null,
+              onPressed: isReadOnly || progress >= 5
+                  ? null
+                  : () => updateGoalProgress(goal['id'], 1),
             ),
           ],
         ),
@@ -180,9 +173,13 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
 
   @override
   Widget build(BuildContext context) {
+    // READ the currentRole from your HomePageProvider:
+    final currentRole = context.watch<HomePageProvider>().currentRole;
+    final isReadOnly = currentRole == 'Parent';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(recordId != null ? 'Update Progress Record' : 'New Progress Record'),
+        title: Text('Progress Record'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -196,40 +193,49 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    // Display the goals section.
-                    Center(
-                      child: activeGoals.isEmpty
-                          ? const Text("No active goals.")
-                          : Column(
-                              children: activeGoals.map(buildGoalCard).toList(),
-                            ),
-                    ),
-                    // Button to create a new goal.
-                    Align(
-                      alignment: Alignment.center,
-                      child: TextButton.icon(
-                        onPressed: () async {
-                          // Open the Create New Goal modal.
-                          await showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                            ),
-                            builder: (context) => ProgressGoalModal(
-                                student: widget.student, lesson: widget.lesson),
-                          );
-                          // After closing the modal, refresh the progress record.
-                          await fetchExistingProgressRecord();
-                        },
-                        icon: const Icon(Icons.add, color: Colors.orange),
-                        label: const Text("Create New Goal", style: TextStyle(color: Colors.orange)),
+                    // — goals —
+                    if (activeGoals.isEmpty)
+                      const Center(child: Text("No active goals."))
+                    else
+                      Column(
+                        children: activeGoals.map((goal) {
+                          return buildGoalCard(goal, isReadOnly);
+                        }).toList(),
                       ),
-                    ),
+
+                    // — “Create New Goal” button, hide or disable when read-only —
+                    if (!isReadOnly)
+                      Align(
+                        alignment: Alignment.center,
+                        child: TextButton.icon(
+                          onPressed: () async {
+                            await showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(16)),
+                              ),
+                              builder: (_) => ProgressGoalModal(
+                                  student: widget.student,
+                                  lesson: widget.lesson),
+                            );
+                            await fetchExistingProgressRecord();
+                          },
+                          icon: const Icon(Icons.add, color: Colors.orange),
+                          label: const Text(
+                            "Create New Goal",
+                            style: TextStyle(color: Colors.orange),
+                          ),
+                        ),
+                      ),
+
                     const SizedBox(height: 16),
-                    // Notes input field.
+
+                    // — notes field (disable when read-only) —
                     TextFormField(
                       controller: _notesController,
+                      enabled: !isReadOnly,
                       decoration: const InputDecoration(
                         labelText: 'Notes',
                         hintText: 'Enter quick notes here...',
@@ -237,11 +243,16 @@ class _NewProgressRecordPageState extends State<NewProgressRecordPage> {
                       ),
                       maxLines: null,
                     ),
+
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _saveRecord,
-                      child: Text(recordId != null ? 'Update Record' : 'Save Record'),
-                    ),
+                    if (!isReadOnly) ... {
+                      // — Save/Update button (disable when read-only) —
+                      ElevatedButton(
+                        onPressed: isReadOnly ? null : _saveRecord,
+                        child: Text(
+                            recordId != null ? 'Update Record' : 'Save Record'),
+                      ),
+                    }
                   ],
                 ),
               ),

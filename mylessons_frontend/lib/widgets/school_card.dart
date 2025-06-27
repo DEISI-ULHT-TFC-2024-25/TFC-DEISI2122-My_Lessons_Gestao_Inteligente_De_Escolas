@@ -19,13 +19,6 @@ class SchoolCard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         provider.selectSchool(school);
-        // 2) navigate into its detail screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SchoolDetailsContent(school: school),
-          ),
-        );
       },
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 12),
@@ -70,15 +63,23 @@ class SchoolCard extends StatelessWidget {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.star,
-                                  size: 16, color: Colors.amber),
+                              const Icon(Icons.star, size: 16, color: Colors.amber),
                               const SizedBox(width: 4),
-                              Text(school['rating'].toString()),
-                              const SizedBox(width: 8),
+                              // rating number itself (won’t really overflow, but good to cap it)
                               Text(
-                                '(${school['reviews'] ?? 0} reviews)',
-                                style: const TextStyle(
-                                    fontSize: 12, color: Colors.grey),
+                                school['rating'].toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(width: 8),
+                              // make the reviews text flexible so it can squeeze or ellipsize
+                              Flexible(
+                                child: Text(
+                                  '(${school['reviews'] ?? 0} reviews)',
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -106,13 +107,6 @@ class SchoolCard extends StatelessWidget {
                           updatedService['school_name'] =
                               school['name'] ?? 'N/A';
                           provider.selectService(updatedService);
-                          // 3️⃣ Navigate to the service details page
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ServiceDetailsContent(),
-                            ),
-                          );
                         },
                         child: Container(
                           margin: const EdgeInsets.only(right: 8),

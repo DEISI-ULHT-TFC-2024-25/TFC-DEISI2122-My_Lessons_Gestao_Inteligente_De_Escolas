@@ -617,20 +617,29 @@ class _HomePageState extends State<HomePage>
                 return Container(
                   width: 260,
                   margin: const EdgeInsets.only(right: 12),
-                  child: InkWell(
-                    onTap: () {
-                      provider.selectSchool(school);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SchoolDetailsContent(school: school),
+                  child: Stack(
+                    children: [
+                      SchoolCard(
+                        school: school,
+                        provider: provider,
+                      ),
+                      // fill the entire 260×190 area
+                      Positioned.fill(
+                        child: Material(
+                          color: Colors.transparent, // no visual change
+                          child: InkWell(
+                            onTap: () {
+                              provider.selectSchool(school);
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/main',
+                                    (route) => false,
+                                arguments: {'initialIndex': 1},
+                              );
+                            },
+                          ),
                         ),
-                      );
-                    },
-                    child: SchoolCard(
-                      school: school,
-                      provider: provider,
-                    ),
+                      ),
+                    ],
                   ),
                 );
               },
