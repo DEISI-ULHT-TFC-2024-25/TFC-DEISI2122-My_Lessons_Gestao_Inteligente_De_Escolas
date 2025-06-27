@@ -690,6 +690,8 @@ class Lesson(models.Model):
         Determines if a lesson can still be rescheduled based on the school's reschedule time limit.
         """
         if self.date and self.start_time and self.school:
+            if self.is_done:
+                return False
             lesson_datetime = datetime.combine(self.date, self.start_time)
             lesson_datetime = make_aware(lesson_datetime)
 

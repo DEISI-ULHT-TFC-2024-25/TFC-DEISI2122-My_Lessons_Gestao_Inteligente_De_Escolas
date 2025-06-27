@@ -50,26 +50,22 @@ class LessonModalProvider with ChangeNotifier {
       schedulePrivateLesson(lessonId, newDate, newTime);
 
   Future<bool> showScheduleLessonModal(
-      BuildContext context,
-      dynamic lesson,
-      ) async {
-
+    BuildContext context,
+    dynamic lesson,
+  ) async {
     // … your ID logic stays the same …
     final rawId = lesson['id'] ?? lesson['lesson_id'];
-    final int lessonId = rawId is int
-        ? rawId
-        : int.parse(rawId.toString());
+    final int lessonId = rawId is int ? rawId : int.parse(rawId.toString());
 
     // coalesce expiration date
     final rawExp = lesson['expiration_date'];
-    final String expirationDate = (rawExp == null || rawExp == 'None')
-        ? 'None'
-        : rawExp as String;
+    final String expirationDate =
+        (rawExp == null || rawExp == 'None') ? 'None' : rawExp as String;
 
     final homeProvider = context.read<HomePageProvider>();
     final currentRole = homeProvider.currentRole;
     final schoolScheduleTimeLimit =
-    await fetchSchoolScheduleTimeLimit(lesson["school"]);
+        await fetchSchoolScheduleTimeLimit(lesson["school"]);
 
     // Await the bottom sheet and get a bool result
     final didSchedule = await showModalBottomSheet<bool>(
@@ -87,7 +83,6 @@ class LessonModalProvider with ChangeNotifier {
         );
       },
     );
-
 
     // normalize null to false
     return didSchedule == true;
@@ -110,11 +105,25 @@ class LessonModalProvider with ChangeNotifier {
           child: Wrap(
             children: [
               ListTile(
-                leading: const Icon(Icons.calendar_today, color: Colors.orange),
-                title: const Text("Schedule Lesson"),
+                leading: Icon(
+                  (lesson["is_done"] == true)
+                      ? Icons.article
+                      : Icons.calendar_today,
+                  color: Colors.orange,
+                ),
+                title: Text(
+                  (lesson["is_done"] == true)
+                      ? "View Report"
+                      : "Schedule Lesson",
+                ),
                 onTap: () async {
                   Navigator.of(sheetCtx).pop();
-                  if (lesson['type']?.toString().toLowerCase() == 'group') {
+
+                  if (lesson["is_done"] == true) {
+                    // Abrir o relatório
+                    handleLessonReport(homeCtx, lesson);
+                  } else if (lesson['type']?.toString().toLowerCase() ==
+                      'group') {
                     showDialog(
                       context: sheetCtx,
                       builder: (context) => AlertDialog(
@@ -130,17 +139,13 @@ class LessonModalProvider with ChangeNotifier {
                       ),
                     );
                   } else {
-
-                    // 2) open your scheduling modal (returns bool)
                     final didSchedule = await showScheduleLessonModal(
-                      homeCtx,    // ← still use the outer context here
+                      homeCtx,
                       lesson,
                     );
 
                     if (didSchedule) {
-                      // 1) start the data refresh, but don't wait for it
                       homeProv.fetchData();
-                      // 2) immediately give the user feedback
                       ScaffoldMessenger.of(homeCtx).showSnackBar(
                         const SnackBar(content: Text("Lesson scheduled!")),
                       );
@@ -164,201 +169,205 @@ class LessonModalProvider with ChangeNotifier {
   }
 
   /// Builds and returns a card widget representing a lesson.
-/// Builds and returns a card widget representing a lesson.
-Widget buildLessonCard(
+  /// Builds and returns a card widget representing a lesson.
+  Widget buildLessonCard(
     BuildContext context,
     dynamic lesson,
     dynamic unschedulableLessons, {
     bool isLastLesson = false,
   }) {
-  // Determine whether this is a group lesson.
-  final bool isGroup = lesson['type']?.toString().toLowerCase() == 'group';
+    // Determine whether this is a group lesson.
+    final bool isGroup = lesson['type']?.toString().toLowerCase() == 'group';
 
-  // Safely extract all potentially-null fields as strings.
-  final String studentName = lesson['students_name']?.toString() ?? 'Unknown student';
-  final String subjectName = lesson['subject_name']?.toString()  ?? '';
-  final String dateRaw     = lesson['date']?.toString()          ?? '';
-  final String startRaw    = lesson['start_time']?.toString()    ?? '';
-  final String endRaw      = lesson['end_time']?.toString()      ?? '';
+    // Safely extract all potentially-null fields as strings.
+    final String studentName =
+        lesson['students_name']?.toString() ?? 'Unknown student';
+    final String subjectName = lesson['subject_name']?.toString() ?? '';
+    final String dateRaw = lesson['date']?.toString() ?? '';
+    final String startRaw = lesson['start_time']?.toString() ?? '';
+    final String endRaw = lesson['end_time']?.toString() ?? '';
 
-  // Attempt to parse the date string, trying ISO first then fallback.
-  DateTime? lessonDate;
-  if (dateRaw.isNotEmpty) {
-    lessonDate = DateTime.tryParse(dateRaw);
-    if (lessonDate == null) {
-      try {
-        lessonDate = DateFormat('dd MMM yyyy').parse(dateRaw);
-      } catch (_) {
-        lessonDate = null;
+    // Attempt to parse the date string, trying ISO first then fallback.
+    DateTime? lessonDate;
+    if (dateRaw.isNotEmpty) {
+      lessonDate = DateTime.tryParse(dateRaw);
+      if (lessonDate == null) {
+        try {
+          lessonDate = DateFormat('dd MMM yyyy').parse(dateRaw);
+        } catch (_) {
+          lessonDate = null;
+        }
       }
     }
-  }
 
-  // Determine whether the lesson is today, in the past, or upcoming.
-  final DateTime now       = DateTime.now();
-  final DateTime todayOnly = DateTime(now.year, now.month, now.day);
-  bool isToday = false;
-  bool isPast  = false;
-  if (lessonDate != null) {
-    final DateTime lessonOnly = DateTime(lessonDate.year, lessonDate.month, lessonDate.day);
-    isToday = lessonOnly == todayOnly;
-    isPast  = lessonOnly.isBefore(todayOnly) && lesson["is_done"] == false;
-  }
-
-  // Build a display string for the date/time, with color coding.
-  String dateTimeStr;
-  Color dateTextColor = Colors.black54;
-  if (lessonDate != null) {
-    if (isPast) {
-      dateTimeStr    = '$dateRaw at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
-      dateTextColor = Colors.red;
-    } else if (isToday) {
-      dateTimeStr    = 'Today at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
-      dateTextColor = Colors.orange;
-    } else {
-      dateTimeStr    = '$dateRaw at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
+    // Determine whether the lesson is today, in the past, or upcoming.
+    final DateTime now = DateTime.now();
+    final DateTime todayOnly = DateTime(now.year, now.month, now.day);
+    bool isToday = false;
+    bool isPast = false;
+    if (lessonDate != null) {
+      final DateTime lessonOnly =
+          DateTime(lessonDate.year, lessonDate.month, lessonDate.day);
+      isToday = lessonOnly == todayOnly;
+      isPast = lessonOnly.isBefore(todayOnly) && lesson["is_done"] == false;
     }
-  } else {
-    dateTimeStr = 'Unknown';
-  }
 
-  return InkWell(
-    onTap: () => showLessonCardOptions(context, lesson),
-    child: Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
+    // Build a display string for the date/time, with color coding.
+    String dateTimeStr;
+    Color dateTextColor = Colors.black54;
+    if (lessonDate != null) {
+      if (isPast) {
+        dateTimeStr = '$dateRaw at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
+        dateTextColor = Colors.red;
+      } else if (isToday) {
+        dateTimeStr = 'Today at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
+        dateTextColor = Colors.orange;
+      } else {
+        dateTimeStr = '$dateRaw at ${startRaw.isNotEmpty ? startRaw : 'TBD'}';
+      }
+    } else {
+      dateTimeStr = 'Unknown';
+    }
 
-            // Calendar or report icon.
-            InkWell(
-              onTap: () async {
-                if (isLastLesson) {
-                  handleLessonReport(context, lesson);
-                } else if ((unschedulableLessons ?? [])
-                    .contains(lesson['lesson_id']?.toString() ?? '')) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("Reschedule Unavailable"),
-                      content: const Text("The reschedule period has passed!"),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text("OK"),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (isGroup) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("Scheduling Unavailable"),
-                      content: const Text(
-                          "To change the schedule of a group lesson, please contact the school."),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text("OK"),
-                        )
-                      ],
-                    ),
-                  );
-                } else {
-                  // 2) open your scheduling modal (returns bool)
-                  final didSchedule = await showScheduleLessonModal(
-                    context,    // ← still use the outer context here
-                    lesson,
-                  );
+    return InkWell(
+      onTap: () => showLessonCardOptions(context, lesson),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
 
-                  if (didSchedule) {
-                    final homeProv = context.read<HomePageProvider>();
-                    homeProv.fetchData();
-                    // 2) immediately give the user feedback
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Lesson scheduled!")),
-                    );
-                  }
-                }
-              },
-              child: SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(
-                  isLastLesson ? Icons.article : Icons.calendar_today,
-                  size: 28,
-                  color: Colors.orange,
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 16),
-
-            // Main column with text info.
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    studentName,
-                    style: GoogleFonts.lato(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  if (subjectName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subjectName,
-                      style: GoogleFonts.lato(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black54,
+              // Calendar or report icon.
+              InkWell(
+                onTap: () async {
+                  if (isLastLesson) {
+                    handleLessonReport(context, lesson);
+                  } else if ((unschedulableLessons ?? [])
+                      .contains(lesson['lesson_id']?.toString() ?? '')) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Reschedule Unavailable"),
+                        content:
+                            const Text("The reschedule period has passed!"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    dateTimeStr,
-                    style: GoogleFonts.lato(
-                      fontSize: 14,
-                      color: dateTextColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                    );
+                  } else if (isGroup) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Scheduling Unavailable"),
+                        content: const Text(
+                            "To change the schedule of a group lesson, please contact the school."),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("OK"),
+                          )
+                        ],
+                      ),
+                    );
+                  } else {
+                    // 2) open your scheduling modal (returns bool)
+                    final didSchedule = await showScheduleLessonModal(
+                      context, // ← still use the outer context here
+                      lesson,
+                    );
 
-            // Group/person icon and details button.
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isGroup ? Icons.groups : Icons.person,
-                  size: 20,
-                  color: Colors.grey,
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => showLessonDetailsModal(context, lesson),
-                  child: const Icon(
-                    Icons.more_vert,
+                    if (didSchedule) {
+                      final homeProv = context.read<HomePageProvider>();
+                      homeProv.fetchData();
+                      // 2) immediately give the user feedback
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Lesson scheduled!")),
+                      );
+                    }
+                  }
+                },
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    isLastLesson ? Icons.article : Icons.calendar_today,
                     size: 28,
                     color: Colors.orange,
                   ),
                 ),
-              ],
-            ),
+              ),
 
-            const SizedBox(width: 8),
-          ],
+              const SizedBox(width: 16),
+
+              // Main column with text info.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      studentName,
+                      style: GoogleFonts.lato(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    if (subjectName.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subjectName,
+                        style: GoogleFonts.lato(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      dateTimeStr,
+                      style: GoogleFonts.lato(
+                        fontSize: 14,
+                        color: dateTextColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Group/person icon and details button.
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isGroup ? Icons.groups : Icons.person,
+                    size: 20,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => showLessonDetailsModal(context, lesson),
+                    child: const Icon(
+                      Icons.more_vert,
+                      size: 28,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 8),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}}
+    );
+  }
+}

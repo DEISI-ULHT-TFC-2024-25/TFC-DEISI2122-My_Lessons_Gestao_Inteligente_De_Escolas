@@ -74,6 +74,10 @@ class _HomePageState extends State<HomePage>
     super.initState();
     registerFcmTokenIfNeeded();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HomePageProvider>().fetchData();
+    });
+
     _headerAnimationController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
 
@@ -88,6 +92,8 @@ class _HomePageState extends State<HomePage>
         });
       }
     });
+
+
 
     _lessonsScrollController.addListener(() {
       if (_lessonsScrollController.offset > 50 && _showToggleRow) {
