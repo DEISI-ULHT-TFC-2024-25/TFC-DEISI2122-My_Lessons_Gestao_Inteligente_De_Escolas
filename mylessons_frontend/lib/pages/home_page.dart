@@ -10,12 +10,15 @@ import 'package:intl/intl.dart';
 import 'package:mylessons_frontend/modals/lesson_details_modal.dart';
 import 'package:mylessons_frontend/modals/pack_details_modal.dart';
 import 'package:mylessons_frontend/modals/schedule_multiple_lessons_modal.dart';
+import 'package:mylessons_frontend/pages/school_details_page.dart';
 import 'package:mylessons_frontend/providers/pack_details_provider.dart';
 import 'package:mylessons_frontend/widgets/handle_lesson_report.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../providers/school_provider.dart';
+import '../widgets/school_card.dart';
 import 'profile_completion_page.dart';
 import '../providers/lessons_modal_provider.dart';
 import '../services/api_service.dart';
@@ -92,8 +95,6 @@ class _HomePageState extends State<HomePage>
         });
       }
     });
-
-
 
     _lessonsScrollController.addListener(() {
       if (_lessonsScrollController.offset > 50 && _showToggleRow) {
@@ -220,8 +221,7 @@ class _HomePageState extends State<HomePage>
         parentContext: context,
         lessons: lessons,
         unschedulableLessons:
-            context.read<HomePageProvider>()
-                .unschedulableLessons,
+            context.read<HomePageProvider>().unschedulableLessons,
         expirationDate: expirationDate,
         currentRole: context.read<HomePageProvider>().currentRole,
         schoolScheduleTimeLimit: timeLimit,
@@ -577,6 +577,79 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  Widget _buildSchoolsCarousel() {
+    final provider = context.watch<SchoolProvider>();
+    final schools = provider.filteredSchools;
+    if (schools.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card header, just like your Today cards
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: const BoxDecoration(
+              color: Colors.orange,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: const Text(
+              'Explore Schools',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          // Inner carousel, identical to what you already had
+          SizedBox(
+            height: 190,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              itemCount: schools.length,
+              itemBuilder: (ctx, idx) {
+                final school = schools[idx];
+                return Container(
+                  width: 260,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Stack(
+                    children: [
+                      SchoolCard(
+                        school: school,
+                        provider: provider,
+                      ),
+                      // fill the entire 260×190 area
+                      Positioned.fill(
+                        child: Material(
+                          color: Colors.transparent, // no visual change
+                          child: InkWell(
+                            onTap: () {
+                              provider.selectSchool(school);
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/main',
+                                    (route) => false,
+                                arguments: {'initialIndex': 1},
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildToggleRowForLessons() {
     return AnimatedOpacity(
       opacity: _showToggleRow ? 1.0 : 0.0,
@@ -663,14 +736,10 @@ class _HomePageState extends State<HomePage>
                 onPressed: () {
                   if (_lessonsActiveTabIndex == 0) {
                     _showLessonFilterModal(
-                        true,
-                        context.read<HomePageProvider>()
-                            .upcomingLessons);
+                        true, context.read<HomePageProvider>().upcomingLessons);
                   } else {
                     _showLessonFilterModal(
-                        false,
-                        context.read<HomePageProvider>()
-                            .lastLessons);
+                        false, context.read<HomePageProvider>().lastLessons);
                   }
                 },
               ),
@@ -764,14 +833,10 @@ class _HomePageState extends State<HomePage>
                 onPressed: () {
                   if (_packsActiveTabIndex == 0) {
                     _showPackFilterModal(
-                        true,
-                        context.read<HomePageProvider>()
-                            .activePacks);
+                        true, context.read<HomePageProvider>().activePacks);
                   } else {
                     _showPackFilterModal(
-                        false,
-                        context.read<HomePageProvider>()
-                            .lastPacks);
+                        false, context.read<HomePageProvider>().lastPacks);
                   }
                 },
               ),
@@ -1130,14 +1195,12 @@ class _HomePageState extends State<HomePage>
           label,
           color,
           items.map((lesson) {
-            return context.read<LessonModalProvider>()
-                .buildLessonCard(
-              context,
-              lesson,
-              context.read<PackDetailsProvider>()
-                  .unschedulableLessons,
-              isLastLesson: false,
-            );
+            return context.read<LessonModalProvider>().buildLessonCard(
+                  context,
+                  lesson,
+                  context.read<PackDetailsProvider>().unschedulableLessons,
+                  isLastLesson: false,
+                );
           }).toList(),
         ),
         if (hasMore)
@@ -1206,384 +1269,387 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     return Consumer<HomePageProvider>(
       builder: (context, homeProvider, child) {
-          if (!homeProvider.isLoading && homeProvider.currentRole.isEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              await storage.delete(key: 'auth_token');
-              Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
-            });
-          } else if (!homeProvider.isLoading &&
-              !_didNavigateToProfile &&
-              (homeProvider.firstName.isEmpty ||
-                  homeProvider.lastName.isEmpty ||
-                  homeProvider.phone.isEmpty)) {
-            _didNavigateToProfile = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ProfileCompletionPage(
-                    initialFirstName: homeProvider.firstName,
-                    initialLastName: homeProvider.lastName,
-                    initialPhone: homeProvider.phone,
-                    initialCountryCode: homeProvider.countryCode,
-                  ),
+        if (!homeProvider.isLoading && homeProvider.currentRole.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await storage.delete(key: 'auth_token');
+            Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
+          });
+        } else if (!homeProvider.isLoading &&
+            !_didNavigateToProfile &&
+            (homeProvider.firstName.isEmpty ||
+                homeProvider.lastName.isEmpty ||
+                homeProvider.phone.isEmpty)) {
+          _didNavigateToProfile = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ProfileCompletionPage(
+                  initialFirstName: homeProvider.firstName,
+                  initialLastName: homeProvider.lastName,
+                  initialPhone: homeProvider.phone,
+                  initialCountryCode: homeProvider.countryCode,
                 ),
-              );
-            });
-          }
+              ),
+            );
+          });
+        }
 
-          // ——————————————————————————————————————
-          // Build Lessons Tab.
-          Widget lessonsTab = _lessonsActiveTabIndex == 0
-              ? RefreshIndicator(
-                  color: Colors.orange,
-                  backgroundColor: Colors.white,
-                  onRefresh: () async {
-                    await homeProvider.fetchData();
-                  },
-                  child: SingleChildScrollView(
-                    controller: _lessonsScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        // Moved toggle row inside the scrollable content.
-                        _buildToggleRowForLessons(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: homeProvider.isLoading
-                              ? Column(
-                                  children: List.generate(
-                                      3, (index) => _buildLoadingCard()),
-                                )
-                              : Builder(builder: (context) {
-                                  // Retrieve the filtered active lessons list.
-                                  final activeLessons = _filterLessons(
-                                    homeProvider.upcomingLessons,
-                                    upcomingSearchQuery,
-                                    upcomingFilters,
-                                  );
+        // ——————————————————————————————————————
+        // Build Lessons Tab.
+        Widget lessonsTab = _lessonsActiveTabIndex == 0
+            ? RefreshIndicator(
+                color: Colors.orange,
+                backgroundColor: Colors.white,
+                onRefresh: () => homeProvider.fetchData(),
+                child: ListView(
+                  controller: _lessonsScrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 8,
+                    bottom: MediaQuery.of(context).padding.bottom +
+                        kBottomNavigationBarHeight,
+                  ),
+                  children: [
+                    // Moved toggle row inside the scrollable content.
+                    _buildToggleRowForLessons(),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: homeProvider.isLoading
+                          ? Column(
+                              children: List.generate(
+                                  3, (index) => _buildLoadingCard()),
+                            )
+                          : Builder(builder: (context) {
+                              // Retrieve the filtered active lessons list.
+                              final activeLessons = _filterLessons(
+                                homeProvider.upcomingLessons,
+                                upcomingSearchQuery,
+                                upcomingFilters,
+                              );
 
-                                  // 1. filter each bucket separately
-                                  final todayList = _filterLessons(
-                                    homeProvider.todayLessons,
-                                    upcomingSearchQuery,
-                                    upcomingFilters,
-                                  );
-                                  final needRescheduleList = _filterLessons(
-                                    homeProvider.needRescheduleLessons,
-                                    upcomingSearchQuery,
-                                    upcomingFilters,
-                                  );
-                                  final upcomingList = _filterLessons(
-                                    homeProvider.upcomingLessons,
-                                    upcomingSearchQuery,
-                                    upcomingFilters,
-                                  );
+                              // 1. filter each bucket separately
+                              final todayList = _filterLessons(
+                                homeProvider.todayLessons,
+                                upcomingSearchQuery,
+                                upcomingFilters,
+                              );
+                              final needRescheduleList = _filterLessons(
+                                homeProvider.needRescheduleLessons,
+                                upcomingSearchQuery,
+                                upcomingFilters,
+                              );
+                              final upcomingList = _filterLessons(
+                                homeProvider.upcomingLessons,
+                                upcomingSearchQuery,
+                                upcomingFilters,
+                              );
 
-                                  List<Widget> sections = [];
+                              List<Widget> sections = [];
 
 // Today:
-                                  // Today:
-                                  sections.add(_buildGroupWithLoadMore(
-                                    label: 'Today',
-                                    items: todayList,
-                                    color: Colors.orange,
-                                    hasMore: homeProvider.hasMoreToday,
-                                    onLoadMore: () => homeProvider
-                                        .fetchUpcomingLessons(bucket: 'today'),
-                                  ));
+                              // Today:
+                              sections.add(_buildGroupWithLoadMore(
+                                label: 'Today',
+                                items: todayList,
+                                color: Colors.orange,
+                                hasMore: homeProvider.hasMoreToday,
+                                onLoadMore: () => homeProvider
+                                    .fetchUpcomingLessons(bucket: 'today'),
+                              ));
 
-                                  // Need Reschedule:
-                                  sections.add(_buildGroupWithLoadMore(
-                                    label: 'Need Reschedule',
-                                    items: needRescheduleList,
-                                    color: Colors.red,
-                                    hasMore: homeProvider.hasMoreReschedule,
-                                    onLoadMore: () =>
-                                        homeProvider.fetchUpcomingLessons(
-                                            bucket: 'reschedule'),
-                                  ));
+                              // Need Reschedule:
+                              sections.add(_buildGroupWithLoadMore(
+                                label: 'Need Reschedule',
+                                items: needRescheduleList,
+                                color: Colors.red,
+                                hasMore: homeProvider.hasMoreReschedule,
+                                onLoadMore: () => homeProvider
+                                    .fetchUpcomingLessons(bucket: 'reschedule'),
+                              ));
 
-                                  // Upcoming:
-                                  sections.add(_buildGroupWithLoadMore(
-                                    label: 'Upcoming',
-                                    items: upcomingList,
-                                    color: Colors.grey,
-                                    hasMore: homeProvider.hasMoreUpcoming,
-                                    onLoadMore: () =>
-                                        homeProvider.fetchUpcomingLessons(
-                                            bucket: 'upcoming'),
-                                  ));
+                              // Upcoming:
+                              sections.add(_buildGroupWithLoadMore(
+                                label: 'Upcoming',
+                                items: upcomingList,
+                                color: Colors.grey,
+                                hasMore: homeProvider.hasMoreUpcoming,
+                                onLoadMore: () => homeProvider
+                                    .fetchUpcomingLessons(bucket: 'upcoming'),
+                              ));
 
-                                  return Column(children: sections);
-                                }),
-                        ),
-                      ],
+                              return Column(children: sections);
+                            }),
                     ),
-                  ),
-                )
-              // inside the “History” branch of your lessonsTab:
-              : RefreshIndicator(
-                  color: Colors.orange,
-                  backgroundColor: Colors.white,
-                  onRefresh: () async => await homeProvider.fetchData(),
-                  child: SingleChildScrollView(
-                    controller: _lessonsScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildToggleRowForLessons(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: homeProvider.isLoading
-                              ? Column(
-                                  children: List.generate(
-                                      3, (_) => _buildLoadingCard()),
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // your list of history lesson cards
-                                    ..._filterLessons(
-                                      homeProvider.lastLessons,
-                                      lastLessonsSearchQuery,
-                                      lastLessonsFilters,
-                                    ).map((lesson) =>
-                                        context.read<LessonModalProvider>(
-                                        ).buildLessonCard(
-                                          context,
-                                          lesson,
-                                          context.read<PackDetailsProvider>(
-                                                  )
-                                              .unschedulableLessons,
-                                          isLastLesson: true,
-                                        )),
-                                    // load more button + spinner
-                                    if (homeProvider.hasMoreLastLessons)
-                                      Center(
-                                        child: TextButton(
-                                          onPressed: _isLoadingHistory
-                                              ? null
-                                              : () async {
-                                                  setState(() =>
-                                                      _isLoadingHistory = true);
-                                                  await homeProvider
-                                                      .fetchLastLessons(
-                                                          loadMore: true);
-                                                  setState(() =>
-                                                      _isLoadingHistory =
-                                                          false);
-                                                },
-                                          child: _isLoadingHistory
-                                              ? SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Colors.orange,
-                                                  ),
-                                                )
-                                              : const Text(
-                                                  'Load more history lessons'),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-
-          // Build Packs Tab.
-          Widget packsTab = _packsActiveTabIndex == 0
-              // Active Packs
-              ? RefreshIndicator(
-                  color: Colors.orange,
-                  backgroundColor: Colors.white,
-                  onRefresh: () async => await homeProvider.fetchData(),
-                  child: SingleChildScrollView(
-                    controller: _packsScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildToggleRowForPacks(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: homeProvider.isLoading
-                              ? Column(
-                                  children: List.generate(
-                                      3, (_) => _buildLoadingCard()),
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // your list of active pack cards
-                                    ..._filterPacks(
-                                      homeProvider.activePacks,
-                                      activePacksSearchQuery,
-                                      activePacksFilters,
-                                    ).map((pack) => _buildPackCard(pack)),
-                                    // load more button + spinner
-                                    if (homeProvider.hasMoreActivePacks)
-                                      Center(
-                                        child: TextButton(
-                                          onPressed: _isLoadingActivePacks
-                                              ? null
-                                              : () async {
-                                                  setState(() =>
-                                                      _isLoadingActivePacks =
-                                                          true);
-                                                  await homeProvider
-                                                      .fetchActivePacks(
-                                                          loadMore: true);
-                                                  setState(() =>
-                                                      _isLoadingActivePacks =
-                                                          false);
-                                                },
-                                          child: _isLoadingActivePacks
-                                              ? SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Colors.orange,
-                                                  ),
-                                                )
-                                              : const Text(
-                                                  'Load more active packs'),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              // Last (Historical) Packs
-              : RefreshIndicator(
-                  color: Colors.orange,
-                  backgroundColor: Colors.white,
-                  onRefresh: () async => await homeProvider.fetchData(),
-                  child: SingleChildScrollView(
-                    controller: _packsScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildToggleRowForPacks(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: homeProvider.isLoading
-                              ? Column(
-                                  children: List.generate(
-                                      3, (_) => _buildLoadingCard()),
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // your list of completed pack cards
-                                    ..._filterPacks(
-                                      homeProvider.lastPacks,
-                                      lastPacksSearchQuery,
-                                      lastPacksFilters,
-                                    ).map((pack) => _buildPackCard(pack)),
-                                    // load more button + spinner
-                                    if (homeProvider.hasMoreLastPacks)
-                                      Center(
-                                        child: TextButton(
-                                          onPressed: _isLoadingLastPacks
-                                              ? null
-                                              : () async {
-                                                  setState(() =>
-                                                      _isLoadingLastPacks =
-                                                          true);
-                                                  await homeProvider
-                                                      .fetchLastPacks(
-                                                          loadMore: true);
-                                                  setState(() =>
-                                                      _isLoadingLastPacks =
-                                                          false);
-                                                },
-                                          child: _isLoadingLastPacks
-                                              ? SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Colors.orange,
-                                                  ),
-                                                )
-                                              : const Text(
-                                                  'Load more completed packs'),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-
-          // Build Stats Tab.
-          Widget statsTab = (homeProvider.currentRole == "Admin" ||
-                  homeProvider.currentRole == "Instructor")
-              ? homeProvider.isLoading
-                  ? _buildStatsSkeleton()
-                  : (homeProvider.currentRole == "Admin"
-                      ? _buildAdminStats(homeProvider)
-                      : _buildInstructorStats(homeProvider))
-              : _buildNoStats();
-
-          return Scaffold(
-            body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 12.0),
-                child: Column(
-                  children: [
-                    _buildHeader(homeProvider),
-                    Expanded(
-                      child: DefaultTabController(
-                        length: 3,
-                        child: Column(
-                          children: [
-                            TabBar(
-                              labelColor: Colors.orange,
-                              unselectedLabelColor: Colors.grey,
-                              tabs: const [
-                                Tab(text: "Lessons"),
-                                Tab(text: "Packs"),
-                                Tab(text: "Stats"),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: Builder(
-                                builder: (scaffoldCtx) {
-                                  return TabBarView(
-                                    children: [
-                                      lessonsTab,
-                                      packsTab,
-                                      statsTab,
-                                    ],
-                                  );
-                                }
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    if (homeProvider.currentRole == "Parent")
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8), // ← only left & right
+                      child: _buildSchoolsCarousel(),
                     ),
                   ],
                 ),
+              )
+            // inside the “History” branch of your lessonsTab:
+            : RefreshIndicator(
+                color: Colors.orange,
+                backgroundColor: Colors.white,
+                onRefresh: () => homeProvider.fetchData(),
+                child: ListView(
+                  controller: _lessonsScrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 8,
+                    bottom: MediaQuery.of(context).padding.bottom +
+                        kBottomNavigationBarHeight,
+                  ),
+                  children: [
+                    _buildToggleRowForLessons(),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: homeProvider.isLoading
+                          ? Column(
+                              children:
+                                  List.generate(3, (_) => _buildLoadingCard()),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // your list of history lesson cards
+                                ..._filterLessons(
+                                  homeProvider.lastLessons,
+                                  lastLessonsSearchQuery,
+                                  lastLessonsFilters,
+                                ).map((lesson) => context
+                                    .read<LessonModalProvider>()
+                                    .buildLessonCard(
+                                      context,
+                                      lesson,
+                                      context
+                                          .read<PackDetailsProvider>()
+                                          .unschedulableLessons,
+                                      isLastLesson: true,
+                                    )),
+                                // load more button + spinner
+                                if (homeProvider.hasMoreLastLessons)
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: _isLoadingHistory
+                                          ? null
+                                          : () async {
+                                              setState(() =>
+                                                  _isLoadingHistory = true);
+                                              await homeProvider
+                                                  .fetchLastLessons(
+                                                      loadMore: true);
+                                              setState(() =>
+                                                  _isLoadingHistory = false);
+                                            },
+                                      child: _isLoadingHistory
+                                          ? SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.orange,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Load more history lessons'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+              );
+
+        // Build Packs Tab.
+        Widget packsTab = _packsActiveTabIndex == 0
+            // Active Packs
+            ? RefreshIndicator(
+                color: Colors.orange,
+                backgroundColor: Colors.white,
+                onRefresh: () => homeProvider.fetchData(),
+                child: ListView(
+                  controller: _packsScrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 8,
+                    bottom: MediaQuery.of(context).padding.bottom +
+                        kBottomNavigationBarHeight,
+                  ),
+                  children: [
+                    _buildToggleRowForPacks(),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: homeProvider.isLoading
+                          ? Column(
+                              children:
+                                  List.generate(3, (_) => _buildLoadingCard()),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // your list of active pack cards
+                                ..._filterPacks(
+                                  homeProvider.activePacks,
+                                  activePacksSearchQuery,
+                                  activePacksFilters,
+                                ).map((pack) => _buildPackCard(pack)),
+                                // load more button + spinner
+                                if (homeProvider.hasMoreActivePacks)
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: _isLoadingActivePacks
+                                          ? null
+                                          : () async {
+                                              setState(() =>
+                                                  _isLoadingActivePacks = true);
+                                              await homeProvider
+                                                  .fetchActivePacks(
+                                                      loadMore: true);
+                                              setState(() =>
+                                                  _isLoadingActivePacks =
+                                                      false);
+                                            },
+                                      child: _isLoadingActivePacks
+                                          ? SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.orange,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Load more active packs'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+              )
+            // Last (Historical) Packs
+            : RefreshIndicator(
+                color: Colors.orange,
+                backgroundColor: Colors.white,
+                onRefresh: () => homeProvider.fetchData(),
+                child: ListView(
+                  controller: _packsScrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 8,
+                    bottom: MediaQuery.of(context).padding.bottom +
+                        kBottomNavigationBarHeight,
+                  ),
+                  children: [
+                    _buildToggleRowForPacks(),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: homeProvider.isLoading
+                          ? Column(
+                              children:
+                                  List.generate(3, (_) => _buildLoadingCard()),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // your list of completed pack cards
+                                ..._filterPacks(
+                                  homeProvider.lastPacks,
+                                  lastPacksSearchQuery,
+                                  lastPacksFilters,
+                                ).map((pack) => _buildPackCard(pack)),
+                                // load more button + spinner
+                                if (homeProvider.hasMoreLastPacks)
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: _isLoadingLastPacks
+                                          ? null
+                                          : () async {
+                                              setState(() =>
+                                                  _isLoadingLastPacks = true);
+                                              await homeProvider.fetchLastPacks(
+                                                  loadMore: true);
+                                              setState(() =>
+                                                  _isLoadingLastPacks = false);
+                                            },
+                                      child: _isLoadingLastPacks
+                                          ? SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.orange,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Load more completed packs'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+              );
+
+        // Build Stats Tab.
+        Widget statsTab = (homeProvider.currentRole == "Admin" ||
+                homeProvider.currentRole == "Instructor")
+            ? homeProvider.isLoading
+                ? _buildStatsSkeleton()
+                : (homeProvider.currentRole == "Admin"
+                    ? _buildAdminStats(homeProvider)
+                    : _buildInstructorStats(homeProvider))
+            : _buildNoStats();
+
+        return Scaffold(
+          body: SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Column(
+                children: [
+                  _buildHeader(homeProvider),
+                  Expanded(
+                    child: DefaultTabController(
+                      length: 3,
+                      child: Column(
+                        children: [
+                          TabBar(
+                            labelColor: Colors.orange,
+                            unselectedLabelColor: Colors.grey,
+                            tabs: const [
+                              Tab(text: "Lessons"),
+                              Tab(text: "Packs"),
+                              Tab(text: "Stats"),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Builder(builder: (scaffoldCtx) {
+                              return TabBarView(
+                                children: [
+                                  lessonsTab,
+                                  packsTab,
+                                  statsTab,
+                                ],
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-
-    );}
+          ),
+        );
+      },
+    );
+  }
 }
