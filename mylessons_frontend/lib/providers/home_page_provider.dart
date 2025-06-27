@@ -63,7 +63,6 @@ class HomePageProvider extends ChangeNotifier {
 
   HomePageProvider() {
     setInitialDate();
-    fetchData();
   }
 
   void setInitialDate() {
